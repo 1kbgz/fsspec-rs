@@ -1,0 +1,21 @@
+fsspec_rs
+=========
+
+.. py:module:: fsspec_rs
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   fsspec_rs.__version__
+
+
+Package Contents
+----------------
+
+.. py:data:: __version__
+   :value: '0.1.0'
+
+
