@@ -1,0 +1,12 @@
+# Changes here will be overwritten by Copier
+_commit: 28c66e4
+_src_path: https://github.com/python-project-templates/base.git
+add_docs: true
+add_extension: rust
+add_wiki: false
+email: dev@1kbgz.com
+github: 1kbgz
+project_description: fsspec-compatible backends with Rust accleration
+project_name: fsspec-rs
+python_version_primary: '3.11'
+team: the fsspec-rs authors
