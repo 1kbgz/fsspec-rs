@@ -3,6 +3,11 @@ fsspec_rs
 
 .. py:module:: fsspec_rs
 
+.. autoapi-nested-parse::
+
+   fsspec-rs: fsspec-compatible backends with Rust acceleration.
+
+
 
 Attributes
 ----------

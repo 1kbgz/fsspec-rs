@@ -242,13 +242,20 @@
         <article role="main" id="furo-main-content">
           <section id="module-test_all">
 <span id="test-all"></span><h1>test_all<a class="headerlink" href="#module-test_all" title="Link to this heading">¶</a></h1>
-<section id="functions">
-<h2>Functions<a class="headerlink" href="#functions" title="Link to this heading">¶</a></h2>
+<p>Tests for fsspec_rs core types exposed via PyO3.</p>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">¶</a></h2>
 <div class="table-wrapper autosummary longtable docutils container">
 <table class="autosummary longtable docutils align-default">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#test_all.test_all" title="test_all.test_all"><code class="xref py py-obj docutils literal notranslate"><span class="pre">test_all</span></code></a>()</p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#test_all.TestVersion" title="test_all.TestVersion"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TestVersion</span></code></a></p></td>
+<td><p>Test that the package version is accessible.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#test_all.TestFileType" title="test_all.TestFileType"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TestFileType</span></code></a></p></td>
+<td><p>Test the FileType enum exposed from Rust.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#test_all.TestFileInfo" title="test_all.TestFileInfo"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TestFileInfo</span></code></a></p></td>
+<td><p>Test the FileInfo struct exposed from Rust.</p></td>
 </tr>
 </tbody>
 </table>
@@ -256,10 +263,143 @@
 </section>
 <section id="module-contents">
 <h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading">¶</a></h2>
-<dl class="py function">
-<dt class="sig sig-object py" id="test_all.test_all">
-<span class="sig-prename descclassname"><span class="pre">test_all.</span></span><span class="sig-name descname"><span class="pre">test_all</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.test_all" title="Link to this definition">¶</a></dt>
+<dl class="py class">
+<dt class="sig sig-object py" id="test_all.TestVersion">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">test_all.</span></span><span class="sig-name descname"><span class="pre">TestVersion</span></span><a class="headerlink" href="#test_all.TestVersion" title="Link to this definition">¶</a></dt>
+<dd><p>Test that the package version is accessible.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestVersion.test_version_exists">
+<span class="sig-name descname"><span class="pre">test_version_exists</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestVersion.test_version_exists" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestVersion.test_version_is_string">
+<span class="sig-name descname"><span class="pre">test_version_is_string</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestVersion.test_version_is_string" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="test_all.TestFileType">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">test_all.</span></span><span class="sig-name descname"><span class="pre">TestFileType</span></span><a class="headerlink" href="#test_all.TestFileType" title="Link to this definition">¶</a></dt>
+<dd><p>Test the FileType enum exposed from Rust.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileType.test_file_type_file">
+<span class="sig-name descname"><span class="pre">test_file_type_file</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileType.test_file_type_file" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileType.test_file_type_directory">
+<span class="sig-name descname"><span class="pre">test_file_type_directory</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileType.test_file_type_directory" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileType.test_file_type_other">
+<span class="sig-name descname"><span class="pre">test_file_type_other</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileType.test_file_type_other" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileType.test_file_type_str">
+<span class="sig-name descname"><span class="pre">test_file_type_str</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileType.test_file_type_str" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileType.test_file_type_repr">
+<span class="sig-name descname"><span class="pre">test_file_type_repr</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileType.test_file_type_repr" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileType.test_file_type_eq">
+<span class="sig-name descname"><span class="pre">test_file_type_eq</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileType.test_file_type_eq" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileType.test_file_type_directory_repr">
+<span class="sig-name descname"><span class="pre">test_file_type_directory_repr</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileType.test_file_type_directory_repr" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileType.test_file_type_other_repr">
+<span class="sig-name descname"><span class="pre">test_file_type_other_repr</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileType.test_file_type_other_repr" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="test_all.TestFileInfo">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">test_all.</span></span><span class="sig-name descname"><span class="pre">TestFileInfo</span></span><a class="headerlink" href="#test_all.TestFileInfo" title="Link to this definition">¶</a></dt>
+<dd><p>Test the FileInfo struct exposed from Rust.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_creation">
+<span class="sig-name descname"><span class="pre">test_file_info_creation</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_creation" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_defaults">
+<span class="sig-name descname"><span class="pre">test_file_info_defaults</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_defaults" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_directory">
+<span class="sig-name descname"><span class="pre">test_file_info_directory</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_directory" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_file">
+<span class="sig-name descname"><span class="pre">test_file_info_file</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_file" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_str">
+<span class="sig-name descname"><span class="pre">test_file_info_str</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_str" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_repr">
+<span class="sig-name descname"><span class="pre">test_file_info_repr</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_repr" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_eq">
+<span class="sig-name descname"><span class="pre">test_file_info_eq</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_eq" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_neq_name">
+<span class="sig-name descname"><span class="pre">test_file_info_neq_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_neq_name" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_neq_size">
+<span class="sig-name descname"><span class="pre">test_file_info_neq_size</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_neq_size" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_neq_type">
+<span class="sig-name descname"><span class="pre">test_file_info_neq_type</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_neq_type" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_to_dict">
+<span class="sig-name descname"><span class="pre">test_file_info_to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_to_dict" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_to_dict_directory">
+<span class="sig-name descname"><span class="pre">test_file_info_to_dict_directory</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_to_dict_directory" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_invalid_type">
+<span class="sig-name descname"><span class="pre">test_file_info_invalid_type</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_invalid_type" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="test_all.TestFileInfo.test_file_info_other_type">
+<span class="sig-name descname"><span class="pre">test_file_info_other_type</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#test_all.TestFileInfo.test_file_info_other_type" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
 
 </section>
 </section>
@@ -320,9 +460,41 @@
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">test_all</a><ul>
-<li><a class="reference internal" href="#functions">Functions</a></li>
+<li><a class="reference internal" href="#classes">Classes</a></li>
 <li><a class="reference internal" href="#module-contents">Module Contents</a><ul>
-<li><a class="reference internal" href="#test_all.test_all"><code class="docutils literal notranslate"><span class="pre">test_all()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestVersion"><code class="docutils literal notranslate"><span class="pre">TestVersion</span></code></a><ul>
+<li><a class="reference internal" href="#test_all.TestVersion.test_version_exists"><code class="docutils literal notranslate"><span class="pre">TestVersion.test_version_exists()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestVersion.test_version_is_string"><code class="docutils literal notranslate"><span class="pre">TestVersion.test_version_is_string()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#test_all.TestFileType"><code class="docutils literal notranslate"><span class="pre">TestFileType</span></code></a><ul>
+<li><a class="reference internal" href="#test_all.TestFileType.test_file_type_file"><code class="docutils literal notranslate"><span class="pre">TestFileType.test_file_type_file()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileType.test_file_type_directory"><code class="docutils literal notranslate"><span class="pre">TestFileType.test_file_type_directory()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileType.test_file_type_other"><code class="docutils literal notranslate"><span class="pre">TestFileType.test_file_type_other()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileType.test_file_type_str"><code class="docutils literal notranslate"><span class="pre">TestFileType.test_file_type_str()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileType.test_file_type_repr"><code class="docutils literal notranslate"><span class="pre">TestFileType.test_file_type_repr()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileType.test_file_type_eq"><code class="docutils literal notranslate"><span class="pre">TestFileType.test_file_type_eq()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileType.test_file_type_directory_repr"><code class="docutils literal notranslate"><span class="pre">TestFileType.test_file_type_directory_repr()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileType.test_file_type_other_repr"><code class="docutils literal notranslate"><span class="pre">TestFileType.test_file_type_other_repr()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#test_all.TestFileInfo"><code class="docutils literal notranslate"><span class="pre">TestFileInfo</span></code></a><ul>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_creation"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_creation()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_defaults"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_defaults()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_directory"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_directory()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_file"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_file()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_str"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_str()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_repr"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_repr()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_eq"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_eq()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_neq_name"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_neq_name()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_neq_size"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_neq_size()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_neq_type"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_neq_type()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_to_dict"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_to_dict()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_to_dict_directory"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_to_dict_directory()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_invalid_type"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_invalid_type()</span></code></a></li>
+<li><a class="reference internal" href="#test_all.TestFileInfo.test_file_info_other_type"><code class="docutils literal notranslate"><span class="pre">TestFileInfo.test_file_info_other_type()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

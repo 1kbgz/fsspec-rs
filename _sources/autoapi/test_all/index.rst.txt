@@ -3,17 +3,109 @@ test_all
 
 .. py:module:: test_all
 
+.. autoapi-nested-parse::
 
-Functions
----------
+   Tests for fsspec_rs core types exposed via PyO3.
+
+
+
+Classes
+-------
 
 .. autoapisummary::
 
-   test_all.test_all
+   test_all.TestVersion
+   test_all.TestFileType
+   test_all.TestFileInfo
 
 
 Module Contents
 ---------------
 
-.. py:function:: test_all()
+.. py:class:: TestVersion
+
+   Test that the package version is accessible.
+
+
+   .. py:method:: test_version_exists()
+
+
+   .. py:method:: test_version_is_string()
+
+
+.. py:class:: TestFileType
+
+   Test the FileType enum exposed from Rust.
+
+
+   .. py:method:: test_file_type_file()
+
+
+   .. py:method:: test_file_type_directory()
+
+
+   .. py:method:: test_file_type_other()
+
+
+   .. py:method:: test_file_type_str()
+
+
+   .. py:method:: test_file_type_repr()
+
+
+   .. py:method:: test_file_type_eq()
+
+
+   .. py:method:: test_file_type_directory_repr()
+
+
+   .. py:method:: test_file_type_other_repr()
+
+
+.. py:class:: TestFileInfo
+
+   Test the FileInfo struct exposed from Rust.
+
+
+   .. py:method:: test_file_info_creation()
+
+
+   .. py:method:: test_file_info_defaults()
+
+
+   .. py:method:: test_file_info_directory()
+
+
+   .. py:method:: test_file_info_file()
+
+
+   .. py:method:: test_file_info_str()
+
+
+   .. py:method:: test_file_info_repr()
+
+
+   .. py:method:: test_file_info_eq()
+
+
+   .. py:method:: test_file_info_neq_name()
+
+
+   .. py:method:: test_file_info_neq_size()
+
+
+   .. py:method:: test_file_info_neq_type()
+
+
+   .. py:method:: test_file_info_to_dict()
+
+
+   .. py:method:: test_file_info_to_dict_directory()
+
+
+   .. py:method:: test_file_info_invalid_type()
+
+
+   .. py:method:: test_file_info_other_type()
+
 
