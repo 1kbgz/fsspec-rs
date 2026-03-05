@@ -11,12 +11,22 @@ pub mod error;
 pub mod file;
 pub mod types;
 
+mod async_fs;
 mod fs;
+mod local;
+mod s3;
 
+#[cfg(test)]
+mod local_tests;
+#[cfg(test)]
+mod s3_tests;
 #[cfg(test)]
 mod tests;
 
+pub use async_fs::AsyncFileSystem;
 pub use error::{FsError, FsResult};
 pub use file::FsFile;
 pub use fs::FileSystem;
+pub use local::{LocalFile, LocalFs};
+pub use s3::{S3Config, S3File, S3Fs};
 pub use types::{DuResult, FileInfo, FileType, OpenMode, OpenOptions, WalkEntry};

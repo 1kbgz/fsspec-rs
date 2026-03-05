@@ -126,7 +126,7 @@ impl FileSystem for MockFs {
         let path = path.trim_end_matches('/');
 
         // Check path exists as a dir
-        if !dirs.contains(&path.to_string()) && path != "/" && path != "" {
+        if !dirs.contains(&path.to_string()) && path != "/" && !path.is_empty() {
             return Err(FsError::NotFound(format!("directory not found: {path}")));
         }
 
@@ -161,10 +161,8 @@ impl FileSystem for MockFs {
         // Find direct child dirs that are in the dirs list
         for dir in dirs.iter() {
             if let Some(rest) = dir.strip_prefix(&prefix) {
-                if !rest.is_empty() && !rest.contains('/') {
-                    if seen.insert(dir.clone()) {
-                        results.push(FileInfo::directory(dir.clone()));
-                    }
+                if !rest.is_empty() && !rest.contains('/') && seen.insert(dir.clone()) {
+                    results.push(FileInfo::directory(dir.clone()));
                 }
             }
         }
@@ -177,7 +175,7 @@ impl FileSystem for MockFs {
         let mut store = self.store.lock().unwrap();
         store
             .remove(path)
-            .ok_or_else(|| FsError::NotFound(format!("{path}")))?;
+            .ok_or_else(|| FsError::NotFound(path.to_string()))?;
         Ok(())
     }
 
@@ -185,7 +183,7 @@ impl FileSystem for MockFs {
         let store = self.store.lock().unwrap();
         let data = store
             .get(src)
-            .ok_or_else(|| FsError::NotFound(format!("{src}")))?
+            .ok_or_else(|| FsError::NotFound(src.to_string()))?
             .clone();
         drop(store);
         let mut store = self.store.lock().unwrap();
@@ -205,7 +203,7 @@ impl FileSystem for MockFs {
                 let store = self.store.lock().unwrap();
                 let data = store
                     .get(path)
-                    .ok_or_else(|| FsError::NotFound(format!("{path}")))?
+                    .ok_or_else(|| FsError::NotFound(path.to_string()))?
                     .clone();
                 Ok(Box::new(MockFile {
                     name: path.to_string(),
@@ -261,7 +259,7 @@ impl FileSystem for MockFs {
                 return Ok(FileInfo::directory(path_clean));
             }
         }
-        Err(FsError::NotFound(format!("{path}")))
+        Err(FsError::NotFound(path.to_string()))
     }
 
     fn mkdir(&self, path: &str, create_parents: bool) -> FsResult<()> {
@@ -297,7 +295,7 @@ impl FileSystem for MockFs {
             dirs.remove(pos);
             Ok(())
         } else {
-            Err(FsError::NotFound(format!("{path}")))
+            Err(FsError::NotFound(path.to_string()))
         }
     }
 }

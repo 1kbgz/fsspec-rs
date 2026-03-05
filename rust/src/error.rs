@@ -96,14 +96,14 @@ mod error_tests {
 
     #[test]
     fn test_from_io_error_other() {
-        let io_err = io::Error::new(io::ErrorKind::Other, "misc");
+        let io_err = io::Error::other("misc");
         let fs_err: FsError = io_err.into();
         assert!(matches!(fs_err, FsError::IoError(_)));
     }
 
     #[test]
     fn test_source() {
-        let io_err = io::Error::new(io::ErrorKind::Other, "misc");
+        let io_err = io::Error::other("misc");
         let fs_err = FsError::IoError(io_err);
         assert!(std::error::Error::source(&fs_err).is_some());
 
