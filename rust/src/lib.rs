@@ -1,34 +1,22 @@
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Example {
-    pub stuff: String,
-}
+//! # fsspec_rs
+//!
+//! A Rust-native filesystem abstraction framework inspired by Python's
+//! [filesystem_spec (fsspec)](https://filesystem-spec.readthedocs.io/).
+//!
+//! This crate provides traits and types for building filesystem backends
+//! in pure Rust, with the same "implement a few primitives, get everything
+//! else for free" design pattern as fsspec.
 
-impl Example {
-    pub fn new(value: String) -> Self {
-        Example { stuff: value }
-    }
-}
+pub mod error;
+pub mod file;
+pub mod types;
 
-/**********************************/
+mod fs;
+
 #[cfg(test)]
-mod example_tests {
-    use super::*;
+mod tests;
 
-    #[test]
-    fn test_new() {
-        let e = Example::new(String::from("test"));
-        assert_eq!(e.stuff, String::from("test"));
-    }
-
-    #[test]
-    fn test_clone_and_eq() {
-        let e = Example::new(String::from("test"));
-        assert_eq!(e, e.clone());
-    }
-
-    #[test]
-    fn test_debug() {
-        let e = Example::new(String::from("test"));
-        assert_eq!(format!("{e:?}"), "Example { stuff: \"test\" }");
-    }
-}
+pub use error::{FsError, FsResult};
+pub use file::FsFile;
+pub use fs::FileSystem;
+pub use types::{DuResult, FileInfo, FileType, OpenMode, OpenOptions, WalkEntry};
