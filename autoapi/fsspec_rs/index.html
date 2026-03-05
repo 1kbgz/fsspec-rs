@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="prev" title="test_all" href="../test_all/index.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="fsspec_rs.local" href="local/index.html"><link rel="prev" title="test_all" href="../test_all/index.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
         <title>fsspec_rs - fsspec-rs v0.1.0</title>
@@ -198,8 +198,14 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../test_s3/index.html">test_s3</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../test_all/index.html">test_all</a></li>
-<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">fsspec_rs</a></li>
+<li class="toctree-l2 current has-children current-page"><a class="current reference internal" href="#">fsspec_rs</a><input aria-label="Toggle navigation of fsspec_rs" checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="local/index.html">fsspec_rs.local</a></li>
+<li class="toctree-l3"><a class="reference internal" href="s3/index.html">fsspec_rs.s3</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../test_local/index.html">test_local</a></li>
 </ul>
 </li>
 </ul>
@@ -243,6 +249,15 @@
           <section id="module-fsspec_rs">
 <span id="fsspec-rs"></span><h1>fsspec_rs<a class="headerlink" href="#module-fsspec_rs" title="Link to this heading">¶</a></h1>
 <p>fsspec-rs: fsspec-compatible backends with Rust acceleration.</p>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="local/index.html">fsspec_rs.local</a></li>
+<li class="toctree-l1"><a class="reference internal" href="s3/index.html">fsspec_rs.s3</a></li>
+</ul>
+</div>
+</section>
 <section id="attributes">
 <h2>Attributes<a class="headerlink" href="#attributes" title="Link to this heading">¶</a></h2>
 <div class="table-wrapper autosummary longtable docutils container">
@@ -255,12 +270,1076 @@
 </table>
 </div>
 </section>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">¶</a></h2>
+<div class="table-wrapper autosummary longtable docutils container">
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#fsspec_rs.LocalFile" title="fsspec_rs.LocalFile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LocalFile</span></code></a></p></td>
+<td><p>File-like wrapper delegating to the Rust <code class="docutils literal notranslate"><span class="pre">RustLocalFile</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#fsspec_rs.LocalFileSystem" title="fsspec_rs.LocalFileSystem"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LocalFileSystem</span></code></a></p></td>
+<td><p>Local filesystem backed by the Rust <code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> implementation.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#fsspec_rs.S3File" title="fsspec_rs.S3File"><code class="xref py py-obj docutils literal notranslate"><span class="pre">S3File</span></code></a></p></td>
+<td><p>File-like wrapper delegating to the Rust <code class="docutils literal notranslate"><span class="pre">RustS3File</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#fsspec_rs.S3FileSystem" title="fsspec_rs.S3FileSystem"><code class="xref py py-obj docutils literal notranslate"><span class="pre">S3FileSystem</span></code></a></p></td>
+<td><p>S3 filesystem backed by the Rust <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> implementation.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
 <section id="package-contents">
 <h2>Package Contents<a class="headerlink" href="#package-contents" title="Link to this heading">¶</a></h2>
 <dl class="py data">
 <dt class="sig sig-object py" id="fsspec_rs.__version__">
 <span class="sig-prename descclassname"><span class="pre">fsspec_rs.</span></span><span class="sig-name descname"><span class="pre">__version__</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'0.1.0'</span></em><a class="headerlink" href="#fsspec_rs.__version__" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fsspec_rs.</span></span><span class="sig-name descname"><span class="pre">LocalFile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#fsspec_rs.LocalFileSystem" title="fsspec_rs.LocalFileSystem"><span class="pre">LocalFileSystem</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'rb'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">fsspec.spec.AbstractBufferedFile</span></code></p>
+<p>File-like wrapper delegating to the Rust <code class="docutils literal notranslate"><span class="pre">RustLocalFile</span></code>.</p>
+<p>Template for files with buffered reading and writing</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fs</strong> (<em>instance</em><em> of </em><em>FileSystem</em>)</p></li>
+<li><p><strong>path</strong> (<em>str</em>) – location in file-system</p></li>
+<li><p><strong>mode</strong> (<em>str</em>) – Normal file modes. Currently only ‘wb’, ‘ab’ or ‘rb’. Some file
+systems may be read-only, and some may not support append.</p></li>
+<li><p><strong>block_size</strong> (<em>int</em>) – Buffer size for reading or writing, ‘default’ for class default</p></li>
+<li><p><strong>autocommit</strong> (<em>bool</em>) – Whether to write to final destination; may only impact what
+happens when file is being closed.</p></li>
+<li><p><strong>cache_type</strong> (<em>{&quot;readahead&quot;</em><em>, </em><em>&quot;none&quot;</em><em>, </em><em>&quot;mmap&quot;</em><em>, </em><em>&quot;bytes&quot;}</em><em>, </em><em>default &quot;readahead&quot;</em>) – Caching policy in read mode. See the definitions in <code class="docutils literal notranslate"><span class="pre">core</span></code>.</p></li>
+<li><p><strong>cache_options</strong> (<em>dict</em>) – Additional options passed to the constructor for the cache specified
+by <cite>cache_type</cite>.</p></li>
+<li><p><strong>size</strong> (<em>int</em>) – If given and in read mode, suppressed having to look up the file size</p></li>
+<li><p><strong>kwargs</strong> – Gets stored as self.kwargs</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile._rust_file">
+<span class="sig-name descname"><span class="pre">_rust_file</span></span><a class="headerlink" href="#fsspec_rs.LocalFile._rust_file" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.path">
+<span class="sig-name descname"><span class="pre">path</span></span><a class="headerlink" href="#fsspec_rs.LocalFile.path" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.mode">
+<span class="sig-name descname"><span class="pre">mode</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'rb'</span></em><a class="headerlink" href="#fsspec_rs.LocalFile.mode" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.fs">
+<span class="sig-name descname"><span class="pre">fs</span></span><a class="headerlink" href="#fsspec_rs.LocalFile.fs" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.blocksize">
+<span class="sig-name descname"><span class="pre">blocksize</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#fsspec_rs.LocalFile.blocksize" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.loc">
+<span class="sig-name descname"><span class="pre">loc</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#fsspec_rs.LocalFile.loc" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.read">
+<span class="sig-name descname"><span class="pre">read</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">length</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytes</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.read"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.read" title="Link to this definition">¶</a></dt>
+<dd><p>Return data from cache, or fetch pieces as necessary</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>length</strong> (<em>int</em><em> (</em><em>-1</em><em>)</em>) – Number of bytes to read; if &lt;0, all remaining bytes.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.write">
+<span class="sig-name descname"><span class="pre">write</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bytes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.write"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.write" title="Link to this definition">¶</a></dt>
+<dd><p>Write data to buffer.</p>
+<p>Buffer only sent on flush() or if buffer is greater than
+or equal to blocksize.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>bytes</em>) – Set of bytes to be written.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.seek">
+<span class="sig-name descname"><span class="pre">seek</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">whence</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.seek"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.seek" title="Link to this definition">¶</a></dt>
+<dd><p>Set current file location</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>loc</strong> (<em>int</em>) – byte location</p></li>
+<li><p><strong>whence</strong> (<em>{0</em><em>, </em><em>1</em><em>, </em><em>2}</em>) – from start of file, current location or end of file, resp.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.tell">
+<span class="sig-name descname"><span class="pre">tell</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.tell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.tell" title="Link to this definition">¶</a></dt>
+<dd><p>Current file location</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.flush">
+<span class="sig-name descname"><span class="pre">flush</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.flush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.flush" title="Link to this definition">¶</a></dt>
+<dd><p>Write buffered data to backend store.</p>
+<p>Writes the current buffer, if it is larger than the block-size, or if
+the file is being closed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>force</strong> (<em>bool</em>) – When closing, write the last block even if it is smaller than
+blocks are allowed to be. Disallows further writing to this file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.close"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.close" title="Link to this definition">¶</a></dt>
+<dd><p>Close file</p>
+<p>Finalizes writes, discards cache</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.closed">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">closed</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#fsspec_rs.LocalFile.closed" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.readable">
+<span class="sig-name descname"><span class="pre">readable</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.readable"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.readable" title="Link to this definition">¶</a></dt>
+<dd><p>Whether opened for reading</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.writable">
+<span class="sig-name descname"><span class="pre">writable</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.writable"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.writable" title="Link to this definition">¶</a></dt>
+<dd><p>Whether opened for writing</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.seekable">
+<span class="sig-name descname"><span class="pre">seekable</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.seekable"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.seekable" title="Link to this definition">¶</a></dt>
+<dd><p>Whether is seekable (only in read mode)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.__enter__">
+<span class="sig-name descname"><span class="pre">__enter__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.__enter__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.__enter__" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.__exit__">
+<span class="sig-name descname"><span class="pre">__exit__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.__exit__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.__exit__" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.__repr__">
+<span class="sig-name descname"><span class="pre">__repr__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.__repr__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.__repr__" title="Link to this definition">¶</a></dt>
+<dd><p>Return repr(self).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fsspec_rs.</span></span><span class="sig-name descname"><span class="pre">LocalFileSystem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">auto_mkdir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">storage_options</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">fsspec.AbstractFileSystem</span></code></p>
+<p>Local filesystem backed by the Rust <code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> implementation.</p>
+<p>The protocol is registered as <code class="docutils literal notranslate"><span class="pre">(&quot;file-rs&quot;,</span> <span class="pre">&quot;local-rs&quot;)</span></code> so it can
+coexist with the pure-Python <code class="docutils literal notranslate"><span class="pre">fsspec.implementations.local.LocalFileSystem</span></code>
+which owns the <code class="docutils literal notranslate"><span class="pre">(&quot;file&quot;,</span> <span class="pre">&quot;local&quot;)</span></code> protocol names.</p>
+<p>Create and configure file-system instance</p>
+<p>Instances may be cachable, so if similar enough arguments are seen
+a new instance is not required. The token attribute exists to allow
+implementations to cache instances if they wish.</p>
+<p>A reasonable default should be provided if there are no arguments.</p>
+<p>Subclasses should call this method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>use_listings_cache</strong> – passed to <code class="docutils literal notranslate"><span class="pre">DirCache</span></code>, if the implementation supports
+directory listing caching. Pass use_listings_cache=False
+to disable such caching.</p></li>
+<li><p><strong>listings_expiry_time</strong> – passed to <code class="docutils literal notranslate"><span class="pre">DirCache</span></code>, if the implementation supports
+directory listing caching. Pass use_listings_cache=False
+to disable such caching.</p></li>
+<li><p><strong>max_paths</strong> – passed to <code class="docutils literal notranslate"><span class="pre">DirCache</span></code>, if the implementation supports
+directory listing caching. Pass use_listings_cache=False
+to disable such caching.</p></li>
+<li><p><strong>skip_instance_cache</strong> (<em>bool</em>) – If this is a cachable implementation, pass True here to force
+creating a new instance even if a matching instance exists, and prevent
+storing this instance.</p></li>
+<li><p><strong>asynchronous</strong> (<em>bool</em>)</p></li>
+<li><p><strong>loop</strong> (<em>asyncio-compatible IOLoop</em><em> or </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.protocol">
+<span class="sig-name descname"><span class="pre">protocol</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">('file-rs',</span> <span class="pre">'local-rs')</span></em><a class="headerlink" href="#fsspec_rs.LocalFileSystem.protocol" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.local_file">
+<span class="sig-name descname"><span class="pre">local_file</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em><a class="headerlink" href="#fsspec_rs.LocalFileSystem.local_file" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem._rust">
+<span class="sig-name descname"><span class="pre">_rust</span></span><a class="headerlink" href="#fsspec_rs.LocalFileSystem._rust" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.auto_mkdir">
+<span class="sig-name descname"><span class="pre">auto_mkdir</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#fsspec_rs.LocalFileSystem.auto_mkdir" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.ls">
+<span class="sig-name descname"><span class="pre">ls</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">detail</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.ls"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.ls" title="Link to this definition">¶</a></dt>
+<dd><p>List objects at path.</p>
+<p>This should include subdirectories and files at that location. The
+difference between a file and a directory must be clear when details
+are requested.</p>
+<p>The specific keys, or perhaps a FileInfo class, or similar, is TBD,
+but must be consistent across implementations.
+Must include:</p>
+<ul class="simple">
+<li><p>full path to the entry (without protocol)</p></li>
+<li><p>size of the entry, in bytes. If the value cannot be determined, will
+be <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></li>
+<li><p>type of entry, “file”, “directory” or other</p></li>
+</ul>
+<p>Additional information
+may be present, appropriate to the file-system, e.g., generation,
+checksum, etc.</p>
+<p>May use refresh=True|False to allow use of self._ls_from_cache to
+check for a saved listing and avoid calling the backend. This would be
+common where listing may be expensive.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>)</p></li>
+<li><p><strong>detail</strong> (<em>bool</em>) – if True, gives a list of dictionaries, where each is the same as
+the result of <code class="docutils literal notranslate"><span class="pre">info(path)</span></code>. If False, gives a list of paths
+(str).</p></li>
+<li><p><strong>kwargs</strong> (<em>may have additional backend-specific options</em><em>, </em><em>such as version</em>) – information</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><em>List of strings if detail is False, or list of directory information</em></p></li>
+<li><p><em>dicts if detail is True.</em></p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.info">
+<span class="sig-name descname"><span class="pre">info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.info" title="Link to this definition">¶</a></dt>
+<dd><p>Give details of entry at path</p>
+<p>Returns a single dictionary, with exactly the same information as <code class="docutils literal notranslate"><span class="pre">ls</span></code>
+would with <code class="docutils literal notranslate"><span class="pre">detail=True</span></code>.</p>
+<p>The default implementation calls ls and could be overridden by a
+shortcut. kwargs are passed on to <code class="docutils literal notranslate"><span class="pre">`ls()</span></code>.</p>
+<p>Some file systems might not be able to measure the file’s size, in
+which case, the returned dict will include <code class="docutils literal notranslate"><span class="pre">'size':</span> <span class="pre">None</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p><strong>dict with keys</strong> (<em>name (full path in the FS), size (in bytes), type (file,</em>)</p></li>
+<li><p><em>directory, or something else) and other FS-specific keys.</em></p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem._open">
+<span class="sig-name descname"><span class="pre">_open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'rb'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autocommit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem._open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem._open" title="Link to this definition">¶</a></dt>
+<dd><p>Return a Rust-backed file object.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.mkdir">
+<span class="sig-name descname"><span class="pre">mkdir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">create_parents</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.mkdir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.mkdir" title="Link to this definition">¶</a></dt>
+<dd><p>Create directory entry at path</p>
+<p>For systems that don’t have true directories, may create an for
+this instance only and not touch the real filesystem</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – location</p></li>
+<li><p><strong>create_parents</strong> (<em>bool</em>) – if True, this is equivalent to <code class="docutils literal notranslate"><span class="pre">makedirs</span></code></p></li>
+<li><p><strong>kwargs</strong> – may be permissions, etc.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.makedirs">
+<span class="sig-name descname"><span class="pre">makedirs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exist_ok</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.makedirs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.makedirs" title="Link to this definition">¶</a></dt>
+<dd><p>Recursively make directories</p>
+<p>Creates directory at path and any intervening required directories.
+Raises exception if, for instance, the path already exists but is a
+file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – leaf directory name</p></li>
+<li><p><strong>exist_ok</strong> (<em>bool</em><em> (</em><em>False</em><em>)</em>) – If False, will error if the target already exists</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.rmdir">
+<span class="sig-name descname"><span class="pre">rmdir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.rmdir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.rmdir" title="Link to this definition">¶</a></dt>
+<dd><p>Remove a directory, if empty</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.rm_file">
+<span class="sig-name descname"><span class="pre">rm_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.rm_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.rm_file" title="Link to this definition">¶</a></dt>
+<dd><p>Delete a file</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.rm">
+<span class="sig-name descname"><span class="pre">rm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recursive</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxdepth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.rm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.rm" title="Link to this definition">¶</a></dt>
+<dd><p>Delete files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em><em> or </em><em>list</em><em> of </em><em>str</em>) – File(s) to delete.</p></li>
+<li><p><strong>recursive</strong> (<em>bool</em>) – If file(s) are directories, recursively delete contents and then
+also remove the directory</p></li>
+<li><p><strong>maxdepth</strong> (<em>int</em><em> or </em><em>None</em>) – Depth to pass to walk for finding files to delete, if recursive.
+If None, there will be no limit and infinite recursion may be
+possible.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.cp_file">
+<span class="sig-name descname"><span class="pre">cp_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.cp_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.cp_file" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.copy">
+<span class="sig-name descname"><span class="pre">copy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recursive</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.copy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.copy" title="Link to this definition">¶</a></dt>
+<dd><p>Copy within two locations in the filesystem</p>
+<dl class="simple">
+<dt>on_error<span class="classifier">“raise”, “ignore”</span></dt><dd><p>If raise, any not-found exceptions will be raised; if ignore any
+not-found exceptions will cause the path to be skipped; defaults to
+raise unless recursive is true, where the default is ignore</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.mv">
+<span class="sig-name descname"><span class="pre">mv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.mv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.mv" title="Link to this definition">¶</a></dt>
+<dd><p>Move file(s) from one location to another</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.exists">
+<span class="sig-name descname"><span class="pre">exists</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.exists"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.exists" title="Link to this definition">¶</a></dt>
+<dd><p>Is there a file at the given path</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.isdir">
+<span class="sig-name descname"><span class="pre">isdir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.isdir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.isdir" title="Link to this definition">¶</a></dt>
+<dd><p>Is this entry directory-like?</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.isfile">
+<span class="sig-name descname"><span class="pre">isfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.isfile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.isfile" title="Link to this definition">¶</a></dt>
+<dd><p>Is this entry file-like?</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.size">
+<span class="sig-name descname"><span class="pre">size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.size" title="Link to this definition">¶</a></dt>
+<dd><p>Size in bytes of file</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.cat_file">
+<span class="sig-name descname"><span class="pre">cat_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytes</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.cat_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.cat_file" title="Link to this definition">¶</a></dt>
+<dd><p>Get the content of a file</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>URL</em><em> of </em><em>file on this filesystems</em>)</p></li>
+<li><p><strong>start</strong> (<em>int</em>) – Bytes limits of the read. If negative, backwards from end,
+like usual python slices. Either can be None for start or
+end of file, respectively</p></li>
+<li><p><strong>end</strong> (<em>int</em>) – Bytes limits of the read. If negative, backwards from end,
+like usual python slices. Either can be None for start or
+end of file, respectively</p></li>
+<li><p><strong>kwargs</strong> (passed to <code class="docutils literal notranslate"><span class="pre">open()</span></code>.)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.pipe_file">
+<span class="sig-name descname"><span class="pre">pipe_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bytes</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.pipe_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.pipe_file" title="Link to this definition">¶</a></dt>
+<dd><p>Set the bytes of given file</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.head">
+<span class="sig-name descname"><span class="pre">head</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1024</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytes</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.head"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.head" title="Link to this definition">¶</a></dt>
+<dd><p>Get the first <code class="docutils literal notranslate"><span class="pre">size</span></code> bytes from file</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.tail">
+<span class="sig-name descname"><span class="pre">tail</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1024</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytes</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.tail"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.tail" title="Link to this definition">¶</a></dt>
+<dd><p>Get the last <code class="docutils literal notranslate"><span class="pre">size</span></code> bytes from file</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.touch">
+<span class="sig-name descname"><span class="pre">touch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.touch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.touch" title="Link to this definition">¶</a></dt>
+<dd><p>Create empty file, or update timestamp</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – file location</p></li>
+<li><p><strong>truncate</strong> (<em>bool</em>) – If True, always set file size to 0; if False, update timestamp and
+leave file unchanged, if backend allows this</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.walk">
+<span class="sig-name descname"><span class="pre">walk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxdepth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">topdown</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.walk"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.walk" title="Link to this definition">¶</a></dt>
+<dd><p>Return all files under the given path.</p>
+<p>List all files, recursing into subdirectories; output is iterator-style,
+like <code class="docutils literal notranslate"><span class="pre">os.walk()</span></code>. For a simple list of files, <code class="docutils literal notranslate"><span class="pre">find()</span></code> is available.</p>
+<p>When topdown is True, the caller can modify the dirnames list in-place (perhaps
+using del or slice assignment), and walk() will
+only recurse into the subdirectories whose names remain in dirnames;
+this can be used to prune the search, impose a specific order of visiting,
+or even to inform walk() about directories the caller creates or renames before
+it resumes walk() again.
+Modifying dirnames when topdown is False has no effect. (see os.walk)</p>
+<p>Note that the “files” outputted will include anything that is not
+a directory, such as links.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – Root to recurse into</p></li>
+<li><p><strong>maxdepth</strong> (<em>int</em>) – Maximum recursion depth. None means limitless, but not recommended
+on link-based file-systems.</p></li>
+<li><p><strong>topdown</strong> (<em>bool</em><em> (</em><em>True</em><em>)</em>) – Whether to walk the directory tree from the top downwards or from
+the bottom upwards.</p></li>
+<li><p><strong>on_error</strong> (<em>&quot;omit&quot;</em><em>, </em><em>&quot;raise&quot;</em><em>, </em><em>a callable</em>) – if omit (default), path with exception will simply be empty;
+If raise, an underlying exception will be raised;
+if callable, it will be called with a single OSError instance as argument</p></li>
+<li><p><strong>kwargs</strong> (passed to <code class="docutils literal notranslate"><span class="pre">ls</span></code>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.find">
+<span class="sig-name descname"><span class="pre">find</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxdepth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">withdirs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.find"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.find" title="Link to this definition">¶</a></dt>
+<dd><p>List all files below path.</p>
+<p>Like posix <code class="docutils literal notranslate"><span class="pre">find</span></code> command without conditions</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>)</p></li>
+<li><p><strong>maxdepth</strong> (<em>int</em><em> or </em><em>None</em>) – If not None, the maximum number of levels to descend</p></li>
+<li><p><strong>withdirs</strong> (<em>bool</em>) – Whether to include directory paths in the output. This is True
+when used by glob, but users usually only want files.</p></li>
+<li><p><strong>ls.</strong> (<em>kwargs are passed to</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.du">
+<span class="sig-name descname"><span class="pre">du</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxdepth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.du"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.du" title="Link to this definition">¶</a></dt>
+<dd><p>Space used by files and optionally directories within a path</p>
+<p>Directory size does not include the size of its contents.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>)</p></li>
+<li><p><strong>total</strong> (<em>bool</em>) – Whether to sum all the file sizes</p></li>
+<li><p><strong>maxdepth</strong> (<em>int</em><em> or </em><em>None</em>) – Maximum number of directory levels to descend, None for unlimited.</p></li>
+<li><p><strong>withdirs</strong> (<em>bool</em>) – Whether to include directory paths in the output.</p></li>
+<li><p><strong>kwargs</strong> (passed to <code class="docutils literal notranslate"><span class="pre">find</span></code>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>Dict of {path</strong> (<em>size} if total=False, or int otherwise, where numbers</em>)</p></li>
+<li><p><em>refer to bytes used.</em></p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.read_text">
+<span class="sig-name descname"><span class="pre">read_text</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">errors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">newline</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.read_text"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.read_text" title="Link to this definition">¶</a></dt>
+<dd><p>Get the contents of the file as a string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – URL of file on this filesystems</p></li>
+<li><p><strong>encoding</strong> (same as <cite>open</cite>.)</p></li>
+<li><p><strong>errors</strong> (same as <cite>open</cite>.)</p></li>
+<li><p><strong>newline</strong> (same as <cite>open</cite>.)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.write_text">
+<span class="sig-name descname"><span class="pre">write_text</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">errors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">newline</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.write_text"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.write_text" title="Link to this definition">¶</a></dt>
+<dd><p>Write the text to the given file.</p>
+<p>An existing file will be overwritten.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – URL of file on this filesystems</p></li>
+<li><p><strong>value</strong> (<em>str</em>) – Text to write.</p></li>
+<li><p><strong>encoding</strong> (same as <cite>open</cite>.)</p></li>
+<li><p><strong>errors</strong> (same as <cite>open</cite>.)</p></li>
+<li><p><strong>newline</strong> (same as <cite>open</cite>.)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.get_file">
+<span class="sig-name descname"><span class="pre">get_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rpath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lpath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.get_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.get_file" title="Link to this definition">¶</a></dt>
+<dd><p>Copy single remote file to local</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.put_file">
+<span class="sig-name descname"><span class="pre">put_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lpath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rpath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.put_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.put_file" title="Link to this definition">¶</a></dt>
+<dd><p>Copy single file to remote</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="fsspec_rs.S3File">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fsspec_rs.</span></span><span class="sig-name descname"><span class="pre">S3File</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#fsspec_rs.S3FileSystem" title="fsspec_rs.S3FileSystem"><span class="pre">S3FileSystem</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'rb'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">fsspec.spec.AbstractBufferedFile</span></code></p>
+<p>File-like wrapper delegating to the Rust <code class="docutils literal notranslate"><span class="pre">RustS3File</span></code>.</p>
+<p>Template for files with buffered reading and writing</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fs</strong> (<em>instance</em><em> of </em><em>FileSystem</em>)</p></li>
+<li><p><strong>path</strong> (<em>str</em>) – location in file-system</p></li>
+<li><p><strong>mode</strong> (<em>str</em>) – Normal file modes. Currently only ‘wb’, ‘ab’ or ‘rb’. Some file
+systems may be read-only, and some may not support append.</p></li>
+<li><p><strong>block_size</strong> (<em>int</em>) – Buffer size for reading or writing, ‘default’ for class default</p></li>
+<li><p><strong>autocommit</strong> (<em>bool</em>) – Whether to write to final destination; may only impact what
+happens when file is being closed.</p></li>
+<li><p><strong>cache_type</strong> (<em>{&quot;readahead&quot;</em><em>, </em><em>&quot;none&quot;</em><em>, </em><em>&quot;mmap&quot;</em><em>, </em><em>&quot;bytes&quot;}</em><em>, </em><em>default &quot;readahead&quot;</em>) – Caching policy in read mode. See the definitions in <code class="docutils literal notranslate"><span class="pre">core</span></code>.</p></li>
+<li><p><strong>cache_options</strong> (<em>dict</em>) – Additional options passed to the constructor for the cache specified
+by <cite>cache_type</cite>.</p></li>
+<li><p><strong>size</strong> (<em>int</em>) – If given and in read mode, suppressed having to look up the file size</p></li>
+<li><p><strong>kwargs</strong> – Gets stored as self.kwargs</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.S3File._rust_file">
+<span class="sig-name descname"><span class="pre">_rust_file</span></span><a class="headerlink" href="#fsspec_rs.S3File._rust_file" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.path">
+<span class="sig-name descname"><span class="pre">path</span></span><a class="headerlink" href="#fsspec_rs.S3File.path" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.mode">
+<span class="sig-name descname"><span class="pre">mode</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'rb'</span></em><a class="headerlink" href="#fsspec_rs.S3File.mode" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.fs">
+<span class="sig-name descname"><span class="pre">fs</span></span><a class="headerlink" href="#fsspec_rs.S3File.fs" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.blocksize">
+<span class="sig-name descname"><span class="pre">blocksize</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#fsspec_rs.S3File.blocksize" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.loc">
+<span class="sig-name descname"><span class="pre">loc</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#fsspec_rs.S3File.loc" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.read">
+<span class="sig-name descname"><span class="pre">read</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">length</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytes</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.read"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.read" title="Link to this definition">¶</a></dt>
+<dd><p>Return data from cache, or fetch pieces as necessary</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>length</strong> (<em>int</em><em> (</em><em>-1</em><em>)</em>) – Number of bytes to read; if &lt;0, all remaining bytes.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.write">
+<span class="sig-name descname"><span class="pre">write</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bytes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.write"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.write" title="Link to this definition">¶</a></dt>
+<dd><p>Write data to buffer.</p>
+<p>Buffer only sent on flush() or if buffer is greater than
+or equal to blocksize.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>bytes</em>) – Set of bytes to be written.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.seek">
+<span class="sig-name descname"><span class="pre">seek</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">whence</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.seek"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.seek" title="Link to this definition">¶</a></dt>
+<dd><p>Set current file location</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>loc</strong> (<em>int</em>) – byte location</p></li>
+<li><p><strong>whence</strong> (<em>{0</em><em>, </em><em>1</em><em>, </em><em>2}</em>) – from start of file, current location or end of file, resp.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.tell">
+<span class="sig-name descname"><span class="pre">tell</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.tell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.tell" title="Link to this definition">¶</a></dt>
+<dd><p>Current file location</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.flush">
+<span class="sig-name descname"><span class="pre">flush</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.flush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.flush" title="Link to this definition">¶</a></dt>
+<dd><p>Write buffered data to backend store.</p>
+<p>Writes the current buffer, if it is larger than the block-size, or if
+the file is being closed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>force</strong> (<em>bool</em>) – When closing, write the last block even if it is smaller than
+blocks are allowed to be. Disallows further writing to this file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.close"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.close" title="Link to this definition">¶</a></dt>
+<dd><p>Close file</p>
+<p>Finalizes writes, discards cache</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.closed">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">closed</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#fsspec_rs.S3File.closed" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.readable">
+<span class="sig-name descname"><span class="pre">readable</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.readable"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.readable" title="Link to this definition">¶</a></dt>
+<dd><p>Whether opened for reading</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.writable">
+<span class="sig-name descname"><span class="pre">writable</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.writable"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.writable" title="Link to this definition">¶</a></dt>
+<dd><p>Whether opened for writing</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.seekable">
+<span class="sig-name descname"><span class="pre">seekable</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.seekable"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.seekable" title="Link to this definition">¶</a></dt>
+<dd><p>Whether is seekable (only in read mode)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.__enter__">
+<span class="sig-name descname"><span class="pre">__enter__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.__enter__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.__enter__" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.__exit__">
+<span class="sig-name descname"><span class="pre">__exit__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.__exit__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.__exit__" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.__repr__">
+<span class="sig-name descname"><span class="pre">__repr__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.__repr__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.__repr__" title="Link to this definition">¶</a></dt>
+<dd><p>Return repr(self).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fsspec_rs.</span></span><span class="sig-name descname"><span class="pre">S3FileSystem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bucket</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">secret</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">endpoint_url</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">region</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">anon</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">client_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">storage_options</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">fsspec.AbstractFileSystem</span></code></p>
+<p>S3 filesystem backed by the Rust <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> implementation.</p>
+<p>The protocol is registered as <code class="docutils literal notranslate"><span class="pre">&quot;s3-rs&quot;</span></code> so it can coexist with the
+pure-Python <code class="docutils literal notranslate"><span class="pre">s3fs.S3FileSystem</span></code> which owns the <code class="docutils literal notranslate"><span class="pre">&quot;s3&quot;</span></code> protocol.</p>
+<dl class="simple">
+<dt>Credential resolution (matching s3fs conventions):</dt><dd><ol class="arabic simple">
+<li><p>Explicit keyword arguments (<code class="docutils literal notranslate"><span class="pre">key</span></code>, <code class="docutils literal notranslate"><span class="pre">secret</span></code>, <code class="docutils literal notranslate"><span class="pre">endpoint_url</span></code>, …)</p></li>
+<li><p>Values from <code class="docutils literal notranslate"><span class="pre">fsspec.config.conf[&quot;s3&quot;]</span></code> (populated from <code class="docutils literal notranslate"><span class="pre">FSSPEC_S3_*</span></code>
+environment variables)</p></li>
+<li><p>Falls through to object_store’s own credential chain (IAM roles, etc.)</p></li>
+</ol>
+</dd>
+</dl>
+<p>Create and configure file-system instance</p>
+<p>Instances may be cachable, so if similar enough arguments are seen
+a new instance is not required. The token attribute exists to allow
+implementations to cache instances if they wish.</p>
+<p>A reasonable default should be provided if there are no arguments.</p>
+<p>Subclasses should call this method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>use_listings_cache</strong> – passed to <code class="docutils literal notranslate"><span class="pre">DirCache</span></code>, if the implementation supports
+directory listing caching. Pass use_listings_cache=False
+to disable such caching.</p></li>
+<li><p><strong>listings_expiry_time</strong> – passed to <code class="docutils literal notranslate"><span class="pre">DirCache</span></code>, if the implementation supports
+directory listing caching. Pass use_listings_cache=False
+to disable such caching.</p></li>
+<li><p><strong>max_paths</strong> – passed to <code class="docutils literal notranslate"><span class="pre">DirCache</span></code>, if the implementation supports
+directory listing caching. Pass use_listings_cache=False
+to disable such caching.</p></li>
+<li><p><strong>skip_instance_cache</strong> (<em>bool</em>) – If this is a cachable implementation, pass True here to force
+creating a new instance even if a matching instance exists, and prevent
+storing this instance.</p></li>
+<li><p><strong>asynchronous</strong> (<em>bool</em>)</p></li>
+<li><p><strong>loop</strong> (<em>asyncio-compatible IOLoop</em><em> or </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.protocol">
+<span class="sig-name descname"><span class="pre">protocol</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">('s3-rs',)</span></em><a class="headerlink" href="#fsspec_rs.S3FileSystem.protocol" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem._rust">
+<span class="sig-name descname"><span class="pre">_rust</span></span><a class="headerlink" href="#fsspec_rs.S3FileSystem._rust" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.bucket">
+<span class="sig-name descname"><span class="pre">bucket</span></span><a class="headerlink" href="#fsspec_rs.S3FileSystem.bucket" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.ls">
+<span class="sig-name descname"><span class="pre">ls</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">detail</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.ls"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.ls" title="Link to this definition">¶</a></dt>
+<dd><p>List objects at path.</p>
+<p>This should include subdirectories and files at that location. The
+difference between a file and a directory must be clear when details
+are requested.</p>
+<p>The specific keys, or perhaps a FileInfo class, or similar, is TBD,
+but must be consistent across implementations.
+Must include:</p>
+<ul class="simple">
+<li><p>full path to the entry (without protocol)</p></li>
+<li><p>size of the entry, in bytes. If the value cannot be determined, will
+be <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></li>
+<li><p>type of entry, “file”, “directory” or other</p></li>
+</ul>
+<p>Additional information
+may be present, appropriate to the file-system, e.g., generation,
+checksum, etc.</p>
+<p>May use refresh=True|False to allow use of self._ls_from_cache to
+check for a saved listing and avoid calling the backend. This would be
+common where listing may be expensive.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>)</p></li>
+<li><p><strong>detail</strong> (<em>bool</em>) – if True, gives a list of dictionaries, where each is the same as
+the result of <code class="docutils literal notranslate"><span class="pre">info(path)</span></code>. If False, gives a list of paths
+(str).</p></li>
+<li><p><strong>kwargs</strong> (<em>may have additional backend-specific options</em><em>, </em><em>such as version</em>) – information</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><em>List of strings if detail is False, or list of directory information</em></p></li>
+<li><p><em>dicts if detail is True.</em></p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.info">
+<span class="sig-name descname"><span class="pre">info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.info" title="Link to this definition">¶</a></dt>
+<dd><p>Give details of entry at path</p>
+<p>Returns a single dictionary, with exactly the same information as <code class="docutils literal notranslate"><span class="pre">ls</span></code>
+would with <code class="docutils literal notranslate"><span class="pre">detail=True</span></code>.</p>
+<p>The default implementation calls ls and could be overridden by a
+shortcut. kwargs are passed on to <code class="docutils literal notranslate"><span class="pre">`ls()</span></code>.</p>
+<p>Some file systems might not be able to measure the file’s size, in
+which case, the returned dict will include <code class="docutils literal notranslate"><span class="pre">'size':</span> <span class="pre">None</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p><strong>dict with keys</strong> (<em>name (full path in the FS), size (in bytes), type (file,</em>)</p></li>
+<li><p><em>directory, or something else) and other FS-specific keys.</em></p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem._open">
+<span class="sig-name descname"><span class="pre">_open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'rb'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autocommit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem._open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem._open" title="Link to this definition">¶</a></dt>
+<dd><p>Return a Rust-backed S3 file object.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.mkdir">
+<span class="sig-name descname"><span class="pre">mkdir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">create_parents</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.mkdir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.mkdir" title="Link to this definition">¶</a></dt>
+<dd><p>Create directory entry at path</p>
+<p>For systems that don’t have true directories, may create an for
+this instance only and not touch the real filesystem</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – location</p></li>
+<li><p><strong>create_parents</strong> (<em>bool</em>) – if True, this is equivalent to <code class="docutils literal notranslate"><span class="pre">makedirs</span></code></p></li>
+<li><p><strong>kwargs</strong> – may be permissions, etc.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.rmdir">
+<span class="sig-name descname"><span class="pre">rmdir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.rmdir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.rmdir" title="Link to this definition">¶</a></dt>
+<dd><p>Remove a directory, if empty</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.rm_file">
+<span class="sig-name descname"><span class="pre">rm_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.rm_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.rm_file" title="Link to this definition">¶</a></dt>
+<dd><p>Delete a file</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.rm">
+<span class="sig-name descname"><span class="pre">rm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recursive</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxdepth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.rm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.rm" title="Link to this definition">¶</a></dt>
+<dd><p>Delete files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em><em> or </em><em>list</em><em> of </em><em>str</em>) – File(s) to delete.</p></li>
+<li><p><strong>recursive</strong> (<em>bool</em>) – If file(s) are directories, recursively delete contents and then
+also remove the directory</p></li>
+<li><p><strong>maxdepth</strong> (<em>int</em><em> or </em><em>None</em>) – Depth to pass to walk for finding files to delete, if recursive.
+If None, there will be no limit and infinite recursion may be
+possible.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.cp_file">
+<span class="sig-name descname"><span class="pre">cp_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.cp_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.cp_file" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.exists">
+<span class="sig-name descname"><span class="pre">exists</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.exists"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.exists" title="Link to this definition">¶</a></dt>
+<dd><p>Is there a file at the given path</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.isdir">
+<span class="sig-name descname"><span class="pre">isdir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.isdir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.isdir" title="Link to this definition">¶</a></dt>
+<dd><p>Is this entry directory-like?</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.isfile">
+<span class="sig-name descname"><span class="pre">isfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.isfile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.isfile" title="Link to this definition">¶</a></dt>
+<dd><p>Is this entry file-like?</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.size">
+<span class="sig-name descname"><span class="pre">size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.size" title="Link to this definition">¶</a></dt>
+<dd><p>Size in bytes of file</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.cat_file">
+<span class="sig-name descname"><span class="pre">cat_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytes</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.cat_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.cat_file" title="Link to this definition">¶</a></dt>
+<dd><p>Get the content of a file</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>URL</em><em> of </em><em>file on this filesystems</em>)</p></li>
+<li><p><strong>start</strong> (<em>int</em>) – Bytes limits of the read. If negative, backwards from end,
+like usual python slices. Either can be None for start or
+end of file, respectively</p></li>
+<li><p><strong>end</strong> (<em>int</em>) – Bytes limits of the read. If negative, backwards from end,
+like usual python slices. Either can be None for start or
+end of file, respectively</p></li>
+<li><p><strong>kwargs</strong> (passed to <code class="docutils literal notranslate"><span class="pre">open()</span></code>.)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.pipe_file">
+<span class="sig-name descname"><span class="pre">pipe_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bytes</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.pipe_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.pipe_file" title="Link to this definition">¶</a></dt>
+<dd><p>Set the bytes of given file</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.head">
+<span class="sig-name descname"><span class="pre">head</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1024</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytes</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.head"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.head" title="Link to this definition">¶</a></dt>
+<dd><p>Get the first <code class="docutils literal notranslate"><span class="pre">size</span></code> bytes from file</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.tail">
+<span class="sig-name descname"><span class="pre">tail</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1024</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytes</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.tail"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.tail" title="Link to this definition">¶</a></dt>
+<dd><p>Get the last <code class="docutils literal notranslate"><span class="pre">size</span></code> bytes from file</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.walk">
+<span class="sig-name descname"><span class="pre">walk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxdepth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">topdown</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.walk"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.walk" title="Link to this definition">¶</a></dt>
+<dd><p>Return all files under the given path.</p>
+<p>List all files, recursing into subdirectories; output is iterator-style,
+like <code class="docutils literal notranslate"><span class="pre">os.walk()</span></code>. For a simple list of files, <code class="docutils literal notranslate"><span class="pre">find()</span></code> is available.</p>
+<p>When topdown is True, the caller can modify the dirnames list in-place (perhaps
+using del or slice assignment), and walk() will
+only recurse into the subdirectories whose names remain in dirnames;
+this can be used to prune the search, impose a specific order of visiting,
+or even to inform walk() about directories the caller creates or renames before
+it resumes walk() again.
+Modifying dirnames when topdown is False has no effect. (see os.walk)</p>
+<p>Note that the “files” outputted will include anything that is not
+a directory, such as links.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – Root to recurse into</p></li>
+<li><p><strong>maxdepth</strong> (<em>int</em>) – Maximum recursion depth. None means limitless, but not recommended
+on link-based file-systems.</p></li>
+<li><p><strong>topdown</strong> (<em>bool</em><em> (</em><em>True</em><em>)</em>) – Whether to walk the directory tree from the top downwards or from
+the bottom upwards.</p></li>
+<li><p><strong>on_error</strong> (<em>&quot;omit&quot;</em><em>, </em><em>&quot;raise&quot;</em><em>, </em><em>a callable</em>) – if omit (default), path with exception will simply be empty;
+If raise, an underlying exception will be raised;
+if callable, it will be called with a single OSError instance as argument</p></li>
+<li><p><strong>kwargs</strong> (passed to <code class="docutils literal notranslate"><span class="pre">ls</span></code>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.find">
+<span class="sig-name descname"><span class="pre">find</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxdepth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">withdirs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.find"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.find" title="Link to this definition">¶</a></dt>
+<dd><p>List all files below path.</p>
+<p>Like posix <code class="docutils literal notranslate"><span class="pre">find</span></code> command without conditions</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>)</p></li>
+<li><p><strong>maxdepth</strong> (<em>int</em><em> or </em><em>None</em>) – If not None, the maximum number of levels to descend</p></li>
+<li><p><strong>withdirs</strong> (<em>bool</em>) – Whether to include directory paths in the output. This is True
+when used by glob, but users usually only want files.</p></li>
+<li><p><strong>ls.</strong> (<em>kwargs are passed to</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.read_text">
+<span class="sig-name descname"><span class="pre">read_text</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">errors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">newline</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.read_text"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.read_text" title="Link to this definition">¶</a></dt>
+<dd><p>Get the contents of the file as a string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – URL of file on this filesystems</p></li>
+<li><p><strong>encoding</strong> (same as <cite>open</cite>.)</p></li>
+<li><p><strong>errors</strong> (same as <cite>open</cite>.)</p></li>
+<li><p><strong>newline</strong> (same as <cite>open</cite>.)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.__repr__">
+<span class="sig-name descname"><span class="pre">__repr__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.__repr__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.__repr__" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
 
 </section>
 </section>
@@ -270,7 +1349,15 @@
       <footer>
         
         <div class="related-pages">
-          
+          <a class="next-page" href="local/index.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">fsspec_rs.local</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
           <a class="prev-page" href="../test_all/index.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
@@ -313,9 +1400,115 @@
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">fsspec_rs</a><ul>
+<li><a class="reference internal" href="#submodules">Submodules</a></li>
 <li><a class="reference internal" href="#attributes">Attributes</a></li>
+<li><a class="reference internal" href="#classes">Classes</a></li>
 <li><a class="reference internal" href="#package-contents">Package Contents</a><ul>
 <li><a class="reference internal" href="#fsspec_rs.__version__"><code class="docutils literal notranslate"><span class="pre">__version__</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile"><code class="docutils literal notranslate"><span class="pre">LocalFile</span></code></a><ul>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile._rust_file"><code class="docutils literal notranslate"><span class="pre">LocalFile._rust_file</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.path"><code class="docutils literal notranslate"><span class="pre">LocalFile.path</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.mode"><code class="docutils literal notranslate"><span class="pre">LocalFile.mode</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.fs"><code class="docutils literal notranslate"><span class="pre">LocalFile.fs</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.blocksize"><code class="docutils literal notranslate"><span class="pre">LocalFile.blocksize</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.loc"><code class="docutils literal notranslate"><span class="pre">LocalFile.loc</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.read"><code class="docutils literal notranslate"><span class="pre">LocalFile.read()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.write"><code class="docutils literal notranslate"><span class="pre">LocalFile.write()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.seek"><code class="docutils literal notranslate"><span class="pre">LocalFile.seek()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.tell"><code class="docutils literal notranslate"><span class="pre">LocalFile.tell()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.flush"><code class="docutils literal notranslate"><span class="pre">LocalFile.flush()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.close"><code class="docutils literal notranslate"><span class="pre">LocalFile.close()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.closed"><code class="docutils literal notranslate"><span class="pre">LocalFile.closed</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.readable"><code class="docutils literal notranslate"><span class="pre">LocalFile.readable()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.writable"><code class="docutils literal notranslate"><span class="pre">LocalFile.writable()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.seekable"><code class="docutils literal notranslate"><span class="pre">LocalFile.seekable()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.__enter__"><code class="docutils literal notranslate"><span class="pre">LocalFile.__enter__()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.__exit__"><code class="docutils literal notranslate"><span class="pre">LocalFile.__exit__()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFile.__repr__"><code class="docutils literal notranslate"><span class="pre">LocalFile.__repr__()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem</span></code></a><ul>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.protocol"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.protocol</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.local_file"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.local_file</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem._rust"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem._rust</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.auto_mkdir"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.auto_mkdir</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.ls"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.ls()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.info"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.info()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem._open"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem._open()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.mkdir"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.mkdir()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.makedirs"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.makedirs()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.rmdir"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.rmdir()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.rm_file"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.rm_file()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.rm"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.rm()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.cp_file"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.cp_file()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.copy"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.copy()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.mv"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.mv()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.exists"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.exists()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.isdir"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.isdir()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.isfile"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.isfile()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.size"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.size()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.cat_file"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.cat_file()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.pipe_file"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.pipe_file()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.head"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.head()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.tail"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.tail()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.touch"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.touch()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.walk"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.walk()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.find"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.find()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.du"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.du()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.read_text"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.read_text()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.write_text"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.write_text()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.get_file"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.get_file()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.LocalFileSystem.put_file"><code class="docutils literal notranslate"><span class="pre">LocalFileSystem.put_file()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#fsspec_rs.S3File"><code class="docutils literal notranslate"><span class="pre">S3File</span></code></a><ul>
+<li><a class="reference internal" href="#fsspec_rs.S3File._rust_file"><code class="docutils literal notranslate"><span class="pre">S3File._rust_file</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.path"><code class="docutils literal notranslate"><span class="pre">S3File.path</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.mode"><code class="docutils literal notranslate"><span class="pre">S3File.mode</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.fs"><code class="docutils literal notranslate"><span class="pre">S3File.fs</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.blocksize"><code class="docutils literal notranslate"><span class="pre">S3File.blocksize</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.loc"><code class="docutils literal notranslate"><span class="pre">S3File.loc</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.read"><code class="docutils literal notranslate"><span class="pre">S3File.read()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.write"><code class="docutils literal notranslate"><span class="pre">S3File.write()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.seek"><code class="docutils literal notranslate"><span class="pre">S3File.seek()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.tell"><code class="docutils literal notranslate"><span class="pre">S3File.tell()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.flush"><code class="docutils literal notranslate"><span class="pre">S3File.flush()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.close"><code class="docutils literal notranslate"><span class="pre">S3File.close()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.closed"><code class="docutils literal notranslate"><span class="pre">S3File.closed</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.readable"><code class="docutils literal notranslate"><span class="pre">S3File.readable()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.writable"><code class="docutils literal notranslate"><span class="pre">S3File.writable()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.seekable"><code class="docutils literal notranslate"><span class="pre">S3File.seekable()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.__enter__"><code class="docutils literal notranslate"><span class="pre">S3File.__enter__()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.__exit__"><code class="docutils literal notranslate"><span class="pre">S3File.__exit__()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3File.__repr__"><code class="docutils literal notranslate"><span class="pre">S3File.__repr__()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem"><code class="docutils literal notranslate"><span class="pre">S3FileSystem</span></code></a><ul>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.protocol"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.protocol</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem._rust"><code class="docutils literal notranslate"><span class="pre">S3FileSystem._rust</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.bucket"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.bucket</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.ls"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.ls()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.info"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.info()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem._open"><code class="docutils literal notranslate"><span class="pre">S3FileSystem._open()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.mkdir"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.mkdir()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.rmdir"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.rmdir()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.rm_file"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.rm_file()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.rm"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.rm()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.cp_file"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.cp_file()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.exists"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.exists()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.isdir"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.isdir()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.isfile"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.isfile()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.size"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.size()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.cat_file"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.cat_file()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.pipe_file"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.pipe_file()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.head"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.head()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.tail"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.tail()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.walk"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.walk()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.find"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.find()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.read_text"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.read_text()</span></code></a></li>
+<li><a class="reference internal" href="#fsspec_rs.S3FileSystem.__repr__"><code class="docutils literal notranslate"><span class="pre">S3FileSystem.__repr__()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
