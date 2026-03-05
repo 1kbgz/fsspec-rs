@@ -31,7 +31,9 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 
-dependencies = []
+dependencies = [
+    "fsspec",
+]
 
 [project.optional-dependencies]
 develop = [

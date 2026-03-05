@@ -1,6 +1,6 @@
 use pyo3::exceptions::{
-    PyFileExistsError, PyFileNotFoundError, PyIsADirectoryError, PyNotADirectoryError,
-    PyOSError, PyPermissionError, PyValueError,
+    PyFileExistsError, PyFileNotFoundError, PyIsADirectoryError, PyNotADirectoryError, PyOSError,
+    PyPermissionError, PyValueError,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -94,11 +94,7 @@ impl PyFileInfo {
             "file" => FileType::File,
             "directory" => FileType::Directory,
             "other" => FileType::Other,
-            other => {
-                return Err(PyValueError::new_err(format!(
-                    "unknown file type: {other}"
-                )))
-            }
+            other => return Err(PyValueError::new_err(format!("unknown file type: {other}"))),
         };
         Ok(PyFileInfo {
             inner: FileInfo {
