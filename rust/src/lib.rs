@@ -7,6 +7,8 @@
 //! in pure Rust, with the same "implement a few primitives, get everything
 //! else for free" design pattern as fsspec.
 
+pub mod buffered;
+pub mod caching;
 pub mod error;
 pub mod file;
 pub mod types;
@@ -17,6 +19,8 @@ mod local;
 mod s3;
 
 #[cfg(test)]
+mod cache_tests;
+#[cfg(test)]
 mod local_tests;
 #[cfg(test)]
 mod s3_tests;
@@ -24,6 +28,8 @@ mod s3_tests;
 mod tests;
 
 pub use async_fs::AsyncFileSystem;
+pub use buffered::BufferedFile;
+pub use caching::CacheType;
 pub use error::{FsError, FsResult};
 pub use file::FsFile;
 pub use fs::FileSystem;

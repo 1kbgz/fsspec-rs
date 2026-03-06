@@ -117,6 +117,10 @@ pub struct OpenOptions {
     pub block_size: usize,
     /// Whether to auto-commit on close (vs. transaction mode)
     pub autocommit: bool,
+    /// Cache strategy to use for reads (default: `None` meaning backend decides).
+    pub cache_type: Option<crate::caching::CacheType>,
+    /// Maximum number of cached blocks (only meaningful for `CacheType::Block`).
+    pub max_blocks: usize,
 }
 
 impl Default for OpenOptions {
@@ -124,6 +128,8 @@ impl Default for OpenOptions {
         Self {
             block_size: 4 * 1024 * 1024, // 4 MiB
             autocommit: true,
+            cache_type: None,
+            max_blocks: 32,
         }
     }
 }

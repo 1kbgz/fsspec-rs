@@ -37,10 +37,17 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
         block_size=None,
         autocommit: bool = True,
         cache_options=None,
+        cache_type=None,
         **kwargs,
     ):
         """Return a Rust-backed file object."""
-        return LocalFile(self, path, mode=mode)
+        return LocalFile(
+            self,
+            path,
+            mode=mode,
+            cache_type=cache_type,
+            block_size=block_size,
+        )
 
     def mkdir(self, path: str, create_parents: bool = True, **kwargs):
         return self._rust.mkdir(path, create_parents=create_parents)
@@ -124,9 +131,15 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
 class LocalFile(AbstractBufferedFile):
     """File-like wrapper delegating to the Rust ``RustLocalFile``."""
 
-    def __init__(self, fs: LocalFileSystem, path: str, mode: str = "rb", **kwargs):
+    def __init__(self, fs: LocalFileSystem, path: str, mode: str = "rb", cache_type=None, block_size=None, **kwargs):
         # Open the Rust file handle right away
-        self._rust_file = fs._rust.open(path, mode)
+        self._rust_file = None  # set early so __del__/closed don't blow up
+        open_kwargs = {}
+        if cache_type is not None:
+            open_kwargs["cache_type"] = cache_type
+        if block_size is not None:
+            open_kwargs["block_size"] = block_size
+        self._rust_file = fs._rust.open(path, mode, **open_kwargs)
         self.path = path
         self.mode = mode
         self.fs = fs
@@ -165,7 +178,7 @@ class LocalFile(AbstractBufferedFile):
 
     @property
     def closed(self) -> bool:
-        return self._rust_file.closed
+        return self._rust_file is None or self._rust_file.closed
 
     def readable(self) -> bool:
         return "r" in self.mode

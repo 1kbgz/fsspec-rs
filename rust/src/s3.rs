@@ -13,6 +13,8 @@ use object_store::path::Path as ObjectPath;
 use object_store::{ObjectStore, PutPayload};
 use tokio::runtime::Runtime;
 
+use crate::buffered::{BufferedFile, Uploader};
+use crate::caching::Fetcher;
 use crate::error::{FsError, FsResult};
 use crate::file::FsFile;
 use crate::fs::FileSystem;
@@ -134,6 +136,37 @@ impl S3Fs {
             rt,
             bucket: cfg.bucket,
         })
+    }
+
+    /// Fetch the byte range `[start, end)` from an S3 object.
+    /// This performs a range-GET using `object_store`.
+    pub fn fetch_range(&self, key: &str, start: u64, end: u64) -> FsResult<Vec<u8>> {
+        use object_store::GetOptions;
+        use object_store::GetRange;
+
+        let obj_path = to_object_path(key);
+        let range = GetRange::Bounded(start..end);
+        let opts = GetOptions {
+            range: Some(range),
+            ..Default::default()
+        };
+
+        let result = self
+            .rt
+            .block_on(self.store.get_opts(&obj_path, opts))
+            .map_err(obj_err_to_fs)?;
+        let bytes = self.rt.block_on(result.bytes()).map_err(obj_err_to_fs)?;
+        Ok(bytes.to_vec())
+    }
+
+    /// Upload data to an S3 object.
+    pub fn upload_data(&self, key: &str, data: &[u8]) -> FsResult<()> {
+        let obj_path = to_object_path(key);
+        let payload = PutPayload::from(Bytes::from(data.to_vec()));
+        self.rt
+            .block_on(self.store.put(&obj_path, payload))
+            .map_err(obj_err_to_fs)?;
+        Ok(())
     }
 }
 
@@ -331,12 +364,62 @@ impl FileSystem for S3Fs {
         &self,
         path: &str,
         mode: OpenMode,
-        _opts: Option<OpenOptions>,
+        opts: Option<OpenOptions>,
     ) -> FsResult<Box<dyn FsFile>> {
         let key = self.strip_protocol(path);
         let key = normalise_key(&key).to_string();
+        let opts = opts.unwrap_or_default();
+
         match mode {
             OpenMode::Read => {
+                // If a cache_type is specified, use BufferedFile with lazy range-fetch.
+                if let Some(cache_type) = opts.cache_type {
+                    // Get file size via HEAD
+                    let obj_path = to_object_path(&key);
+                    let meta = self
+                        .rt
+                        .block_on(self.store.head(&obj_path))
+                        .map_err(obj_err_to_fs)?;
+                    let file_size = meta.size as u64;
+
+                    // Build a fetcher that captures an Arc<AmazonS3> clone
+                    let store = Arc::clone(&self.store);
+                    let key_clone = key.clone();
+                    let fetcher: Fetcher = Box::new(move |start, end| {
+                        use object_store::GetOptions;
+                        use object_store::GetRange;
+
+                        let obj_path = to_object_path(&key_clone);
+                        let range = GetRange::Bounded(start..end);
+                        let get_opts = GetOptions {
+                            range: Some(range),
+                            ..Default::default()
+                        };
+
+                        // Build a Runtime per fetch — we are inside a closure
+                        // that will be called from sync context.
+                        let rt = Runtime::new().map_err(|e| FsError::Other(e.to_string()))?;
+                        let result = rt
+                            .block_on(store.get_opts(&obj_path, get_opts))
+                            .map_err(obj_err_to_fs)?;
+                        let bytes = rt.block_on(result.bytes()).map_err(obj_err_to_fs)?;
+                        Ok(bytes.to_vec())
+                    });
+
+                    let blocksize = opts.block_size as u64;
+                    let max_blocks = opts.max_blocks;
+
+                    return Ok(Box::new(BufferedFile::new_read(
+                        key,
+                        fetcher,
+                        Some(file_size),
+                        cache_type,
+                        blocksize,
+                        max_blocks,
+                    )));
+                }
+
+                // Default: eagerly load entire file (backwards compatible)
                 let obj_path = to_object_path(&key);
                 let result = self
                     .rt
@@ -349,11 +432,32 @@ impl FileSystem for S3Fs {
                     Arc::clone(&self.store),
                 )))
             }
-            OpenMode::Write | OpenMode::Exclusive => Ok(Box::new(S3File::new_write(
-                key,
-                Arc::clone(&self.store),
-                mode == OpenMode::Exclusive,
-            ))),
+            OpenMode::Write | OpenMode::Exclusive => {
+                // If cache_type is set, use BufferedFile for writes
+                if opts.cache_type.is_some() {
+                    let store = Arc::clone(&self.store);
+                    let key_clone = key.clone();
+                    let uploader: Uploader = Box::new(move |data: &[u8]| {
+                        let obj_path = to_object_path(&key_clone);
+                        let payload = PutPayload::from(Bytes::from(data.to_vec()));
+                        let rt = Runtime::new().map_err(|e| FsError::Other(e.to_string()))?;
+                        rt.block_on(store.put(&obj_path, payload))
+                            .map_err(obj_err_to_fs)?;
+                        Ok(())
+                    });
+                    return Ok(Box::new(BufferedFile::new_write(
+                        key,
+                        uploader,
+                        opts.autocommit,
+                    )));
+                }
+
+                Ok(Box::new(S3File::new_write(
+                    key,
+                    Arc::clone(&self.store),
+                    mode == OpenMode::Exclusive,
+                )))
+            }
             OpenMode::Append => {
                 // Download existing content (if any), then open for write at end
                 let obj_path = to_object_path(&key);
