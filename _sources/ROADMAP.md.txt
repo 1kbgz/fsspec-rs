@@ -333,11 +333,16 @@ The [`object_store`](https://crates.io/crates/object_store) crate (from the Apac
 
 ### Phase 3: Buffered File & Caching ✦ _Milestone: feature parity with fsspec file objects_
 
-- [ ] **3.1** Implement Rust `BufferedFile` struct with pluggable read cache (readahead, block, all-bytes)
-- [ ] **3.2** Implement Rust write buffering with configurable block size and auto-flush
-- [ ] **3.3** Expose cache strategies to Python via configuration
-- [ ] **3.4** Integrate with fsspec's `AbstractBufferedFile` for Python-side compatibility
-- [ ] **3.5** Tests and benchmarks for buffered read/write patterns
+- [x] **3.1** Implement Rust `BufferedFile` struct with pluggable read cache (readahead, block, all-bytes) — `rust/src/buffered.rs`
+- [x] **3.2** Implement Rust `Cache` trait with 4 strategies: `NoCache`, `ReadAheadCache`, `BlockCache`, `AllBytesCache` — `rust/src/caching.rs`
+- [x] **3.3** Implement Rust write buffering with `Uploader` closure and auto-commit on drop
+- [x] **3.4** Add `fetch_range()` to `S3Fs` for lazy range-GET via `object_store::GetRange`
+- [x] **3.5** Wire `cache_type` into `OpenOptions` and `S3Fs::open()` — when set, returns `BufferedFile` instead of `S3File`
+- [x] **3.6** Expose `cache_type`, `block_size`, `max_blocks` parameters in PyO3 `RustS3Fs.open()` and `RustLocalFs.open()`
+- [x] **3.7** Expose `cache_type` in Python `_open()` methods (`LocalFileSystem`, `S3FileSystem`)
+- [x] **3.8** Tests: 30 new Rust unit tests (cache strategies + BufferedFile read/write/seek/commit/discard)
+- [x] **3.9** Tests: 21 new Python tests (cache_type parameter acceptance, invalid cache_type, read patterns)
+- [ ] **3.10** Benchmark: compare cached vs uncached S3 reads for sequential and random access patterns
 
 ### Phase 4: Advanced Features ✦ _Milestone: production-ready_
 

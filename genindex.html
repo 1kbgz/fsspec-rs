@@ -203,6 +203,7 @@
 <li class="toctree-l3"><a class="reference internal" href="autoapi/fsspec_rs/s3/index.html">fsspec_rs.s3</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/test_cache/index.html">test_cache</a></li>
 <li class="toctree-l2"><a class="reference internal" href="autoapi/test_local/index.html">test_local</a></li>
 </ul>
 </li>
@@ -690,6 +691,8 @@
 </li>
           <li><a href="autoapi/test_all/index.html#module-test_all">test_all</a>
 </li>
+          <li><a href="autoapi/test_cache/index.html#module-test_cache">test_cache</a>
+</li>
           <li><a href="autoapi/test_local/index.html#module-test_local">test_local</a>
 </li>
           <li><a href="autoapi/test_s3/index.html#module-test_s3">test_s3</a>
@@ -843,6 +846,8 @@
           <li><a href="autoapi/fsspec_rs/s3/index.html#fsspec_rs.s3.S3FileSystem">(class in fsspec_rs.s3)</a>
 </li>
         </ul></li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.sample_file">sample_file() (in module test_cache)</a>
+</li>
         <li><a href="autoapi/fsspec_rs/local/index.html#fsspec_rs.local.LocalFile.seek">seek() (fsspec_rs.local.LocalFile method)</a>
 
         <ul>
@@ -918,6 +923,13 @@
 </li>
         <li><a href="autoapi/test_s3/index.html#test_s3.TestProtocol.test_bucket_attr">test_bucket_attr() (test_s3.TestProtocol method)</a>
 </li>
+        <li>
+    test_cache
+
+        <ul>
+          <li><a href="autoapi/test_cache/index.html#module-test_cache">module</a>
+</li>
+        </ul></li>
         <li><a href="autoapi/test_s3/index.html#test_s3.TestContent.test_cat_file">test_cat_file() (test_s3.TestContent method)</a>
 </li>
         <li><a href="autoapi/test_local/index.html#test_local.TestReadWrite.test_cat_pipe">test_cat_pipe() (test_local.TestReadWrite method)</a>
@@ -1051,8 +1063,6 @@
 </li>
         <li><a href="autoapi/test_s3/index.html#test_s3.TestLs.test_ls_detail_false">test_ls_detail_false() (test_s3.TestLs method)</a>
 </li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="autoapi/test_s3/index.html#test_s3.TestLs.test_ls_detail_true">test_ls_detail_true() (test_s3.TestLs method)</a>
 </li>
         <li><a href="autoapi/test_local/index.html#test_local.TestLs.test_ls_names_only">test_ls_names_only() (test_local.TestLs method)</a>
@@ -1065,12 +1075,32 @@
 </li>
         <li><a href="autoapi/test_local/index.html#test_local.TestCopyMove.test_mv">test_mv() (test_local.TestCopyMove method)</a>
 </li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestLocalOpenCacheType.test_open_block_size">test_open_block_size() (test_cache.TestLocalOpenCacheType method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestLocalOpenCacheType.test_open_cache_type_all">test_open_cache_type_all() (test_cache.TestLocalOpenCacheType method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestLocalOpenCacheType.test_open_cache_type_block">test_open_cache_type_block() (test_cache.TestLocalOpenCacheType method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestLocalOpenCacheType.test_open_cache_type_none">test_open_cache_type_none() (test_cache.TestLocalOpenCacheType method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestLocalOpenCacheType.test_open_cache_type_readahead">test_open_cache_type_readahead() (test_cache.TestLocalOpenCacheType method)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="autoapi/test_local/index.html#test_local.TestOpen.test_open_context_manager">test_open_context_manager() (test_local.TestOpen method)</a>
 
         <ul>
           <li><a href="autoapi/test_s3/index.html#test_s3.TestOpen.test_open_context_manager">(test_s3.TestOpen method)</a>
 </li>
         </ul></li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestLocalOpenCacheType.test_open_invalid_cache_type">test_open_invalid_cache_type() (test_cache.TestLocalOpenCacheType method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestLocalOpenCacheType.test_open_no_cache_type">test_open_no_cache_type() (test_cache.TestLocalOpenCacheType method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestFsspecOpenSignature.test_open_passes_block_size">test_open_passes_block_size() (test_cache.TestFsspecOpenSignature method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestFsspecOpenSignature.test_open_passes_cache_type">test_open_passes_cache_type() (test_cache.TestFsspecOpenSignature method)</a>
+</li>
         <li><a href="autoapi/test_s3/index.html#test_s3.TestOpen.test_open_read">test_open_read() (test_s3.TestOpen method)</a>
 </li>
         <li><a href="autoapi/test_local/index.html#test_local.TestOpen.test_open_returns_local_file">test_open_returns_local_file() (test_local.TestOpen method)</a>
@@ -1101,6 +1131,12 @@
 </li>
         <li><a href="autoapi/test_local/index.html#test_local.TestRustInner.test_rust_local_fs_available">test_rust_local_fs_available() (test_local.TestRustInner method)</a>
 </li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestRustOpenDirect.test_rust_open_with_block_size">test_rust_open_with_block_size() (test_cache.TestRustOpenDirect method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestRustOpenDirect.test_rust_open_with_cache_type">test_rust_open_with_cache_type() (test_cache.TestRustOpenDirect method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestRustOpenDirect.test_rust_open_with_max_blocks">test_rust_open_with_max_blocks() (test_cache.TestRustOpenDirect method)</a>
+</li>
         <li><a href="autoapi/test_s3/index.html#test_s3.TestIsInstance.test_rust_s3_file_class_exists">test_rust_s3_file_class_exists() (test_s3.TestIsInstance method)</a>
 </li>
         <li><a href="autoapi/test_s3/index.html#test_s3.TestIsInstance.test_rust_s3_fs_class_exists">test_rust_s3_fs_class_exists() (test_s3.TestIsInstance method)</a>
@@ -1115,6 +1151,12 @@
         <li><a href="autoapi/test_s3/index.html#test_s3.TestIsInstance.test_s3_file_is_buffered_file">test_s3_file_is_buffered_file() (test_s3.TestIsInstance method)</a>
 </li>
         <li><a href="autoapi/test_s3/index.html#test_s3.TestIsInstance.test_s3_filesystem_is_abstract_fs">test_s3_filesystem_is_abstract_fs() (test_s3.TestIsInstance method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestReadPatterns.test_seek_and_read">test_seek_and_read() (test_cache.TestReadPatterns method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestReadPatterns.test_seek_from_end">test_seek_from_end() (test_cache.TestReadPatterns method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestReadPatterns.test_sequential_small_reads">test_sequential_small_reads() (test_cache.TestReadPatterns method)</a>
 </li>
         <li><a href="autoapi/test_local/index.html#test_local.TestSize.test_size">test_size() (test_local.TestSize method)</a>
 
@@ -1144,7 +1186,11 @@
         </ul></li>
         <li><a href="autoapi/test_local/index.html#test_local.TestWalkFind.test_walk_max_depth">test_walk_max_depth() (test_local.TestWalkFind method)</a>
 </li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestWriteWithCacheType.test_write_default">test_write_default() (test_cache.TestWriteWithCacheType method)</a>
+</li>
         <li><a href="autoapi/test_local/index.html#test_local.TestText.test_write_read_text">test_write_read_text() (test_local.TestText method)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestWriteWithCacheType.test_write_with_cache_type_none">test_write_with_cache_type_none() (test_cache.TestWriteWithCacheType method)</a>
 </li>
         <li><a href="autoapi/test_local/index.html#test_local.TestAutoMkdir">TestAutoMkdir (class in test_local)</a>
 </li>
@@ -1170,6 +1216,8 @@
 </li>
         <li><a href="autoapi/test_s3/index.html#test_s3.TestFindWalk">TestFindWalk (class in test_s3)</a>
 </li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestFsspecOpenSignature">TestFsspecOpenSignature (class in test_cache)</a>
+</li>
         <li><a href="autoapi/test_local/index.html#test_local.TestGetPut">TestGetPut (class in test_local)</a>
 </li>
         <li><a href="autoapi/test_local/index.html#test_local.TestInfo">TestInfo (class in test_local)</a>
@@ -1184,6 +1232,8 @@
           <li><a href="autoapi/test_s3/index.html#test_s3.TestIsInstance">(class in test_s3)</a>
 </li>
         </ul></li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestLocalOpenCacheType">TestLocalOpenCacheType (class in test_cache)</a>
+</li>
         <li><a href="autoapi/test_local/index.html#test_local.TestLs">TestLs (class in test_local)</a>
 
         <ul>
@@ -1198,11 +1248,15 @@
         </ul></li>
         <li><a href="autoapi/test_s3/index.html#test_s3.TestProtocol">TestProtocol (class in test_s3)</a>
 </li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestReadPatterns">TestReadPatterns (class in test_cache)</a>
+</li>
         <li><a href="autoapi/test_local/index.html#test_local.TestReadWrite">TestReadWrite (class in test_local)</a>
 </li>
         <li><a href="autoapi/test_local/index.html#test_local.TestRemove">TestRemove (class in test_local)</a>
 </li>
         <li><a href="autoapi/test_local/index.html#test_local.TestRustInner">TestRustInner (class in test_local)</a>
+</li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestRustOpenDirect">TestRustOpenDirect (class in test_cache)</a>
 </li>
         <li><a href="autoapi/test_local/index.html#test_local.TestSize">TestSize (class in test_local)</a>
 </li>
@@ -1214,8 +1268,14 @@
 </li>
         <li><a href="autoapi/test_local/index.html#test_local.TestWalkFind">TestWalkFind (class in test_local)</a>
 </li>
-        <li><a href="autoapi/test_local/index.html#test_local.tmp">tmp() (in module test_local)</a>
+        <li><a href="autoapi/test_cache/index.html#test_cache.TestWriteWithCacheType">TestWriteWithCacheType (class in test_cache)</a>
 </li>
+        <li><a href="autoapi/test_cache/index.html#test_cache.tmp">tmp() (in module test_cache)</a>
+
+        <ul>
+          <li><a href="autoapi/test_local/index.html#test_local.tmp">(in module test_local)</a>
+</li>
+        </ul></li>
         <li><a href="autoapi/fsspec_rs/local/index.html#fsspec_rs.local.LocalFileSystem.touch">touch() (fsspec_rs.local.LocalFileSystem method)</a>
 
         <ul>

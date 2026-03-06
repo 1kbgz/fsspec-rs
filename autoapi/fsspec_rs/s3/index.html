@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html"><link rel="next" title="test_local" href="../../test_local/index.html"><link rel="prev" title="fsspec_rs.local" href="../local/index.html">
+<link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html"><link rel="next" title="test_cache" href="../../test_cache/index.html"><link rel="prev" title="fsspec_rs.local" href="../local/index.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
         <title>fsspec_rs.s3 - fsspec-rs v0.1.0</title>
@@ -205,6 +205,7 @@
 <li class="toctree-l3 current current-page"><a class="current reference internal" href="#">fsspec_rs.s3</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="../../test_cache/index.html">test_cache</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../test_local/index.html">test_local</a></li>
 </ul>
 </li>
@@ -387,7 +388,7 @@ which case, the returned dict will include <code class="docutils literal notrans
 
 <dl class="py method">
 <dt class="sig sig-object py" id="fsspec_rs.s3.S3FileSystem._open">
-<span class="sig-name descname"><span class="pre">_open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'rb'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autocommit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../_modules/fsspec_rs/s3.html#S3FileSystem._open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.s3.S3FileSystem._open" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">_open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'rb'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autocommit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../_modules/fsspec_rs/s3.html#S3FileSystem._open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.s3.S3FileSystem._open" title="Link to this definition">¶</a></dt>
 <dd><p>Return a Rust-backed S3 file object.</p>
 </dd></dl>
 
@@ -580,7 +581,7 @@ when used by glob, but users usually only want files.</p></li>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="fsspec_rs.s3.S3File">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fsspec_rs.s3.</span></span><span class="sig-name descname"><span class="pre">S3File</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#fsspec_rs.s3.S3FileSystem" title="fsspec_rs.s3.S3FileSystem"><span class="pre">S3FileSystem</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'rb'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../_modules/fsspec_rs/s3.html#S3File"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.s3.S3File" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fsspec_rs.s3.</span></span><span class="sig-name descname"><span class="pre">S3File</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#fsspec_rs.s3.S3FileSystem" title="fsspec_rs.s3.S3FileSystem"><span class="pre">S3FileSystem</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'rb'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../_modules/fsspec_rs/s3.html#S3File"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.s3.S3File" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">fsspec.spec.AbstractBufferedFile</span></code></p>
 <p>File-like wrapper delegating to the Rust <code class="docutils literal notranslate"><span class="pre">RustS3File</span></code>.</p>
 <p>Template for files with buffered reading and writing</p>
@@ -604,7 +605,7 @@ by <cite>cache_type</cite>.</p></li>
 </dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="fsspec_rs.s3.S3File._rust_file">
-<span class="sig-name descname"><span class="pre">_rust_file</span></span><a class="headerlink" href="#fsspec_rs.s3.S3File._rust_file" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">_rust_file</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#fsspec_rs.s3.S3File._rust_file" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -746,12 +747,12 @@ blocks are allowed to be. Disallows further writing to this file.</p>
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="../../test_local/index.html">
+          <a class="next-page" href="../../test_cache/index.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">test_local</div>
+                <div class="title">test_cache</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>

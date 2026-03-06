@@ -129,7 +129,7 @@ Module Contents
 
 
 
-   .. py:method:: _open(path: str, mode: str = 'rb', block_size=None, autocommit: bool = True, cache_options=None, **kwargs)
+   .. py:method:: _open(path: str, mode: str = 'rb', block_size=None, autocommit: bool = True, cache_options=None, cache_type=None, **kwargs)
 
       Return a Rust-backed S3 file object.
 
@@ -312,7 +312,7 @@ Module Contents
    .. py:method:: __repr__() -> str
 
 
-.. py:class:: S3File(fs: S3FileSystem, path: str, mode: str = 'rb', **kwargs)
+.. py:class:: S3File(fs: S3FileSystem, path: str, mode: str = 'rb', cache_type=None, block_size=None, **kwargs)
 
    Bases: :py:obj:`fsspec.spec.AbstractBufferedFile`
 
@@ -344,6 +344,8 @@ Module Contents
 
 
    .. py:attribute:: _rust_file
+      :value: None
+
 
 
    .. py:attribute:: path

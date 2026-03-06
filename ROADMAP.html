@@ -205,6 +205,7 @@
 <li class="toctree-l3"><a class="reference internal" href="autoapi/fsspec_rs/s3/index.html">fsspec_rs.s3</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/test_cache/index.html">test_cache</a></li>
 <li class="toctree-l2"><a class="reference internal" href="autoapi/test_local/index.html">test_local</a></li>
 </ul>
 </li>
@@ -651,11 +652,16 @@
 <section id="phase-3-buffered-file-caching-milestone-feature-parity-with-fsspec-file-objects">
 <h3>Phase 3: Buffered File &amp; Caching ✦ <em>Milestone: feature parity with fsspec file objects</em><a class="headerlink" href="#phase-3-buffered-file-caching-milestone-feature-parity-with-fsspec-file-objects" title="Link to this heading">¶</a></h3>
 <ul class="simple">
-<li><p>[ ] <strong>3.1</strong> Implement Rust <code class="docutils literal notranslate"><span class="pre">BufferedFile</span></code> struct with pluggable read cache (readahead, block, all-bytes)</p></li>
-<li><p>[ ] <strong>3.2</strong> Implement Rust write buffering with configurable block size and auto-flush</p></li>
-<li><p>[ ] <strong>3.3</strong> Expose cache strategies to Python via configuration</p></li>
-<li><p>[ ] <strong>3.4</strong> Integrate with fsspec’s <code class="docutils literal notranslate"><span class="pre">AbstractBufferedFile</span></code> for Python-side compatibility</p></li>
-<li><p>[ ] <strong>3.5</strong> Tests and benchmarks for buffered read/write patterns</p></li>
+<li><p>[x] <strong>3.1</strong> Implement Rust <code class="docutils literal notranslate"><span class="pre">BufferedFile</span></code> struct with pluggable read cache (readahead, block, all-bytes) — <code class="docutils literal notranslate"><span class="pre">rust/src/buffered.rs</span></code></p></li>
+<li><p>[x] <strong>3.2</strong> Implement Rust <code class="docutils literal notranslate"><span class="pre">Cache</span></code> trait with 4 strategies: <code class="docutils literal notranslate"><span class="pre">NoCache</span></code>, <code class="docutils literal notranslate"><span class="pre">ReadAheadCache</span></code>, <code class="docutils literal notranslate"><span class="pre">BlockCache</span></code>, <code class="docutils literal notranslate"><span class="pre">AllBytesCache</span></code> — <code class="docutils literal notranslate"><span class="pre">rust/src/caching.rs</span></code></p></li>
+<li><p>[x] <strong>3.3</strong> Implement Rust write buffering with <code class="docutils literal notranslate"><span class="pre">Uploader</span></code> closure and auto-commit on drop</p></li>
+<li><p>[x] <strong>3.4</strong> Add <code class="docutils literal notranslate"><span class="pre">fetch_range()</span></code> to <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> for lazy range-GET via <code class="docutils literal notranslate"><span class="pre">object_store::GetRange</span></code></p></li>
+<li><p>[x] <strong>3.5</strong> Wire <code class="docutils literal notranslate"><span class="pre">cache_type</span></code> into <code class="docutils literal notranslate"><span class="pre">OpenOptions</span></code> and <code class="docutils literal notranslate"><span class="pre">S3Fs::open()</span></code> — when set, returns <code class="docutils literal notranslate"><span class="pre">BufferedFile</span></code> instead of <code class="docutils literal notranslate"><span class="pre">S3File</span></code></p></li>
+<li><p>[x] <strong>3.6</strong> Expose <code class="docutils literal notranslate"><span class="pre">cache_type</span></code>, <code class="docutils literal notranslate"><span class="pre">block_size</span></code>, <code class="docutils literal notranslate"><span class="pre">max_blocks</span></code> parameters in PyO3 <code class="docutils literal notranslate"><span class="pre">RustS3Fs.open()</span></code> and <code class="docutils literal notranslate"><span class="pre">RustLocalFs.open()</span></code></p></li>
+<li><p>[x] <strong>3.7</strong> Expose <code class="docutils literal notranslate"><span class="pre">cache_type</span></code> in Python <code class="docutils literal notranslate"><span class="pre">_open()</span></code> methods (<code class="docutils literal notranslate"><span class="pre">LocalFileSystem</span></code>, <code class="docutils literal notranslate"><span class="pre">S3FileSystem</span></code>)</p></li>
+<li><p>[x] <strong>3.8</strong> Tests: 30 new Rust unit tests (cache strategies + BufferedFile read/write/seek/commit/discard)</p></li>
+<li><p>[x] <strong>3.9</strong> Tests: 21 new Python tests (cache_type parameter acceptance, invalid cache_type, read patterns)</p></li>
+<li><p>[ ] <strong>3.10</strong> Benchmark: compare cached vs uncached S3 reads for sequential and random access patterns</p></li>
 </ul>
 </section>
 <section id="phase-4-advanced-features-milestone-production-ready">
