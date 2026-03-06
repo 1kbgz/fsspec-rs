@@ -3,8 +3,8 @@ use pyo3::types::PyDict;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::Mutex;
 
-use fsspec_rs::types::OpenMode;
-use fsspec_rs::{FileSystem, LocalFs};
+use fsspec_rs::types::{OpenMode, OpenOptions};
+use fsspec_rs::{CacheType, FileSystem, LocalFs};
 
 use crate::types::{fs_error_to_pyerr, PyFileInfo};
 
@@ -239,14 +239,51 @@ impl RustLocalFs {
     }
 
     /// Open a file and return a RustLocalFile.
-    #[pyo3(signature = (path, mode = "rb"))]
-    fn open(&self, path: &str, mode: &str) -> PyResult<RustLocalFile> {
+    ///
+    /// # Arguments
+    /// * `path` — local file path
+    /// * `mode` — "rb", "wb", "ab", "xb" (default: "rb")
+    /// * `cache_type` — optional cache strategy: "none", "readahead", "block", "all"
+    /// * `block_size` — cache block size in bytes (default: 4 MiB)
+    /// * `max_blocks` — maximum cached blocks for "block" strategy (default: 32)
+    #[pyo3(signature = (path, mode = "rb", cache_type = None, block_size = None, max_blocks = None))]
+    fn open(
+        &self,
+        path: &str,
+        mode: &str,
+        cache_type: Option<&str>,
+        block_size: Option<usize>,
+        max_blocks: Option<usize>,
+    ) -> PyResult<RustLocalFile> {
         let open_mode = OpenMode::from_str_mode(mode).ok_or_else(|| {
             pyo3::exceptions::PyValueError::new_err(format!("unsupported mode: {mode}"))
         })?;
+
+        let opts = if cache_type.is_some() || block_size.is_some() || max_blocks.is_some() {
+            let ct = match cache_type {
+                Some(s) => Some(CacheType::from_str(s).ok_or_else(|| {
+                    pyo3::exceptions::PyValueError::new_err(format!(
+                        "unknown cache_type: {s}. Valid: none, readahead, block, all"
+                    ))
+                })?),
+                None => None,
+            };
+            let mut o = OpenOptions::default();
+            o.cache_type = ct;
+            if let Some(bs) = block_size {
+                o.block_size = bs;
+            }
+            if let Some(mb) = max_blocks {
+                o.max_blocks = mb;
+            }
+            Some(o)
+        } else {
+            None
+        };
+
         let f = self
             .inner
-            .open(path, open_mode, None)
+            .open(path, open_mode, opts)
             .map_err(fs_error_to_pyerr)?;
         Ok(RustLocalFile {
             inner: Mutex::new(Some(f)),

@@ -74,10 +74,17 @@ class S3FileSystem(fsspec.AbstractFileSystem):
         block_size=None,
         autocommit: bool = True,
         cache_options=None,
+        cache_type=None,
         **kwargs,
     ):
         """Return a Rust-backed S3 file object."""
-        return S3File(self, path, mode=mode)
+        return S3File(
+            self,
+            path,
+            mode=mode,
+            cache_type=cache_type,
+            block_size=block_size,
+        )
 
     def mkdir(self, path: str, create_parents: bool = True, **kwargs):
         return self._rust.mkdir(path, create_parents=create_parents)
@@ -140,8 +147,14 @@ class S3FileSystem(fsspec.AbstractFileSystem):
 class S3File(AbstractBufferedFile):
     """File-like wrapper delegating to the Rust ``RustS3File``."""
 
-    def __init__(self, fs: S3FileSystem, path: str, mode: str = "rb", **kwargs):
-        self._rust_file = fs._rust.open(path, mode)
+    def __init__(self, fs: S3FileSystem, path: str, mode: str = "rb", cache_type=None, block_size=None, **kwargs):
+        self._rust_file = None  # set early so __del__/closed don't blow up
+        open_kwargs = {}
+        if cache_type is not None:
+            open_kwargs["cache_type"] = cache_type
+        if block_size is not None:
+            open_kwargs["block_size"] = block_size
+        self._rust_file = fs._rust.open(path, mode, **open_kwargs)
         self.path = path
         self.mode = mode
         self.fs = fs
@@ -177,7 +190,7 @@ class S3File(AbstractBufferedFile):
 
     @property
     def closed(self) -> bool:
-        return self._rust_file.closed
+        return self._rust_file is None or self._rust_file.closed
 
     def readable(self) -> bool:
         return "r" in self.mode
