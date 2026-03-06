@@ -96,7 +96,7 @@ Module Contents
 
 .. py:class:: TestRustInner
 
-   .. py:method:: test_rust_local_fs_available()
+   .. py:method:: test_rust_local_fs_available(tmp)
 
 
    .. py:method:: test_rust_local_file_closes(tmp)
