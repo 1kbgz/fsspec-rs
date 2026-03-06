@@ -71,9 +71,9 @@ class TestConstruction:
 
 
 class TestRustInner:
-    def test_rust_local_fs_available(self):
+    def test_rust_local_fs_available(self, tmp):
         rust_fs = RustLocalFs()
-        assert rust_fs.exists("/tmp")
+        assert rust_fs.exists(tmp)
 
     def test_rust_local_file_closes(self, tmp):
         rust_fs = RustLocalFs()

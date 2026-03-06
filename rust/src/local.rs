@@ -198,6 +198,10 @@ impl FileSystem for LocalFs {
         "/"
     }
 
+    fn sep(&self) -> &str {
+        std::path::MAIN_SEPARATOR_STR
+    }
+
     fn ls(&self, path: &str, _detail: bool) -> FsResult<Vec<FileInfo>> {
         let p = Path::new(path);
         if !p.exists() {
