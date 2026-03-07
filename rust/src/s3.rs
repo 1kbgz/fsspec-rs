@@ -108,6 +108,10 @@ impl S3Fs {
         }
         if let Some(ref endpoint) = cfg.endpoint_url {
             builder = builder.with_endpoint(endpoint);
+            // Allow plain HTTP (needed for MinIO / LocalStack / other local S3)
+            if endpoint.starts_with("http://") {
+                builder = builder.with_allow_http(true);
+            }
         }
         if let Some(ref key) = cfg.access_key_id {
             builder = builder.with_access_key_id(key);
