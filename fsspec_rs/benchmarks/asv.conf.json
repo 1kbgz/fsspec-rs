@@ -1,8 +1,8 @@
 {
     "version": 1,
     "project": "fsspec-rs",
-    "project_url": "https://github.com/1kbgz/fsspec-rs/",
-    "repo": ".",
+    "project_url": "https://github.com/1kbgz/fsspec-fs/",
+    "repo": "https://github.com/1kbgz/fsspec-fs.git",
     "build_command": [
         "python -m pip install build",
         "python -m build",
