@@ -5,7 +5,6 @@ import socket
 
 import pytest
 
-
 MINIO_ENDPOINT = "http://localhost:9000"
 MINIO_KEY = "minioadmin"
 MINIO_SECRET = "minioadmin"
