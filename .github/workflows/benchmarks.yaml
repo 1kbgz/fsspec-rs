@@ -40,20 +40,20 @@ jobs:
       - name: Run quick benchmarks
         run: make benchmark-local-quick
 
-      - name: Compare with main
-        if: github.event_name == 'pull_request'
-        run: |
-          python -m asv continuous --config fsspec_rs/benchmarks/asv.conf.json --verbose main HEAD || true
+      # - name: Compare with main
+      #   if: github.event_name == 'pull_request'
+      #   run: |
+      #     python -m asv continuous --config fsspec_rs/benchmarks/asv.conf.json --verbose main HEAD || true
 
-      - name: Publish benchmark HTML
-        if: github.ref == 'refs/heads/main'
-        run: make benchmark-publish
+      # - name: Publish benchmark HTML
+      #   if: github.ref == 'refs/heads/main'
+      #   run: make benchmark-publish
 
-      - name: Upload benchmark results
-        uses: actions/upload-artifact@v7
-        with:
-          name: benchmark-results
-          path: |
-            .asv/results/
-            docs/html/benchmarks/
-        if: always()
+      # - name: Upload benchmark results
+      #   uses: actions/upload-artifact@v7
+      #   with:
+      #     name: benchmark-results
+      #     path: |
+      #       .asv/results/
+      #       docs/html/benchmarks/
+      #   if: always()

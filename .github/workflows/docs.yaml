@@ -17,7 +17,7 @@ jobs:
       - run: uv pip install .[develop]
       - run: uv pip install yardang laxate asv
       - run: yardang build
-      - run: make benchmark-publish
+      # - run: make benchmark-publish
       - uses: peaceiris/actions-gh-pages@v4
         with:
           publish_branch: gh-pages

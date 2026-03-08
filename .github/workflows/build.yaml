@@ -54,8 +54,16 @@ jobs:
     - name: Build
       run: make build
 
+    - name: Start MinIO
+      run: make minio-start
+      if: matrix.os == 'ubuntu-latest'
+
     - name: Test
       run: make coverage
+
+    - name: Stop MinIO
+      run: make minio-stop
+      if: matrix.os == 'ubuntu-latest'
 
     - name: Upload test results (Python)
       uses: actions/upload-artifact@v7

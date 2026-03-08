@@ -1,20 +1,9 @@
-"""Shared fixtures for fsspec-rs benchmarks.
-
-MinIO fixtures automatically skip when MinIO is not reachable on localhost:9000.
-Start MinIO via:
-    make minio-start
-"""
-
 from __future__ import annotations
 
 import os
 import socket
 
 import pytest
-
-# ---------------------------------------------------------------------------
-# MinIO connectivity check
-# ---------------------------------------------------------------------------
 
 MINIO_ENDPOINT = "http://localhost:9000"
 MINIO_KEY = "minioadmin"
@@ -33,10 +22,6 @@ def _minio_is_reachable() -> bool:
 
 _has_minio = _minio_is_reachable()
 
-# ---------------------------------------------------------------------------
-# Data helpers
-# ---------------------------------------------------------------------------
-
 # Sizes for test payloads
 SMALL = 4 * 1024  # 4 KiB
 MEDIUM = 256 * 1024  # 256 KiB
@@ -46,11 +31,6 @@ LARGE = 4 * 1024 * 1024  # 4 MiB
 def _make_data(size: int) -> bytes:
     """Deterministic test payload of *size* bytes."""
     return bytes(range(256)) * (size // 256) + bytes(range(size % 256))
-
-
-# ---------------------------------------------------------------------------
-# Local filesystem fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
@@ -101,10 +81,6 @@ def py_local_fs():
 
     return LocalFileSystem()
 
-
-# ---------------------------------------------------------------------------
-# S3 (MinIO) fixtures
-# ---------------------------------------------------------------------------
 
 requires_minio = pytest.mark.skipif(
     not _has_minio,
