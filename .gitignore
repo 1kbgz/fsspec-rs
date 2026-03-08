@@ -167,3 +167,7 @@ fsspec-python
 fsspec-union
 organizeit2
 s3fs
+
+# Airspeed Velocity
+.asv
+

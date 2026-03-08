@@ -1,0 +1,30 @@
+{
+    "version": 1,
+    "project": "fsspec-rs",
+    "project_url": "https://github.com/1kbgz/fsspec-rs/",
+    "repo": ".",
+    "build_command": [
+        "python -m pip install build",
+        "python -m build",
+        "python -m pip wheel -w {build_cache_dir} {build_dir}"
+    ],
+    "install_command": [
+        "in-dir={env_dir} python -m pip install {wheel_file}"
+    ],
+    "uninstall_command": [
+        "return-code=any python -m pip uninstall -y {project}"
+    ],
+    "branches": [
+        "main"
+    ],
+    "environment_type": "virtualenv",
+    "install_timeout": 600,
+    "pythons": [
+        "3.11",
+        "3.12"
+    ],
+    "benchmark_dir": ".",
+    "env_dir": "../../.asv/env",
+    "results_dir": "../../.asv/results",
+    "html_dir": "../../docs/html/benchmarks"
+}

@@ -15,8 +15,9 @@ jobs:
       - uses: actions-ext/python/setup@main
       - uses: actions-ext/rust/setup@main
       - run: uv pip install .[develop]
-      - run: uv pip install yardang
+      - run: uv pip install yardang laxate asv
       - run: yardang build
+      - run: make benchmark-publish
       - uses: peaceiris/actions-gh-pages@v4
         with:
           publish_branch: gh-pages

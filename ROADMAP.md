@@ -296,7 +296,7 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
 - [x] **1.10** Create `fsspec_rs.local.LocalFile(AbstractBufferedFile)` wrapping `RustLocalFile` as a Python file-like object
 - [x] **1.11** Register with fsspec: protocol = ("file-rs", "local-rs")
 - [x] **1.12** Tests: all fsspec-compatible operations with isinstance enforcement (47 tests)
-- [ ] **1.13** Benchmark: compare `fsspec_rs.LocalFileSystem` vs `fsspec.implementations.local.LocalFileSystem` for `ls`, `find`, `walk`, `cat`, batch `get`/`put`
+- [x] **1.13** Benchmark: compare `fsspec_rs.LocalFileSystem` vs `fsspec.implementations.local.LocalFileSystem` for `ls`, `find`, `walk`, `cat`, batch `get`/`put`
 
 ### Phase 2: S3 Backend (via `object_store` crate) ✦ _Milestone: working S3 FS in Rust and Python_ ✅
 
@@ -329,7 +329,7 @@ The [`object_store`](https://crates.io/crates/object_store) crate (from the Apac
 - [x] **2.12** Handle credential passthrough: merge from `fsspec.config.conf["s3"]` (populated by `FSSPEC_S3_*` env vars), accept same kwargs as s3fs (`key`, `secret`, `token`, `anon`, `endpoint_url`, `client_kwargs`)
 - [x] **2.13** Register with fsspec: protocol = `("s3-rs",)`
 - [x] **2.14** Tests: 26 Python tests with isinstance enforcement against Backblaze B2 (all passing, skipped when no credentials)
-- [ ] **2.15** Benchmark: compare `fsspec_rs.S3FileSystem` vs `s3fs.S3FileSystem` for ls, cat, get, put, find
+- [x] **2.15** Benchmark: compare `fsspec_rs.S3FileSystem` vs `s3fs.S3FileSystem` for ls, cat, get, put, find
 
 ### Phase 3: Buffered File & Caching ✦ _Milestone: feature parity with fsspec file objects_
 
@@ -342,7 +342,7 @@ The [`object_store`](https://crates.io/crates/object_store) crate (from the Apac
 - [x] **3.7** Expose `cache_type` in Python `_open()` methods (`LocalFileSystem`, `S3FileSystem`)
 - [x] **3.8** Tests: 30 new Rust unit tests (cache strategies + BufferedFile read/write/seek/commit/discard)
 - [x] **3.9** Tests: 21 new Python tests (cache_type parameter acceptance, invalid cache_type, read patterns)
-- [ ] **3.10** Benchmark: compare cached vs uncached S3 reads for sequential and random access patterns
+- [x] **3.10** Benchmark: compare cached vs uncached S3 reads for sequential and random access patterns
 
 ### Phase 4: Advanced Features ✦ _Milestone: production-ready_
 
