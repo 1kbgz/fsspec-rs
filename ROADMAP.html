@@ -256,19 +256,22 @@
 </thead>
 <tbody>
 <tr class="row-even"><td><p><strong>Build infrastructure</strong></p></td>
-<td><p><strong>Complete.</strong> Workspace Cargo.toml (cdylib via PyO3 0.28), <code class="docutils literal notranslate"><span class="pre">rust/Cargo.toml</span></code> (pure rlib), <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> (hatchling + hatch-rs), Makefiles, cibuildwheel, bumpversion, ruff, clippy, coverage — all wired up.</p></td>
+<td><p><strong>Complete.</strong> Workspace Cargo.toml (cdylib via PyO3 0.28), <code class="docutils literal notranslate"><span class="pre">rust/Cargo.toml</span></code> (pure rlib), <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> (hatchling + hatch-rs), Makefiles, cibuildwheel, bumpversion, ruff, clippy, coverage — all wired up. CI caching optimised (Swatinem/rust-cache, no <code class="docutils literal notranslate"><span class="pre">--force</span></code> reinstalls).</p></td>
 </tr>
 <tr class="row-odd"><td><p><strong>Rust core</strong> (<code class="docutils literal notranslate"><span class="pre">rust/src/</span></code>)</p></td>
-<td><p><strong>Complete.</strong> <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> trait (8 primitives + 20 default methods), <code class="docutils literal notranslate"><span class="pre">AsyncFileSystem</span></code> trait (async mirror), <code class="docutils literal notranslate"><span class="pre">FsFile</span></code> trait, <code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> + <code class="docutils literal notranslate"><span class="pre">LocalFile</span></code>, <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> + <code class="docutils literal notranslate"><span class="pre">S3File</span></code> implementations. <code class="docutils literal notranslate"><span class="pre">FsError</span></code> enum, <code class="docutils literal notranslate"><span class="pre">FileType</span></code>, <code class="docutils literal notranslate"><span class="pre">FileInfo</span></code>, <code class="docutils literal notranslate"><span class="pre">OpenMode</span></code>, <code class="docutils literal notranslate"><span class="pre">OpenOptions</span></code>, <code class="docutils literal notranslate"><span class="pre">WalkEntry</span></code>, <code class="docutils literal notranslate"><span class="pre">DuResult</span></code>. 137 unit + 20 S3 integration tests passing.</p></td>
+<td><p><strong>Complete.</strong> <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> trait (8 primitives + 20 default methods), <code class="docutils literal notranslate"><span class="pre">AsyncFileSystem</span></code> trait (async mirror), <code class="docutils literal notranslate"><span class="pre">FsFile</span></code> trait, <code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> + <code class="docutils literal notranslate"><span class="pre">LocalFile</span></code>, <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> + <code class="docutils literal notranslate"><span class="pre">S3File</span></code> implementations. <code class="docutils literal notranslate"><span class="pre">BufferedFile</span></code> + <code class="docutils literal notranslate"><span class="pre">Cache</span></code> trait (NoCache, ReadAhead, Block, AllBytes). <code class="docutils literal notranslate"><span class="pre">FsError</span></code>, <code class="docutils literal notranslate"><span class="pre">FileType</span></code>, <code class="docutils literal notranslate"><span class="pre">FileInfo</span></code>, <code class="docutils literal notranslate"><span class="pre">OpenMode</span></code>, <code class="docutils literal notranslate"><span class="pre">OpenOptions</span></code>, <code class="docutils literal notranslate"><span class="pre">WalkEntry</span></code>, <code class="docutils literal notranslate"><span class="pre">DuResult</span></code>. 167 unit + 20 S3 integration tests passing.</p></td>
 </tr>
 <tr class="row-even"><td><p><strong>PyO3 bridge</strong> (<code class="docutils literal notranslate"><span class="pre">rust/python/</span></code>)</p></td>
-<td><p><strong>Complete.</strong> <code class="docutils literal notranslate"><span class="pre">PyFileType</span></code>, <code class="docutils literal notranslate"><span class="pre">PyFileInfo</span></code>, <code class="docutils literal notranslate"><span class="pre">RustLocalFs</span></code>, <code class="docutils literal notranslate"><span class="pre">RustLocalFile</span></code>, <code class="docutils literal notranslate"><span class="pre">RustS3Fs</span></code>, <code class="docutils literal notranslate"><span class="pre">RustS3File</span></code> pyclasses. Error-to-exception conversion.</p></td>
+<td><p><strong>Complete.</strong> <code class="docutils literal notranslate"><span class="pre">PyFileType</span></code>, <code class="docutils literal notranslate"><span class="pre">PyFileInfo</span></code>, <code class="docutils literal notranslate"><span class="pre">RustLocalFs</span></code>, <code class="docutils literal notranslate"><span class="pre">RustLocalFile</span></code>, <code class="docutils literal notranslate"><span class="pre">RustS3Fs</span></code>, <code class="docutils literal notranslate"><span class="pre">RustS3File</span></code> pyclasses. Error-to-exception conversion. <code class="docutils literal notranslate"><span class="pre">cache_type</span></code>, <code class="docutils literal notranslate"><span class="pre">block_size</span></code>, <code class="docutils literal notranslate"><span class="pre">max_blocks</span></code> exposed on <code class="docutils literal notranslate"><span class="pre">open()</span></code>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><strong>Python package</strong> (<code class="docutils literal notranslate"><span class="pre">fsspec_rs/</span></code>)</p></td>
-<td><p><strong>Complete.</strong> <code class="docutils literal notranslate"><span class="pre">LocalFileSystem</span></code> with <code class="docutils literal notranslate"><span class="pre">protocol</span> <span class="pre">=</span> <span class="pre">(&quot;file-rs&quot;,</span> <span class="pre">&quot;local-rs&quot;)</span></code>, <code class="docutils literal notranslate"><span class="pre">S3FileSystem</span></code> with <code class="docutils literal notranslate"><span class="pre">protocol</span> <span class="pre">=</span> <span class="pre">(&quot;s3-rs&quot;,)</span></code>, both with file wrappers. 97 Python tests passing including isinstance enforcement.</p></td>
+<td><p><strong>Complete.</strong> <code class="docutils literal notranslate"><span class="pre">LocalFileSystem</span></code> with <code class="docutils literal notranslate"><span class="pre">protocol</span> <span class="pre">=</span> <span class="pre">(&quot;file-rs&quot;,</span> <span class="pre">&quot;local-rs&quot;)</span></code>, <code class="docutils literal notranslate"><span class="pre">S3FileSystem</span></code> with <code class="docutils literal notranslate"><span class="pre">protocol</span> <span class="pre">=</span> <span class="pre">(&quot;s3-rs&quot;,)</span></code>, both with file wrappers and <code class="docutils literal notranslate"><span class="pre">cache_type</span></code> forwarding. 114 Python tests passing including isinstance enforcement and cache tests.</p></td>
 </tr>
-<tr class="row-even"><td><p><strong>Tests</strong></p></td>
-<td><p><strong>Complete.</strong> 137 Rust unit tests + 20 S3 integration tests + 97 Python tests = 254 total. All passing.</p></td>
+<tr class="row-even"><td><p><strong>Benchmarks</strong></p></td>
+<td><p><strong>Complete.</strong> <code class="docutils literal notranslate"><span class="pre">pytest-benchmark</span></code> suite: 18 local FS benchmarks, 20 S3 benchmarks (vs MinIO), 28 cache benchmarks. MinIO via <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">minio-start</span></code> (podman). Observed: 2.8–3.5x speedup on local traversal (ls/find/walk), 1.6–3.7x speedup on S3 reads.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Tests</strong></p></td>
+<td><p><strong>Complete.</strong> 167 Rust unit tests + 20 S3 integration tests + 114 Python tests = 301 total. All passing.</p></td>
 </tr>
 </tbody>
 </table>
@@ -636,7 +639,7 @@
 </ul>
 </section>
 <section id="phase-3-buffered-file-caching-milestone-feature-parity-with-fsspec-file-objects">
-<h3>Phase 3: Buffered File &amp; Caching ✦ <em>Milestone: feature parity with fsspec file objects</em><a class="headerlink" href="#phase-3-buffered-file-caching-milestone-feature-parity-with-fsspec-file-objects" title="Link to this heading">¶</a></h3>
+<h3>Phase 3: Buffered File &amp; Caching ✦ <em>Milestone: feature parity with fsspec file objects</em> ✅<a class="headerlink" href="#phase-3-buffered-file-caching-milestone-feature-parity-with-fsspec-file-objects" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p>[x] <strong>3.1</strong> Implement Rust <code class="docutils literal notranslate"><span class="pre">BufferedFile</span></code> struct with pluggable read cache (readahead, block, all-bytes) — <code class="docutils literal notranslate"><span class="pre">rust/src/buffered.rs</span></code></p></li>
 <li><p>[x] <strong>3.2</strong> Implement Rust <code class="docutils literal notranslate"><span class="pre">Cache</span></code> trait with 4 strategies: <code class="docutils literal notranslate"><span class="pre">NoCache</span></code>, <code class="docutils literal notranslate"><span class="pre">ReadAheadCache</span></code>, <code class="docutils literal notranslate"><span class="pre">BlockCache</span></code>, <code class="docutils literal notranslate"><span class="pre">AllBytesCache</span></code> — <code class="docutils literal notranslate"><span class="pre">rust/src/caching.rs</span></code></p></li>
@@ -820,14 +823,55 @@
 <section id="success-criteria">
 <h2>Success Criteria<a class="headerlink" href="#success-criteria" title="Link to this heading">¶</a></h2>
 <ul class="simple">
-<li><p>[ ] <code class="docutils literal notranslate"><span class="pre">fsspec_rs.LocalFileSystem</span></code> passes fsspec’s own test suite patterns for local filesystem operations</p></li>
-<li><p>[ ] <code class="docutils literal notranslate"><span class="pre">fsspec_rs.S3FileSystem</span></code> can be used as a drop-in replacement for <code class="docutils literal notranslate"><span class="pre">s3fs.S3FileSystem</span></code> in common workflows</p></li>
-<li><p>[ ] Measurable speedup (&gt;2x) for filesystem-traversal-heavy operations (find, walk, glob) on local filesystem</p></li>
-<li><p>[ ] Measurable speedup for S3 batch operations (cat many files, list large directories)</p></li>
-<li><p>[ ] Pure-Rust <code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> and <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> usable from Rust projects with no Python dependency</p></li>
+<li><p>[x] <code class="docutils literal notranslate"><span class="pre">fsspec_rs.LocalFileSystem</span></code> passes fsspec’s own test suite patterns for local filesystem operations</p></li>
+<li><p>[x] <code class="docutils literal notranslate"><span class="pre">fsspec_rs.S3FileSystem</span></code> can be used as a drop-in replacement for <code class="docutils literal notranslate"><span class="pre">s3fs.S3FileSystem</span></code> in common workflows</p></li>
+<li><p>[x] Measurable speedup (&gt;2x) for filesystem-traversal-heavy operations (find, walk, glob) on local filesystem — <strong>3.2–3.5x measured</strong></p></li>
+<li><p>[x] Measurable speedup for S3 batch operations (cat many files, list large directories) — <strong>2.2–3.7x measured</strong></p></li>
+<li><p>[x] Pure-Rust <code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> and <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> usable from Rust projects with no Python dependency</p></li>
 <li><p>[ ] Clean <code class="docutils literal notranslate"><span class="pre">cargo</span> <span class="pre">doc</span></code> documentation for the Rust library</p></li>
 <li><p>[ ] Published to PyPI (<code class="docutils literal notranslate"><span class="pre">fsspec-rs</span></code>) and crates.io (<code class="docutils literal notranslate"><span class="pre">fsspec_rs</span></code>)</p></li>
 </ul>
+</section>
+<hr class="docutils" />
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">¶</a></h2>
+<p>Phases 0–3 are complete and all success criteria that require implementation are met. The remaining work falls into three categories: <strong>hardening</strong> (making the library production-ready), <strong>feature completeness</strong> (closing gaps vs. s3fs/fsspec), and <strong>release</strong> (publishing).</p>
+<section id="immediate-priorities-phase-4">
+<h3>Immediate priorities (Phase 4)<a class="headerlink" href="#immediate-priorities-phase-4" title="Link to this heading">¶</a></h3>
+<p>Of the Phase 4 items, two stand out as having the highest impact before a public release:</p>
+<p><strong>4.4 — Verify <code class="docutils literal notranslate"><span class="pre">FSMap</span></code> / <code class="docutils literal notranslate"><span class="pre">get_mapper()</span></code> works out of the box</strong>
+This is likely free via the fsspec base class, but needs a quick smoke test. Pandas, Zarr, and xarray all use <code class="docutils literal notranslate"><span class="pre">get_mapper()</span></code> as their primary fsspec integration point — if it doesn’t work, the “drop-in replacement” claim breaks immediately.</p>
+<p><strong>4.7 — Entry-point registration</strong>
+Without this, users must <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">fsspec_rs</span></code> before using <code class="docutils literal notranslate"><span class="pre">fsspec.open(&quot;s3-rs://...&quot;)</span></code>. Adding a <code class="docutils literal notranslate"><span class="pre">fsspec.implementations</span></code> entry point in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> makes the backends auto-discoverable, which is required for the library to feel like a first-class fsspec citizen.</p>
+<p><strong>4.3 — Callback/progress support</strong>
+High-value usability feature. Many fsspec callers (e.g. <code class="docutils literal notranslate"><span class="pre">fsspec.get()</span></code>) pass <code class="docutils literal notranslate"><span class="pre">callback=</span></code> for progress bars. Without it, long transfers give no feedback. Not a correctness issue, but a real friction point.</p>
+</section>
+<section id="near-term-priorities-phase-4-remainder">
+<h3>Near-term priorities (Phase 4 remainder)<a class="headerlink" href="#near-term-priorities-phase-4-remainder" title="Link to this heading">¶</a></h3>
+<p><strong>4.1 — Directory listing cache (DirCache)</strong>
+fsspec’s <code class="docutils literal notranslate"><span class="pre">DirCache</span></code> with TTL is important for workloads that call <code class="docutils literal notranslate"><span class="pre">ls()</span></code> repeatedly (e.g. <code class="docutils literal notranslate"><span class="pre">walk</span></code>, <code class="docutils literal notranslate"><span class="pre">find</span></code>, <code class="docutils literal notranslate"><span class="pre">glob</span></code> in a loop). Currently every call hits the OS/S3. A Rust-side LRU+TTL cache would amplify the existing traversal speedups.</p>
+<p><strong>4.2 — Transaction support</strong>
+Needed for correctness in write workflows that rely on <code class="docutils literal notranslate"><span class="pre">fsspec.Transaction</span></code>. Affects dask and other frameworks that write multiple files atomically.</p>
+<p><strong>4.5 — Signed URL support for S3</strong>
+Needed for sharing objects without long-lived credentials. Common pattern in ML pipelines.</p>
+<p><strong>4.6 — Multipart concurrent transfers</strong>
+The current S3 backend uploads/downloads sequentially. Concurrent multipart would close the remaining performance gap on large files (currently only 1.4x on 4 MiB reads vs. s3fs).</p>
+</section>
+<section id="documentation-release">
+<h3>Documentation &amp; release<a class="headerlink" href="#documentation-release" title="Link to this heading">¶</a></h3>
+<p>Before publishing to PyPI and crates.io:</p>
+<ul class="simple">
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">cargo</span> <span class="pre">doc</span> <span class="pre">--no-deps</span> <span class="pre">--open</span></code> and fix any missing doc comments on public items</p></li>
+<li><p>Add a <code class="docutils literal notranslate"><span class="pre">CHANGELOG.md</span></code> (start from Phase 0 milestones)</p></li>
+<li><p>Confirm <code class="docutils literal notranslate"><span class="pre">cibuildwheel</span></code> produces clean wheels for Linux (x86_64, aarch64), macOS (arm64), and Windows (x86_64)</p></li>
+<li><p>Add a <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> entry-point for fsspec backend discovery (item 4.7)</p></li>
+</ul>
+</section>
+<section id="phase-5-additional-backends">
+<h3>Phase 5 — additional backends<a class="headerlink" href="#phase-5-additional-backends" title="Link to this heading">¶</a></h3>
+<p>Of the Phase 5 backends, <strong>GCS (5.3) and Azure (5.4)</strong> are essentially free given the <code class="docutils literal notranslate"><span class="pre">object_store</span></code> adapter already in place — they just need configuration wiring and Python classes, matching what was done for S3. These are good candidates to tackle immediately after the Phase 4 hardening pass.</p>
+<p><strong>Memory filesystem (5.1)</strong> is useful as a fast, side-effect-free test double for users who want to unit-test code that uses <code class="docutils literal notranslate"><span class="pre">fsspec_rs</span></code> backends.</p>
+</section>
 </section>
 </section>
 
@@ -893,7 +937,7 @@
 <li><a class="reference internal" href="#phase-0-foundation-core-types-milestone-compilable-trait-with-no-backends">Phase 0: Foundation &amp; Core Types ✦ <em>Milestone: compilable trait with no backends</em> ✅</a></li>
 <li><a class="reference internal" href="#phase-1-local-filesystem-backend-milestone-working-local-fs-in-rust-and-python">Phase 1: Local Filesystem Backend ✦ <em>Milestone: working local FS in Rust and Python</em> ✅</a></li>
 <li><a class="reference internal" href="#phase-2-s3-backend-via-object-store-crate-milestone-working-s3-fs-in-rust-and-python">Phase 2: S3 Backend (via <code class="docutils literal notranslate"><span class="pre">object_store</span></code> crate) ✦ <em>Milestone: working S3 FS in Rust and Python</em> ✅</a></li>
-<li><a class="reference internal" href="#phase-3-buffered-file-caching-milestone-feature-parity-with-fsspec-file-objects">Phase 3: Buffered File &amp; Caching ✦ <em>Milestone: feature parity with fsspec file objects</em></a></li>
+<li><a class="reference internal" href="#phase-3-buffered-file-caching-milestone-feature-parity-with-fsspec-file-objects">Phase 3: Buffered File &amp; Caching ✦ <em>Milestone: feature parity with fsspec file objects</em> ✅</a></li>
 <li><a class="reference internal" href="#phase-4-advanced-features-milestone-production-ready">Phase 4: Advanced Features ✦ <em>Milestone: production-ready</em></a></li>
 <li><a class="reference internal" href="#phase-5-additional-backends-future-milestone-expanded-ecosystem">Phase 5: Additional Backends (Future) ✦ <em>Milestone: expanded ecosystem</em></a></li>
 </ul>
@@ -915,6 +959,13 @@
 </li>
 <li><a class="reference internal" href="#testing-strategy">Testing Strategy</a></li>
 <li><a class="reference internal" href="#success-criteria">Success Criteria</a></li>
+<li><a class="reference internal" href="#next-steps">Next Steps</a><ul>
+<li><a class="reference internal" href="#immediate-priorities-phase-4">Immediate priorities (Phase 4)</a></li>
+<li><a class="reference internal" href="#near-term-priorities-phase-4-remainder">Near-term priorities (Phase 4 remainder)</a></li>
+<li><a class="reference internal" href="#documentation-release">Documentation &amp; release</a></li>
+<li><a class="reference internal" href="#phase-5-additional-backends">Phase 5 — additional backends</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
