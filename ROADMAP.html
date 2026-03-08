@@ -196,21 +196,7 @@
   <input type="hidden" name="area" value="default">
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
-  <ul>
-<li class="toctree-l1 has-children"><a class="reference internal" href="autoapi/index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="autoapi/test_s3/index.html">test_s3</a></li>
-<li class="toctree-l2"><a class="reference internal" href="autoapi/test_all/index.html">test_all</a></li>
-<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/fsspec_rs/index.html">fsspec_rs</a><input aria-label="Toggle navigation of fsspec_rs" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
-<li class="toctree-l3"><a class="reference internal" href="autoapi/fsspec_rs/local/index.html">fsspec_rs.local</a></li>
-<li class="toctree-l3"><a class="reference internal" href="autoapi/fsspec_rs/s3/index.html">fsspec_rs.s3</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="autoapi/test_cache/index.html">test_cache</a></li>
-<li class="toctree-l2"><a class="reference internal" href="autoapi/test_local/index.html">test_local</a></li>
-</ul>
-</li>
-</ul>
-
+  
 </div>
 </div>
 
@@ -612,7 +598,7 @@
 <li><p>[x] <strong>1.10</strong> Create <code class="docutils literal notranslate"><span class="pre">fsspec_rs.local.LocalFile(AbstractBufferedFile)</span></code> wrapping <code class="docutils literal notranslate"><span class="pre">RustLocalFile</span></code> as a Python file-like object</p></li>
 <li><p>[x] <strong>1.11</strong> Register with fsspec: protocol = (“file-rs”, “local-rs”)</p></li>
 <li><p>[x] <strong>1.12</strong> Tests: all fsspec-compatible operations with isinstance enforcement (47 tests)</p></li>
-<li><p>[ ] <strong>1.13</strong> Benchmark: compare <code class="docutils literal notranslate"><span class="pre">fsspec_rs.LocalFileSystem</span></code> vs <code class="docutils literal notranslate"><span class="pre">fsspec.implementations.local.LocalFileSystem</span></code> for <code class="docutils literal notranslate"><span class="pre">ls</span></code>, <code class="docutils literal notranslate"><span class="pre">find</span></code>, <code class="docutils literal notranslate"><span class="pre">walk</span></code>, <code class="docutils literal notranslate"><span class="pre">cat</span></code>, batch <code class="docutils literal notranslate"><span class="pre">get</span></code>/<code class="docutils literal notranslate"><span class="pre">put</span></code></p></li>
+<li><p>[x] <strong>1.13</strong> Benchmark: compare <code class="docutils literal notranslate"><span class="pre">fsspec_rs.LocalFileSystem</span></code> vs <code class="docutils literal notranslate"><span class="pre">fsspec.implementations.local.LocalFileSystem</span></code> for <code class="docutils literal notranslate"><span class="pre">ls</span></code>, <code class="docutils literal notranslate"><span class="pre">find</span></code>, <code class="docutils literal notranslate"><span class="pre">walk</span></code>, <code class="docutils literal notranslate"><span class="pre">cat</span></code>, batch <code class="docutils literal notranslate"><span class="pre">get</span></code>/<code class="docutils literal notranslate"><span class="pre">put</span></code></p></li>
 </ul>
 </section>
 <section id="phase-2-s3-backend-via-object-store-crate-milestone-working-s3-fs-in-rust-and-python">
@@ -646,7 +632,7 @@
 <li><p>[x] <strong>2.12</strong> Handle credential passthrough: merge from <code class="docutils literal notranslate"><span class="pre">fsspec.config.conf[&quot;s3&quot;]</span></code> (populated by <code class="docutils literal notranslate"><span class="pre">FSSPEC_S3_*</span></code> env vars), accept same kwargs as s3fs (<code class="docutils literal notranslate"><span class="pre">key</span></code>, <code class="docutils literal notranslate"><span class="pre">secret</span></code>, <code class="docutils literal notranslate"><span class="pre">token</span></code>, <code class="docutils literal notranslate"><span class="pre">anon</span></code>, <code class="docutils literal notranslate"><span class="pre">endpoint_url</span></code>, <code class="docutils literal notranslate"><span class="pre">client_kwargs</span></code>)</p></li>
 <li><p>[x] <strong>2.13</strong> Register with fsspec: protocol = <code class="docutils literal notranslate"><span class="pre">(&quot;s3-rs&quot;,)</span></code></p></li>
 <li><p>[x] <strong>2.14</strong> Tests: 26 Python tests with isinstance enforcement against Backblaze B2 (all passing, skipped when no credentials)</p></li>
-<li><p>[ ] <strong>2.15</strong> Benchmark: compare <code class="docutils literal notranslate"><span class="pre">fsspec_rs.S3FileSystem</span></code> vs <code class="docutils literal notranslate"><span class="pre">s3fs.S3FileSystem</span></code> for ls, cat, get, put, find</p></li>
+<li><p>[x] <strong>2.15</strong> Benchmark: compare <code class="docutils literal notranslate"><span class="pre">fsspec_rs.S3FileSystem</span></code> vs <code class="docutils literal notranslate"><span class="pre">s3fs.S3FileSystem</span></code> for ls, cat, get, put, find</p></li>
 </ul>
 </section>
 <section id="phase-3-buffered-file-caching-milestone-feature-parity-with-fsspec-file-objects">
@@ -661,7 +647,7 @@
 <li><p>[x] <strong>3.7</strong> Expose <code class="docutils literal notranslate"><span class="pre">cache_type</span></code> in Python <code class="docutils literal notranslate"><span class="pre">_open()</span></code> methods (<code class="docutils literal notranslate"><span class="pre">LocalFileSystem</span></code>, <code class="docutils literal notranslate"><span class="pre">S3FileSystem</span></code>)</p></li>
 <li><p>[x] <strong>3.8</strong> Tests: 30 new Rust unit tests (cache strategies + BufferedFile read/write/seek/commit/discard)</p></li>
 <li><p>[x] <strong>3.9</strong> Tests: 21 new Python tests (cache_type parameter acceptance, invalid cache_type, read patterns)</p></li>
-<li><p>[ ] <strong>3.10</strong> Benchmark: compare cached vs uncached S3 reads for sequential and random access patterns</p></li>
+<li><p>[x] <strong>3.10</strong> Benchmark: compare cached vs uncached S3 reads for sequential and random access patterns</p></li>
 </ul>
 </section>
 <section id="phase-4-advanced-features-milestone-production-ready">
