@@ -204,5 +204,4 @@ section-order = [
 title = "fsspec-rs"
 root = "README.md"
 pages = []
-use-autoapi = true
-
+use-autoapi = false
