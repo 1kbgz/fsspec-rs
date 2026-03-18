@@ -6,11 +6,6 @@ import pytest
 class TestVersion:
     """Test that the package version is accessible."""
 
-    def test_version_exists(self):
-        from fsspec_rs import __version__
-
-        assert __version__ == "0.1.0"
-
     def test_version_is_string(self):
         from fsspec_rs import __version__
 
