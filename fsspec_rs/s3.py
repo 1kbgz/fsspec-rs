@@ -22,6 +22,35 @@ class S3FileSystem(fsspec.AbstractFileSystem):
 
     protocol = ("s3-rs",)
 
+    @classmethod
+    def _strip_protocol(cls, path):
+        """Strip ``s3-rs://`` prefix, returning ``bucket/key``."""
+        for proto in cls.protocol:
+            prefix = f"{proto}://"
+            if path.startswith(prefix):
+                return path[len(prefix) :].lstrip("/")
+        return path
+
+    @staticmethod
+    def _get_kwargs_from_urls(path):
+        """Extract ``bucket`` from a ``s3-rs://bucket/key`` URL."""
+        for proto in ("s3-rs",):
+            prefix = f"{proto}://"
+            if path.startswith(prefix):
+                rest = path[len(prefix) :].lstrip("/")
+                bucket = rest.split("/", 1)[0]
+                if bucket:
+                    return {"bucket": bucket}
+        return {}
+
+    def unstrip_protocol(self, path):
+        """Reconstruct ``s3-rs://bucket/key`` from ``bucket/key``."""
+        bucket_prefix = f"{self.bucket}/"
+        if path.startswith(bucket_prefix):
+            key = path[len(bucket_prefix) :]
+            return f"s3-rs://{self.bucket}/{key}" if key else f"s3-rs://{self.bucket}"
+        return f"s3-rs://{self.bucket}/{path}" if path else f"s3-rs://{self.bucket}"
+
     def __init__(
         self,
         bucket: str,

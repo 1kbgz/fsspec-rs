@@ -17,6 +17,18 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
     protocol = ("file-rs", "local-rs")
     local_file = True
 
+    @classmethod
+    def _strip_protocol(cls, path):
+        """Strip ``file-rs://`` or ``local-rs://`` prefix."""
+        for proto in cls.protocol:
+            prefix = f"{proto}://"
+            if path.startswith(prefix):
+                return path[len(prefix) :]
+        return path
+
+    def unstrip_protocol(self, path):
+        return f"{self.protocol[0]}://{path}"
+
     def __init__(self, auto_mkdir: bool = False, **storage_options):
         super().__init__(**storage_options)
         self._rust = RustLocalFs(auto_mkdir=auto_mkdir)
