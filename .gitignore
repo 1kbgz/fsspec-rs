@@ -158,12 +158,7 @@ s3fs
 # Airspeed Velocity
 .asv
 
-=======
 # AI
 ROADMAP.md
 AGENTS.md
-<<<<<<< before updating
->>>>>>> after updating
-=======
 .github/hooks/sdlc.json
->>>>>>> after updating
