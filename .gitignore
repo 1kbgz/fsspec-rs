@@ -146,6 +146,7 @@ target
 outputs/
 multirun/
 
+<<<<<<< before updating
 # Peer projects
 filesystem_spec
 fsspec-pydantic
@@ -157,3 +158,8 @@ s3fs
 # Airspeed Velocity
 .asv
 
+=======
+# AI
+ROADMAP.md
+AGENTS.md
+>>>>>>> after updating
