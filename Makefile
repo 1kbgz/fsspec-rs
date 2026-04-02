@@ -120,34 +120,8 @@ tests: test
 ##############
 # BENCHMARKS #
 ##############
-.PHONY: benchmark benchmarks benchmark-quick benchmark-local benchmark-local-quick benchmark-publish benchmark-view
 .PHONY: benchmark-local-fs benchmark-s3 benchmark-cache benchmark-pytest
 
-ASV_CONFIG := $(CURDIR)/fsspec_rs/benchmarks/asv.conf.json
-ASV_PUBLISH_CONFIG := $(ASV_CONFIG)
-
-benchmark-machine:  ## initialize machine for benchmarks
-	python -m asv machine --config $(ASV_CONFIG) --yes
-
-benchmark: benchmark-machine  ## run benchmarks for current commit
-	python -m asv run --config $(ASV_CONFIG) --verbose HEAD^!
-
-benchmark-quick: benchmark-machine  ## run quick benchmark
-	python -m asv run --config $(ASV_CONFIG) --quick --verbose HEAD^!
-
-benchmark-local: benchmark-machine  ## run benchmark using local environment
-	python -m asv run --config $(ASV_CONFIG) --python=same --verbose
-
-benchmark-local-quick: benchmark-machine  ## run quick benchmark using local environment
-	python -m asv run --config $(ASV_CONFIG) --python=same --quick --verbose
-
-benchmark-publish:  ## generate benchmark results
-	python -m asv publish --config $(ASV_PUBLISH_CONFIG)
-
-benchmark-view:  ## view benchmark results
-	python -m asv preview --config $(ASV_PUBLISH_CONFIG)
-
-# pytest-benchmark targets
 benchmark-local-fs:  ## benchmark local filesystem (Rust vs Python)
 	python -m pytest fsspec_rs/benchmarks/bench_local.py -v --benchmark-columns=mean,stddev,rounds
 
