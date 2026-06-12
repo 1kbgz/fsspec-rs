@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="fsspec-rs filesystems" href="docs/src/filesystems.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
         <title>fsspec-rs v0.1.1</title>
@@ -196,7 +196,12 @@
   <input type="hidden" name="area" value="default">
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
-  
+  <ul>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/filesystems.html">fsspec-rs filesystems</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/rust.html">Rust traits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/api.html">API reference</a></li>
+</ul>
+
 </div>
 </div>
 
@@ -237,16 +242,18 @@
 </div>
 <section class="tex2jax_ignore mathjax_ignore" id="fsspec-rs">
 <h1>fsspec-rs<a class="headerlink" href="#fsspec-rs" title="Link to this heading">¶</a></h1>
-<p>fsspec-compatible filesystem backends with Rust acceleration</p>
+<p>fsspec-compatible filesystem backends with Rust acceleration.</p>
 <p><a class="reference external" href="https://github.com/1kbgz/fsspec-rs/actions/workflows/build.yaml"><img alt="Build Status" src="https://github.com/1kbgz/fsspec-rs/actions/workflows/build.yaml/badge.svg?branch=main&amp;event=push" /></a>
 <a class="reference external" href="https://codecov.io/gh/1kbgz/fsspec-rs"><img alt="codecov" src="https://codecov.io/gh/1kbgz/fsspec-rs/branch/main/graph/badge.svg" /></a>
 <a class="reference external" href="https://github.com/1kbgz/fsspec-rs"><img alt="License" src="https://img.shields.io/github/license/1kbgz/fsspec-rs" /></a>
 <a class="reference external" href="https://pypi.python.org/pypi/fsspec-rs"><img alt="PyPI" src="https://img.shields.io/pypi/v/fsspec-rs.svg" /></a></p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
-<p><strong>fsspec-rs</strong> provides drop-in replacements for <a class="reference external" href="https://filesystem-spec.readthedocs.io/">fsspec</a> filesystem backends, with performance-critical operations implemented in Rust. The Python classes inherit from fsspec’s real base classes (<code class="docutils literal notranslate"><span class="pre">AbstractFileSystem</span></code>, <code class="docutils literal notranslate"><span class="pre">AbstractBufferedFile</span></code>), so they work everywhere fsspec filesystems are accepted — pandas, dask, xarray, and the broader PyData ecosystem.</p>
-<section id="backends">
-<h3>Backends<a class="headerlink" href="#backends" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">fsspec-rs</span></code> provides Python filesystem classes that inherit from
+<code class="docutils literal notranslate"><span class="pre">fsspec.spec.AbstractFileSystem</span></code> while delegating core operations to Rust.
+They can be used anywhere fsspec filesystems are accepted, including pandas,
+dask, xarray, and direct <code class="docutils literal notranslate"><span class="pre">fsspec.open()</span></code> calls.</p>
+<p>The package currently includes:</p>
 <div class="table-wrapper colwidths-auto docutils container">
 <table class="docutils align-default">
 <thead>
@@ -271,139 +278,41 @@
 </table>
 </div>
 </section>
-<section id="features">
-<h3>Features<a class="headerlink" href="#features" title="Link to this heading">¶</a></h3>
-<ul class="simple">
-<li><p><strong>Pure Rust core</strong> — standalone <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> and <code class="docutils literal notranslate"><span class="pre">AsyncFileSystem</span></code> traits usable from any Rust project, with no Python dependency</p></li>
-<li><p><strong>Full fsspec compatibility</strong> — inherits from real fsspec base classes, participates in the registry, and passes isinstance checks</p></li>
-<li><p><strong>Pluggable read caching</strong> — readahead, block, and all-bytes cache strategies for buffered S3 reads</p></li>
-<li><p><strong>S3 via <code class="docutils literal notranslate"><span class="pre">object_store</span></code></strong> — uses the battle-tested <a class="reference external" href="https://crates.io/crates/object_store">object_store</a> crate (from Apache Arrow) for S3 access with retries, streaming, and standard AWS credential resolution</p></li>
-</ul>
-</section>
+<section id="install">
+<h2>Install<a class="headerlink" href="#install" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>fsspec-rs
+</pre></div>
+</div>
 </section>
 <section id="quick-start">
 <h2>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Local filesystem — drop-in replacement</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">fsspec</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">LocalFileSystem</span>
-
-<span class="n">fs</span> <span class="o">=</span> <span class="n">LocalFileSystem</span><span class="p">()</span>
-<span class="n">fs</span><span class="o">.</span><span class="n">ls</span><span class="p">(</span><span class="s2">&quot;/tmp&quot;</span><span class="p">)</span>
-<span class="n">fs</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s2">&quot;/tmp/example.txt&quot;</span><span class="p">)</span>
-
-<span class="c1"># S3 filesystem</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">S3FileSystem</span>
 
-<span class="n">fs</span> <span class="o">=</span> <span class="n">S3FileSystem</span><span class="p">(</span><span class="n">bucket</span><span class="o">=</span><span class="s2">&quot;my-bucket&quot;</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;us-east-1&quot;</span><span class="p">)</span>
-<span class="n">data</span> <span class="o">=</span> <span class="n">fs</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s2">&quot;path/to/object.parquet&quot;</span><span class="p">)</span>
-<span class="n">fs</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">&quot;path/to/output.txt&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;hello&quot;</span><span class="p">)</span>
+<span class="n">fs</span> <span class="o">=</span> <span class="n">LocalFileSystem</span><span class="p">()</span>
+<span class="n">fs</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">&quot;/tmp/example.txt&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;hello&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">fs</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s2">&quot;/tmp/example.txt&quot;</span><span class="p">))</span>
 
-<span class="c1"># Works with fsspec&#39;s open() and registry</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">fsspec</span>
+<span class="n">s3</span> <span class="o">=</span> <span class="n">S3FileSystem</span><span class="p">(</span><span class="n">bucket</span><span class="o">=</span><span class="s2">&quot;my-bucket&quot;</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;us-east-1&quot;</span><span class="p">)</span>
+<span class="n">s3</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">&quot;path/to/output.txt&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;hello&quot;</span><span class="p">)</span>
 
-<span class="k">with</span> <span class="n">fsspec</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;local-rs:///tmp/example.txt&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="k">with</span> <span class="n">fsspec</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;file-rs:///tmp/example.txt&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
 </pre></div>
 </div>
 </section>
-<section id="performance">
-<h2>Performance<a class="headerlink" href="#performance" title="Link to this heading">¶</a></h2>
-<p>Benchmarks comparing fsspec-rs against the pure-Python fsspec/s3fs implementations (measured with <code class="docutils literal notranslate"><span class="pre">pytest-benchmark</span></code>; S3 benchmarks run against a local MinIO instance):</p>
-<section id="local-filesystem">
-<h3>Local filesystem<a class="headerlink" href="#local-filesystem" title="Link to this heading">¶</a></h3>
-<div class="table-wrapper colwidths-auto docutils container">
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>Operation</p></th>
-<th class="head"><p>fsspec-rs</p></th>
-<th class="head"><p>fsspec (Python)</p></th>
-<th class="head"><p>Speedup</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ls</span></code> (small dir)</p></td>
-<td><p>6.5 µs</p></td>
-<td><p>19.3 µs</p></td>
-<td><p><strong>3.0x</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ls</span></code> (100 files)</p></td>
-<td><p>73.5 µs</p></td>
-<td><p>234.3 µs</p></td>
-<td><p><strong>3.2x</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">find</span></code> (recursive)</p></td>
-<td><p>97.4 µs</p></td>
-<td><p>326.3 µs</p></td>
-<td><p><strong>3.4x</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">walk</span></code> (recursive)</p></td>
-<td><p>86.2 µs</p></td>
-<td><p>299.6 µs</p></td>
-<td><p><strong>3.5x</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">cat_file</span></code> (4 KiB)</p></td>
-<td><p>2.0 µs</p></td>
-<td><p>5.7 µs</p></td>
-<td><p><strong>2.8x</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get</span></code> (100 × 4 KiB)</p></td>
-<td><p>846 µs</p></td>
-<td><p>1,840 µs</p></td>
-<td><p><strong>2.2x</strong></p></td>
-</tr>
-</tbody>
-</table>
+<section id="documentation">
+<h2>Documentation<a class="headerlink" href="#documentation" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="docs/src/filesystems.html"><span class="std std-doc">Filesystems</span></a>: local and S3 usage, configuration, caching, and path conventions.</p></li>
+<li><p><a class="reference internal" href="docs/src/api.html"><span class="std std-doc">API reference</span></a>: Python API generated with yardang/Sphinx.</p></li>
+<li><p><a class="reference internal" href="docs/src/rust.html"><span class="std std-doc">Rust traits</span></a>: Rust <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code>, <code class="docutils literal notranslate"><span class="pre">AsyncFileSystem</span></code>, <code class="docutils literal notranslate"><span class="pre">FsFile</span></code>, and cache traits.</p></li>
+</ul>
+<p>Build docs locally with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>yardang<span class="w"> </span>build
+</pre></div>
 </div>
-</section>
-<section id="s3-vs-s3fs-against-minio">
-<h3>S3 (vs s3fs, against MinIO)<a class="headerlink" href="#s3-vs-s3fs-against-minio" title="Link to this heading">¶</a></h3>
-<div class="table-wrapper colwidths-auto docutils container">
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>Operation</p></th>
-<th class="head"><p>fsspec-rs</p></th>
-<th class="head"><p>s3fs (Python)</p></th>
-<th class="head"><p>Speedup</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">cat_file</span></code> (4 KiB)</p></td>
-<td><p>387 µs</p></td>
-<td><p>1,190 µs</p></td>
-<td><p><strong>3.1x</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cat_file</span></code> (256 KiB)</p></td>
-<td><p>958 µs</p></td>
-<td><p>3,511 µs</p></td>
-<td><p><strong>3.7x</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">cat_file</span></code> (4 MiB)</p></td>
-<td><p>6,156 µs</p></td>
-<td><p>8,884 µs</p></td>
-<td><p><strong>1.4x</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">find</span></code> (recursive)</p></td>
-<td><p>5,454 µs</p></td>
-<td><p>11,803 µs</p></td>
-<td><p><strong>2.2x</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pipe_file</span></code> (4 KiB)</p></td>
-<td><p>4,093 µs</p></td>
-<td><p>5,250 µs</p></td>
-<td><p><strong>1.3x</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_file</span></code> (4 KiB)</p></td>
-<td><p>1,743 µs</p></td>
-<td><p>2,816 µs</p></td>
-<td><p><strong>1.6x</strong></p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This library was generated using <a class="reference external" href="https://copier.readthedocs.io/en/stable/">copier</a> from the <a class="reference external" href="https://github.com/python-project-templates/base">Base Python Project Template repository</a>.</p>
-</div>
-</section>
 </section>
 </section>
 
@@ -412,7 +321,15 @@
       <footer>
         
         <div class="related-pages">
-          
+          <a class="next-page" href="docs/src/filesystems.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">fsspec-rs filesystems</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
           
         </div>
         <div class="bottom-of-page">
