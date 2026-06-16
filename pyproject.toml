@@ -96,6 +96,11 @@ filename = "rust/Cargo.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
+[[tool.bumpversion.files]]
+filename = "rust/bridge/Cargo.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
 [tool.cibuildwheel]
 build = "cp310-*"
 test-command = "pytest -vvv {project}/fsspec_rs/tests"
