@@ -222,6 +222,82 @@ fn main() -> fsspec_rs::FsResult<()> {
 Plain HTTP is allowed automatically when `endpoint_url` starts with
 `http://`, which is useful for MinIO and LocalStack.
 
+## Python fsspec bridge
+
+The optional bridge crate is named `fsspec_rs_bridge`. It adapts Python fsspec
+filesystem objects to the Rust `FileSystem` trait:
+
+```toml
+[dependencies]
+fsspec_rs = "0.1.1"
+fsspec_rs_bridge = "0.1.1"
+```
+
+For local development in this repository:
+
+```toml
+fsspec_rs = { path = "./rust", version = "*" }
+fsspec_rs_bridge = { path = "./rust/bridge", version = "*" }
+```
+
+The bridge is intentionally separate from the pure Rust core crate. It depends
+on PyO3 and Python fsspec at runtime, but it is an `rlib` helper crate rather
+than a Python extension module. It defines no `#[pyclass]` types, which keeps
+downstream PyO3 extension modules from sharing Python class statistics across
+crate boundaries.
+
+Use the bridge when Rust code is running inside a Python process and needs to
+consume an installed fsspec implementation that does not yet have a native
+Rust backend.
+
+```rust
+use std::collections::HashMap;
+
+use fsspec_rs::FileSystem;
+use fsspec_rs_bridge::url_to_fs;
+
+fn main() -> fsspec_rs::FsResult<()> {
+    let storage_options = HashMap::new();
+    let (fs, start_path) = url_to_fs("memory://", &storage_options)?;
+
+    fs.pipe_file("/example.txt", b"hello from Python fsspec")?;
+    let data = fs.cat_file("/example.txt", None, None)?;
+
+    assert_eq!(start_path, "/");
+    assert_eq!(data, b"hello from Python fsspec");
+    Ok(())
+}
+```
+
+You can also construct a bridge from a protocol name:
+
+```rust
+use std::collections::HashMap;
+
+use fsspec_rs::FileSystem;
+use fsspec_rs_bridge::PyFsspecFs;
+
+fn main() -> fsspec_rs::FsResult<()> {
+    let fs = PyFsspecFs::from_protocol("memory", &HashMap::new())?;
+
+    assert_eq!(fs.protocol(), &["python"]);
+    assert_eq!(fs.source_protocol(), "memory");
+    assert_eq!(fs.root_marker(), "/");
+    Ok(())
+}
+```
+
+`PyFsspecFs` implements the same `FileSystem` trait as `LocalFs` and `S3Fs`.
+It delegates primitives such as `ls`, `info`, `open`, `cat_file`,
+`pipe_file`, `cp_file`, `rm_file`, `mkdir`, `rmdir`, `get_file`, and
+`put_file` to the underlying Python filesystem object. Python exceptions are
+mapped back into `FsError` variants where possible.
+
+Because the bridge calls Python, it initializes and attaches to the Python
+interpreter internally. Consumers should still treat it as Python-backed I/O:
+it is best suited for Python extension crates or embedded-Python contexts, not
+standalone Rust binaries that need a Python-free dependency graph.
+
 ## Caching
 
 The caching layer is used by buffered reads. `CacheType::from_str()` accepts:

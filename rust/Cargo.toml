@@ -25,3 +25,8 @@ tempfile = "3"
 [profile.test.junit]
 path = "junit.xml"
 
+[workspace]
+members = [
+    ".",
+    "bridge",
+]

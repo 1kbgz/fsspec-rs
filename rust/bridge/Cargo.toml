@@ -1,0 +1,21 @@
+[package]
+name = "fsspec_rs_bridge"
+version = "0.1.1"
+authors = ["the fsspec-rs authors <dev@1kbgz.com>"]
+edition = "2021"
+license = "Apache-2.0"
+readme = "../../README.md"
+repository = "https://github.com/1kbgz/fsspec-rs"
+description = "Python fsspec bridge for the fsspec-rs Rust traits"
+
+[lib]
+name = "fsspec_rs_bridge"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+fsspec_rs = { path = "..", version = "0.1.1" }
+pyo3 = { version = "0.28.2" }
+
+[dev-dependencies]
+tempfile = "3"

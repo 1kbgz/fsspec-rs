@@ -9,11 +9,11 @@ requirements:  ## install required dev dependencies
 develop: requirements  ## install required dev dependencies
 
 build:  ## build release
-	cargo build --release --all-features
+	cargo build --workspace --release --all-features
 
 .PHONY: lint lints fix format
 lint:  ## run Clippy for linting, rustfmt for autoformat checks
-	cargo clippy --all-features
+	cargo clippy --workspace --all-features
 	cargo fmt --all -- --check
 # alias
 lints: lint
@@ -25,26 +25,26 @@ format: fix
 
 .PHONY: check checks
 check:
-	cargo check --all-features
+	cargo check --workspace --all-features
 # alias
 checks: check
 
 .PHONY: test tests test-ci tests-ci
 test:  ## run the tests
-	cargo llvm-cov nextest --cobertura --output-path  junit.xml
+	cargo llvm-cov nextest --workspace --cobertura --output-path  junit.xml
 
 # alias
 tests: test
 
 coverage:
-	cargo llvm-cov nextest --lcov --output-path coverage
+	cargo llvm-cov nextest --workspace --lcov --output-path coverage
 
 .PHONY: dist publish
 dist:  ## create dist
-	cargo publish --dry-run --allow-dirty
+	cargo publish --workspace --dry-run --allow-dirty
 
 publish:  ## publish to cargo
-	cargo publish
+	cargo publish --workspace
 
 # Thanks to Francoise at marmelab.com for this
 .DEFAULT_GOAL := help
