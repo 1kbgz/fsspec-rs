@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="API reference" href="api.html"><link rel="prev" title="fsspec-rs filesystems" href="filesystems.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>Rust traits - fsspec-rs v0.1.1</title>
+        <title>Rust traits - fsspec-rs v0.1.2</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -167,7 +167,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../index.html"><div class="brand">fsspec-rs <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.1.1</code></div></a>
+      <a href="../../index.html"><div class="brand">fsspec-rs <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.1.2</code></div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -188,7 +188,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
   
-  <span class="sidebar-brand-text">fsspec-rs <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.1.1</code></span>
+  <span class="sidebar-brand-text">fsspec-rs <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.1.2</code></span>
   
 </a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -467,6 +467,72 @@ API through an embedded Tokio runtime.</p>
 <p>Plain HTTP is allowed automatically when <code class="docutils literal notranslate"><span class="pre">endpoint_url</span></code> starts with
 <code class="docutils literal notranslate"><span class="pre">http://</span></code>, which is useful for MinIO and LocalStack.</p>
 </section>
+<section id="python-fsspec-bridge">
+<h2>Python fsspec bridge<a class="headerlink" href="#python-fsspec-bridge" title="Link to this heading">¶</a></h2>
+<p>The optional bridge crate is named <code class="docutils literal notranslate"><span class="pre">fsspec_rs_bridge</span></code>. It adapts Python fsspec
+filesystem objects to the Rust <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> trait:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[dependencies]</span>
+<span class="n">fsspec_rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;0.1.1&quot;</span>
+<span class="n">fsspec_rs_bridge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;0.1.1&quot;</span>
+</pre></div>
+</div>
+<p>For local development in this repository:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="n">fsspec_rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;./rust&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;*&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="n">fsspec_rs_bridge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;./rust/bridge&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;*&quot;</span><span class="w"> </span><span class="p">}</span>
+</pre></div>
+</div>
+<p>The bridge is intentionally separate from the pure Rust core crate. It depends
+on PyO3 and Python fsspec at runtime, but it is an <code class="docutils literal notranslate"><span class="pre">rlib</span></code> helper crate rather
+than a Python extension module. It defines no <code class="docutils literal notranslate"><span class="pre">#[pyclass]</span></code> types, which keeps
+downstream PyO3 extension modules from sharing Python class statistics across
+crate boundaries.</p>
+<p>Use the bridge when Rust code is running inside a Python process and needs to
+consume an installed fsspec implementation that does not yet have a native
+Rust backend.</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">collections</span><span class="p">::</span><span class="n">HashMap</span><span class="p">;</span>
+
+<span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::</span><span class="n">FileSystem</span><span class="p">;</span>
+<span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs_bridge</span><span class="p">::</span><span class="n">url_to_fs</span><span class="p">;</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">fsspec_rs</span><span class="p">::</span><span class="n">FsResult</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">storage_options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">HashMap</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="p">(</span><span class="n">fs</span><span class="p">,</span><span class="w"> </span><span class="n">start_path</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">url_to_fs</span><span class="p">(</span><span class="s">&quot;memory://&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">storage_options</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">fs</span><span class="p">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s">&quot;/example.txt&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;hello from Python fsspec&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fs</span><span class="p">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s">&quot;/example.txt&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">start_path</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;/&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;hello from Python fsspec&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>You can also construct a bridge from a protocol name:</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">collections</span><span class="p">::</span><span class="n">HashMap</span><span class="p">;</span>
+
+<span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::</span><span class="n">FileSystem</span><span class="p">;</span>
+<span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs_bridge</span><span class="p">::</span><span class="n">PyFsspecFs</span><span class="p">;</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">fsspec_rs</span><span class="p">::</span><span class="n">FsResult</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">fs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PyFsspecFs</span><span class="p">::</span><span class="n">from_protocol</span><span class="p">(</span><span class="s">&quot;memory&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">HashMap</span><span class="p">::</span><span class="n">new</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">fs</span><span class="p">.</span><span class="n">protocol</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="p">[</span><span class="s">&quot;python&quot;</span><span class="p">]);</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">fs</span><span class="p">.</span><span class="n">source_protocol</span><span class="p">(),</span><span class="w"> </span><span class="s">&quot;memory&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">fs</span><span class="p">.</span><span class="n">root_marker</span><span class="p">(),</span><span class="w"> </span><span class="s">&quot;/&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">PyFsspecFs</span></code> implements the same <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> trait as <code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> and <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code>.
+It delegates primitives such as <code class="docutils literal notranslate"><span class="pre">ls</span></code>, <code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">open</span></code>, <code class="docutils literal notranslate"><span class="pre">cat_file</span></code>,
+<code class="docutils literal notranslate"><span class="pre">pipe_file</span></code>, <code class="docutils literal notranslate"><span class="pre">cp_file</span></code>, <code class="docutils literal notranslate"><span class="pre">rm_file</span></code>, <code class="docutils literal notranslate"><span class="pre">mkdir</span></code>, <code class="docutils literal notranslate"><span class="pre">rmdir</span></code>, <code class="docutils literal notranslate"><span class="pre">get_file</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">put_file</span></code> to the underlying Python filesystem object. Python exceptions are
+mapped back into <code class="docutils literal notranslate"><span class="pre">FsError</span></code> variants where possible.</p>
+<p>Because the bridge calls Python, it initializes and attaches to the Python
+interpreter internally. Consumers should still treat it as Python-backed I/O:
+it is best suited for Python extension crates or embedded-Python contexts, not
+standalone Rust binaries that need a Python-free dependency graph.</p>
+</section>
 <section id="caching">
 <h2>Caching<a class="headerlink" href="#caching" title="Link to this heading">¶</a></h2>
 <p>The caching layer is used by buffered reads. <code class="docutils literal notranslate"><span class="pre">CacheType::from_str()</span></code> accepts:</p>
@@ -581,6 +647,7 @@ common filesystem semantics into stable variants:</p>
 <li><a class="reference internal" href="#metadata-and-open-options">Metadata and open options</a></li>
 <li><a class="reference internal" href="#localfs">LocalFs</a></li>
 <li><a class="reference internal" href="#s3fs">S3Fs</a></li>
+<li><a class="reference internal" href="#python-fsspec-bridge">Python fsspec bridge</a></li>
 <li><a class="reference internal" href="#caching">Caching</a></li>
 <li><a class="reference internal" href="#error-handling">Error handling</a></li>
 </ul>
@@ -594,7 +661,7 @@ common filesystem semantics into stable variants:</p>
       
     </aside>
   </div>
-</div><script src="../../_static/documentation_options.js?v=a58bc63e"></script>
+</div><script src="../../_static/documentation_options.js?v=92734c54"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
