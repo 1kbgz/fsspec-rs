@@ -196,7 +196,7 @@ class LocalFile(AbstractBufferedFile):
         return "r" in self.mode
 
     def writable(self) -> bool:
-        return "w" in self.mode or "a" in self.mode
+        return "w" in self.mode or "a" in self.mode or "x" in self.mode
 
     def seekable(self) -> bool:
         return True

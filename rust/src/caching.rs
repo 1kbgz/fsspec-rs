@@ -14,6 +14,8 @@
 //! | `"all"`       | [`AllBytesCache`]   | Fetch entire file on first access. |
 //! | `"none"`      | [`NoCache`]         | Pass-through, no caching at all. |
 
+use std::{error::Error, fmt, str::FromStr};
+
 use crate::error::FsResult;
 
 // ============================================================================
@@ -36,15 +38,42 @@ pub enum CacheType {
     All,
 }
 
-impl CacheType {
-    /// Parse from a string (case-insensitive).
-    pub fn from_str(s: &str) -> Option<Self> {
+/// Error returned when parsing a cache strategy name fails.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ParseCacheTypeError {
+    value: String,
+}
+
+impl ParseCacheTypeError {
+    fn new(value: &str) -> Self {
+        Self {
+            value: value.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for ParseCacheTypeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "unknown cache type {:?}; valid values are none, readahead, block, and all",
+            self.value
+        )
+    }
+}
+
+impl Error for ParseCacheTypeError {}
+
+impl FromStr for CacheType {
+    type Err = ParseCacheTypeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_lowercase().as_str() {
-            "none" => Some(Self::None),
-            "readahead" | "read_ahead" => Some(Self::ReadAhead),
-            "block" | "blockcache" => Some(Self::Block),
-            "all" | "bytes" => Some(Self::All),
-            _ => None,
+            "none" => Ok(Self::None),
+            "readahead" | "read_ahead" => Ok(Self::ReadAhead),
+            "block" | "blockcache" => Ok(Self::Block),
+            "all" | "bytes" => Ok(Self::All),
+            _ => Err(ParseCacheTypeError::new(s)),
         }
     }
 }
@@ -123,6 +152,11 @@ impl ReadAheadCache {
             data: Vec::new(),
         }
     }
+
+    #[cfg(test)]
+    pub(crate) fn cached_len(&self) -> usize {
+        self.data.len()
+    }
 }
 
 impl Cache for ReadAheadCache {
@@ -146,20 +180,25 @@ impl Cache for ReadAheadCache {
 
         // Partial hit: start is in cache, but end extends beyond
         if start >= self.cache_start && start < cache_end && end > cache_end {
-            // Fetch from cache_end to (end + readahead)
+            let keep_len = self.blocksize.max(end - start);
             let fetch_end = match self.file_size {
-                Some(sz) => (end + self.blocksize).min(sz),
-                None => end + self.blocksize,
+                Some(sz) => (start + keep_len).min(sz),
+                None => start + keep_len,
             };
             let new_data = (self.fetcher)(cache_end, fetch_end)?;
 
-            // Extend cache
-            self.data.extend_from_slice(&new_data);
+            let prefix_len = (cache_end - start) as usize;
+            let mut data = self.data[(start - self.cache_start) as usize..].to_vec();
+            data.extend_from_slice(&new_data);
+            data.truncate(keep_len as usize);
+            self.data = data;
+            self.cache_start = start;
 
-            let new_cache_end = self.cache_start + self.data.len() as u64;
+            let new_cache_end = start + self.data.len() as u64;
             let actual_end = end.min(new_cache_end);
-            let lo = (start - self.cache_start) as usize;
-            let hi = (actual_end - self.cache_start) as usize;
+            let lo = 0;
+            let hi = (actual_end - start) as usize;
+            debug_assert!(prefix_len <= hi);
             return Ok(self.data[lo..hi].to_vec());
         }
 

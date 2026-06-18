@@ -6,7 +6,7 @@ edition = "2021"
 license = "Apache-2.0"
 readme = "../README.md"
 repository = "https://github.com/1kbgz/fsspec-rs"
-description = "fsspec-compatible backends with Rust accleration"
+description = "fsspec-compatible backends with Rust acceleration"
 
 [lib]
 name = "fsspec_rs"
@@ -21,9 +21,6 @@ url = "2"
 
 [dev-dependencies]
 tempfile = "3"
-
-[profile.test.junit]
-path = "junit.xml"
 
 [workspace]
 members = [

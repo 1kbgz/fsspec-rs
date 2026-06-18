@@ -30,15 +30,15 @@ use fsspec_rs::{
 
 The main pieces are:
 
-| Type                         | Purpose                                                                  |
-| ---------------------------- | ------------------------------------------------------------------------ |
-| `FileSystem`                 | Synchronous filesystem trait with primitive methods and default helpers. |
-| `AsyncFileSystem`            | Async mirror of `FileSystem` for async-native backends.                  |
-| `FsFile`                     | File-like trait returned by `FileSystem::open()`.                        |
-| `FileInfo`                   | Metadata for files, directories, and other entries.                      |
-| `OpenMode` and `OpenOptions` | Open mode and buffered I/O options.                                      |
-| `FsError` and `FsResult<T>`  | Shared error and result types.                                           |
-| `Cache` and `CacheType`      | Read cache strategy interface and selector.                              |
+| Type                         | Purpose                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| `FileSystem`                 | Synchronous filesystem trait with primitive methods and default helpers.         |
+| `AsyncFileSystem`            | Experimental async mirror of `FileSystem`; no shipped backend implements it yet. |
+| `FsFile`                     | File-like trait returned by `FileSystem::open()`.                                |
+| `FileInfo`                   | Metadata for files, directories, and other entries.                              |
+| `OpenMode` and `OpenOptions` | Open mode and buffered I/O options.                                              |
+| `FsError` and `FsResult<T>`  | Shared error and result types.                                                   |
+| `Cache` and `CacheType`      | Read cache strategy interface and selector.                                      |
 
 ## FileSystem
 
@@ -107,8 +107,8 @@ The default methods built on those primitives include:
 ## AsyncFileSystem
 
 `AsyncFileSystem` mirrors `FileSystem`, but primitive methods return futures
-and default helpers are `async fn`s. It is intended for backends whose native
-clients are async, such as object stores or HTTP services.
+and default helpers are `async fn`s. It is experimental: the shipped `LocalFs`
+and `S3Fs` backends currently implement the synchronous `FileSystem` trait.
 
 The default async implementation avoids recursive async futures in `walk()` by
 using an explicit stack. Method semantics otherwise match `FileSystem`.
@@ -230,7 +230,7 @@ filesystem objects to the Rust `FileSystem` trait:
 ```toml
 [dependencies]
 fsspec_rs = "0.1.1"
-fsspec_rs_bridge = "0.1.1"
+fsspec_rs_bridge = "0.1.2"
 ```
 
 For local development in this repository:

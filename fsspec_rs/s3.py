@@ -53,7 +53,7 @@ class S3FileSystem(fsspec.AbstractFileSystem):
 
     def __init__(
         self,
-        bucket: str,
+        bucket: str | None = None,
         key: str | None = None,
         secret: str | None = None,
         endpoint_url: str | None = None,
@@ -64,6 +64,8 @@ class S3FileSystem(fsspec.AbstractFileSystem):
         **storage_options,
     ):
         super().__init__(**storage_options)
+        if not bucket:
+            raise ValueError("bucket is required unless it is provided by an s3-rs:// URL")
 
         # Merge from fsspec.config.conf (populated by FSSPEC_S3_* env vars)
         s3_conf = conf.get("s3", {})
@@ -126,9 +128,9 @@ class S3FileSystem(fsspec.AbstractFileSystem):
 
     def rm(self, path, recursive: bool = False, maxdepth=None):
         if isinstance(path, str):
-            return self._rust.rm_file(path)
+            return self._rust.rm(path, recursive=recursive)
         for p in path:
-            self._rust.rm_file(p)
+            self._rust.rm(p, recursive=recursive)
 
     def cp_file(self, path1: str, path2: str, **kwargs):
         return self._rust.cp_file(path1, path2)
@@ -225,7 +227,7 @@ class S3File(AbstractBufferedFile):
         return "r" in self.mode
 
     def writable(self) -> bool:
-        return "w" in self.mode or "a" in self.mode
+        return "w" in self.mode or "a" in self.mode or "x" in self.mode
 
     def seekable(self) -> bool:
         return True

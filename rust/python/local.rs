@@ -93,6 +93,9 @@ impl RustLocalFile {
     /// Close the file.
     fn close(&self) -> PyResult<()> {
         let mut guard = self.inner.lock().unwrap();
+        if let Some(f) = guard.as_mut() {
+            f.commit().map_err(fs_error_to_pyerr)?;
+        }
         *guard = None;
         Ok(())
     }
@@ -199,7 +202,7 @@ impl RustLocalFs {
                 }
                 if let Some(modified) = info.modified {
                     if let Ok(dur) = modified.duration_since(std::time::SystemTime::UNIX_EPOCH) {
-                        d.set_item("created", dur.as_secs_f64())?;
+                        d.set_item("modified", dur.as_secs_f64())?;
                     }
                 }
                 list.append(d)?;
@@ -261,11 +264,10 @@ impl RustLocalFs {
 
         let opts = if cache_type.is_some() || block_size.is_some() || max_blocks.is_some() {
             let ct = match cache_type {
-                Some(s) => Some(CacheType::from_str(s).ok_or_else(|| {
-                    pyo3::exceptions::PyValueError::new_err(format!(
-                        "unknown cache_type: {s}. Valid: none, readahead, block, all"
-                    ))
-                })?),
+                Some(s) => Some(
+                    s.parse::<CacheType>()
+                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
+                ),
                 None => None,
             };
             let mut o = OpenOptions::default();

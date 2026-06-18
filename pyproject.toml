@@ -10,7 +10,7 @@ name = "fsspec-rs"
 authors = [
     {name = "the fsspec-rs authors", email = "dev@1kbgz.com"},
 ]
-description = "fsspec-compatible backends with Rust accleration"
+description = "fsspec-compatible backends with Rust acceleration"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 version = "0.1.2"

@@ -20,14 +20,23 @@ fn make_s3fs() -> Option<S3Fs> {
     let key = env::var("FSSPEC_S3_KEY").ok()?;
     let secret = env::var("FSSPEC_S3_SECRET").ok()?;
     let endpoint = env::var("FSSPEC_S3_ENDPOINT_URL").ok()?;
+    let bucket = env::var("FSSPEC_S3_BUCKET").unwrap_or_else(|_| "timkpaine-public".into());
+    let region = env::var("FSSPEC_S3_REGION").unwrap_or_else(|_| "us-east-005".into());
 
-    let mut cfg = S3Config::new("timkpaine-public");
+    let mut cfg = S3Config::new(bucket);
     cfg.access_key_id = Some(key);
     cfg.secret_access_key = Some(secret);
     cfg.endpoint_url = Some(endpoint);
-    cfg.region = Some("us-east-005".into());
+    cfg.region = Some(region);
 
     Some(S3Fs::new(cfg).expect("failed to construct S3Fs"))
+}
+
+fn expected_file_count() -> usize {
+    env::var("FSSPEC_S3_EXPECTED_FILE_COUNT")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(64)
 }
 
 /// Skip the test if credentials are not set.
@@ -291,7 +300,13 @@ fn test_s3_find() {
         .find("s3://timkpaine-public/projects/organizeit2", None, false)
         .unwrap();
     // organizeit2 test data has 64 files (from the test_backends.py assertion)
-    assert_eq!(files.len(), 64, "expected 64 files, got {}", files.len());
+    assert_eq!(
+        files.len(),
+        expected_file_count(),
+        "expected {} files, got {}",
+        expected_file_count(),
+        files.len()
+    );
 }
 
 #[test]

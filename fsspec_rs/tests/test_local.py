@@ -116,6 +116,8 @@ class TestLs:
         assert isinstance(entries, list)
         assert len(entries) >= 1
         assert any(e["name"] == path for e in entries)
+        entry = next(e for e in entries if e["name"] == path)
+        assert "modified" in entry
 
     def test_ls_names_only(self, fs, tmp):
         assert isinstance(fs, fsspec.AbstractFileSystem)

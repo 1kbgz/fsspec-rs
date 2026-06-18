@@ -140,32 +140,76 @@ benchmarks: benchmark
 #########
 # MINIO #
 #########
-.PHONY: minio-start minio-stop minio-status
+.PHONY: minio-start minio-seed minio-stop minio-status test-s3-py test-s3-rs test-s3
 
+CONTAINER_ENGINE ?= $(shell command -v podman >/dev/null 2>&1 && echo podman || echo docker)
 MINIO_CONTAINER := fsspec-rs-minio
+MINIO_IMAGE ?= docker.io/minio/minio:latest
+MINIO_MC_IMAGE ?= docker.io/minio/mc:latest
+MINIO_ROOT_USER ?= minioadmin
+MINIO_ROOT_PASSWORD ?= minioadmin
+MINIO_ENDPOINT ?= http://localhost:9000
+MINIO_BUCKET ?= timkpaine-public
+MINIO_PREFIX ?= projects/organizeit2
+MINIO_EXPECTED_FILE_COUNT ?= 64
 
-minio-start:  ## start MinIO via podman for local S3 benchmarks
-	@podman rm -f $(MINIO_CONTAINER) 2>/dev/null || true
-	podman run -d --name $(MINIO_CONTAINER) \
+minio-start:  ## start MinIO via podman/docker for local S3 tests and benchmarks
+	@$(CONTAINER_ENGINE) rm -f $(MINIO_CONTAINER) 2>/dev/null || true
+	$(CONTAINER_ENGINE) run -d --name $(MINIO_CONTAINER) \
 		-p 9000:9000 -p 9001:9001 \
-		-e MINIO_ROOT_USER=minioadmin \
-		-e MINIO_ROOT_PASSWORD=minioadmin \
-		docker.io/minio/minio:latest server /data --console-address ":9001"
+		-e MINIO_ROOT_USER=$(MINIO_ROOT_USER) \
+		-e MINIO_ROOT_PASSWORD=$(MINIO_ROOT_PASSWORD) \
+		$(MINIO_IMAGE) server /data --console-address ":9001"
 	@echo "Waiting for MinIO to be ready..."
-	@for i in $$(seq 1 30); do \
-		podman exec $(MINIO_CONTAINER) mc ready local 2>/dev/null && break; \
+	@ready=0; \
+	for i in $$(seq 1 30); do \
+		if $(CONTAINER_ENGINE) run --rm --network=host --entrypoint="" $(MINIO_MC_IMAGE) \
+			sh -c 'mc alias set local $(MINIO_ENDPOINT) $(MINIO_ROOT_USER) $(MINIO_ROOT_PASSWORD) >/dev/null && mc ready local >/dev/null' >/dev/null 2>&1; then ready=1; break; fi; \
 		sleep 1; \
-	done
-	podman run --rm --network=host --entrypoint="" \
-		docker.io/minio/mc:latest \
-		sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb --ignore-existing local/benchmark"
+	done; \
+	test $$ready -eq 1
+	$(MAKE) minio-seed
 	@echo "MinIO ready at http://localhost:9000 (console: http://localhost:9001)"
 
+minio-seed:  ## seed MinIO with the S3 integration-test fixture
+	$(CONTAINER_ENGINE) run --rm --network=host --entrypoint="" \
+		$(MINIO_MC_IMAGE) \
+		sh -c 'mc alias set local $(MINIO_ENDPOINT) $(MINIO_ROOT_USER) $(MINIO_ROOT_PASSWORD) && \
+			mc mb --ignore-existing local/$(MINIO_BUCKET) && \
+			tmp=$$(mktemp) && : > $$tmp && \
+			for d in subdir1 subdir2 subdir3 subdir4; do \
+				for i in $$(seq 1 16); do \
+					mc cp $$tmp local/$(MINIO_BUCKET)/$(MINIO_PREFIX)/$$d/file$$i.txt >/dev/null; \
+				done; \
+			done'
+
 minio-stop:  ## stop MinIO container
-	podman rm -f $(MINIO_CONTAINER) 2>/dev/null || true
+	$(CONTAINER_ENGINE) rm -f $(MINIO_CONTAINER) 2>/dev/null || true
 
 minio-status:  ## check if MinIO is running
-	@podman ps --filter name=$(MINIO_CONTAINER) --format "{{.Names}} {{.Status}}" 2>/dev/null || echo "not running"
+	@$(CONTAINER_ENGINE) ps --filter name=$(MINIO_CONTAINER) --format "{{.Names}} {{.Status}}" 2>/dev/null || echo "not running"
+
+test-s3-py:  ## run Python S3 tests against local MinIO
+	FSSPEC_S3_ENDPOINT_URL=$(MINIO_ENDPOINT) \
+	FSSPEC_S3_KEY=$(MINIO_ROOT_USER) \
+	FSSPEC_S3_SECRET=$(MINIO_ROOT_PASSWORD) \
+	FSSPEC_S3_REGION=us-east-1 \
+	FSSPEC_S3_BUCKET=$(MINIO_BUCKET) \
+	FSSPEC_S3_PREFIX=$(MINIO_PREFIX) \
+	FSSPEC_S3_EXPECTED_FILE_COUNT=$(MINIO_EXPECTED_FILE_COUNT) \
+	python -m pytest -v fsspec_rs/tests/test_s3.py
+
+test-s3-rs:  ## run Rust S3 tests against local MinIO
+	cd rust && \
+	FSSPEC_S3_ENDPOINT_URL=$(MINIO_ENDPOINT) \
+	FSSPEC_S3_KEY=$(MINIO_ROOT_USER) \
+	FSSPEC_S3_SECRET=$(MINIO_ROOT_PASSWORD) \
+	FSSPEC_S3_REGION=us-east-1 \
+	FSSPEC_S3_BUCKET=$(MINIO_BUCKET) \
+	FSSPEC_S3_EXPECTED_FILE_COUNT=$(MINIO_EXPECTED_FILE_COUNT) \
+	cargo test s3_tests -- --ignored
+
+test-s3: test-s3-py test-s3-rs  ## run all S3 tests against local MinIO
 
 ###########
 # VERSION #

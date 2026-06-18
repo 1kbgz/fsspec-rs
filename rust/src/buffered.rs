@@ -127,7 +127,7 @@ impl Read for BufferedFile {
         let cache = self
             .cache
             .as_mut()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "no cache available"))?;
+            .ok_or_else(|| io::Error::other("no cache available"))?;
 
         let file_sz = cache.size().unwrap_or(u64::MAX);
         if self.read_pos >= file_sz {
@@ -139,7 +139,7 @@ impl Read for BufferedFile {
 
         let data = cache
             .fetch(self.read_pos, end)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| io::Error::other(e.to_string()))?;
 
         let n = data.len().min(buf.len());
         buf[..n].copy_from_slice(&data[..n]);

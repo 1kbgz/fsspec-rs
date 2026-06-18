@@ -1,20 +1,21 @@
 //! S3 filesystem backend using the `object_store` crate.
 //!
-//! Wraps [`object_store::aws::AmazonS3`] to implement the [`FileSystem`] trait,
-//! providing a sync API via an embedded tokio runtime.
+//! Wraps an `object_store` S3 store to implement the [`FileSystem`] trait,
+//! providing a sync API via an embedded Tokio runtime.
 
 use std::collections::HashMap;
+use std::fmt;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::sync::Arc;
 
 use bytes::Bytes;
-use object_store::aws::{AmazonS3, AmazonS3Builder};
+use object_store::aws::AmazonS3Builder;
 use object_store::path::Path as ObjectPath;
-use object_store::{ObjectStore, PutPayload};
+use object_store::{MultipartUpload, ObjectStore, PutMode, PutPayload};
 use tokio::runtime::Runtime;
 
-use crate::buffered::{BufferedFile, Uploader};
-use crate::caching::Fetcher;
+use crate::buffered::BufferedFile;
+use crate::caching::{CacheType, Fetcher};
 use crate::error::{FsError, FsResult};
 use crate::file::FsFile;
 use crate::fs::FileSystem;
@@ -48,18 +49,23 @@ fn to_object_path(key: &str) -> ObjectPath {
     ObjectPath::from(normalise_key(key))
 }
 
+const S3_MIN_MULTIPART_PART_SIZE: usize = 5 * 1024 * 1024;
+
 // ---------------------------------------------------------------------------
 // S3Fs
 // ---------------------------------------------------------------------------
 
 /// Configuration used to construct an [`S3Fs`].
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct S3Config {
     /// S3 bucket name.
     pub bucket: String,
     /// AWS region (e.g. `"us-east-1"`).
     pub region: Option<String>,
     /// Custom endpoint URL (for MinIO / Backblaze B2 / LocalStack).
+    ///
+    /// Plain `http://` endpoints automatically enable object_store's
+    /// `allow_http` setting.
     pub endpoint_url: Option<String>,
     /// Access key ID.
     pub access_key_id: Option<String>,
@@ -71,6 +77,33 @@ pub struct S3Config {
     pub anon: bool,
     /// Use virtual-hosted style URLs.
     pub virtual_hosted_style_request: bool,
+}
+
+impl fmt::Debug for S3Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("S3Config")
+            .field("bucket", &self.bucket)
+            .field("region", &self.region)
+            .field("endpoint_url", &self.endpoint_url)
+            .field(
+                "access_key_id",
+                &self.access_key_id.as_ref().map(|_| "<redacted>"),
+            )
+            .field(
+                "secret_access_key",
+                &self.secret_access_key.as_ref().map(|_| "<redacted>"),
+            )
+            .field(
+                "session_token",
+                &self.session_token.as_ref().map(|_| "<redacted>"),
+            )
+            .field("anon", &self.anon)
+            .field(
+                "virtual_hosted_style_request",
+                &self.virtual_hosted_style_request,
+            )
+            .finish()
+    }
 }
 
 impl S3Config {
@@ -89,12 +122,12 @@ impl S3Config {
     }
 }
 
-/// Sync S3 filesystem backed by `object_store::aws::AmazonS3`.
+/// Sync S3 filesystem backed by an `object_store` S3 store.
 ///
 /// All async `object_store` calls are executed via an embedded tokio runtime.
 pub struct S3Fs {
-    store: Arc<AmazonS3>,
-    rt: Runtime,
+    store: Arc<dyn ObjectStore>,
+    rt: Arc<Runtime>,
     pub bucket: String,
 }
 
@@ -137,8 +170,18 @@ impl S3Fs {
 
         Ok(Self {
             store: Arc::new(store),
-            rt,
+            rt: Arc::new(rt),
             bucket: cfg.bucket,
+        })
+    }
+
+    #[cfg(test)]
+    fn from_object_store(bucket: impl Into<String>, store: Arc<dyn ObjectStore>) -> FsResult<Self> {
+        let rt = Runtime::new().map_err(|e| FsError::Other(e.to_string()))?;
+        Ok(Self {
+            store,
+            rt: Arc::new(rt),
+            bucket: bucket.into(),
         })
     }
 
@@ -167,11 +210,29 @@ impl S3Fs {
     pub fn upload_data(&self, key: &str, data: &[u8]) -> FsResult<()> {
         let obj_path = to_object_path(key);
         let payload = PutPayload::from(Bytes::from(data.to_vec()));
-        self.rt
-            .block_on(self.store.put(&obj_path, payload))
-            .map_err(obj_err_to_fs)?;
+        put_object(&self.rt, self.store.as_ref(), &obj_path, payload, false)?;
         Ok(())
     }
+}
+
+fn put_object<S>(
+    rt: &Runtime,
+    store: &S,
+    obj_path: &ObjectPath,
+    payload: PutPayload,
+    exclusive: bool,
+) -> FsResult<()>
+where
+    S: ObjectStore + ?Sized,
+{
+    if exclusive {
+        rt.block_on(store.put_opts(obj_path, payload, PutMode::Create.into()))
+            .map_err(obj_err_to_fs)?;
+    } else {
+        rt.block_on(store.put(obj_path, payload))
+            .map_err(obj_err_to_fs)?;
+    }
+    Ok(())
 }
 
 impl FileSystem for S3Fs {
@@ -223,7 +284,7 @@ impl FileSystem for S3Fs {
     // Primitives
     // ---------------------------------------------------------------
 
-    fn ls(&self, path: &str, detail: bool) -> FsResult<Vec<FileInfo>> {
+    fn ls(&self, path: &str, _detail: bool) -> FsResult<Vec<FileInfo>> {
         let key = self.strip_protocol(path);
         let prefix = if key.is_empty() {
             None
@@ -280,11 +341,6 @@ impl FileSystem for S3Fs {
         }
 
         entries.sort_by(|a, b| a.name.cmp(&b.name));
-
-        if !detail && !entries.is_empty() {
-            // The trait always returns FileInfo; "detail=false" still works,
-            // the caller just uses .name. We keep full info for consistency.
-        }
 
         // If prefix + objects are both empty, the "directory" may not exist.
         // S3 doesn't have real directories, so this is fine — return empty.
@@ -384,10 +440,11 @@ impl FileSystem for S3Fs {
                         .rt
                         .block_on(self.store.head(&obj_path))
                         .map_err(obj_err_to_fs)?;
-                    let file_size = meta.size as u64;
+                    let file_size = meta.size;
 
-                    // Build a fetcher that captures an Arc<AmazonS3> clone
+                    // Build a fetcher that captures an ObjectStore clone.
                     let store = Arc::clone(&self.store);
+                    let rt = Arc::clone(&self.rt);
                     let key_clone = key.clone();
                     let fetcher: Fetcher = Box::new(move |start, end| {
                         use object_store::GetOptions;
@@ -400,9 +457,6 @@ impl FileSystem for S3Fs {
                             ..Default::default()
                         };
 
-                        // Build a Runtime per fetch — we are inside a closure
-                        // that will be called from sync context.
-                        let rt = Runtime::new().map_err(|e| FsError::Other(e.to_string()))?;
                         let result = rt
                             .block_on(store.get_opts(&obj_path, get_opts))
                             .map_err(obj_err_to_fs)?;
@@ -423,63 +477,73 @@ impl FileSystem for S3Fs {
                     )));
                 }
 
-                // Default: eagerly load entire file (backwards compatible)
                 let obj_path = to_object_path(&key);
-                let result = self
+                let meta = self
                     .rt
-                    .block_on(self.store.get(&obj_path))
+                    .block_on(self.store.head(&obj_path))
                     .map_err(obj_err_to_fs)?;
-                let bytes = self.rt.block_on(result.bytes()).map_err(obj_err_to_fs)?;
-                Ok(Box::new(S3File::new_read(
+                let file_size = meta.size;
+
+                let store = Arc::clone(&self.store);
+                let rt = Arc::clone(&self.rt);
+                let key_clone = key.clone();
+                let fetcher: Fetcher = Box::new(move |start, end| {
+                    use object_store::GetOptions;
+                    use object_store::GetRange;
+
+                    let obj_path = to_object_path(&key_clone);
+                    let range = GetRange::Bounded(start..end);
+                    let get_opts = GetOptions {
+                        range: Some(range),
+                        ..Default::default()
+                    };
+
+                    let result = rt
+                        .block_on(store.get_opts(&obj_path, get_opts))
+                        .map_err(obj_err_to_fs)?;
+                    let bytes = rt.block_on(result.bytes()).map_err(obj_err_to_fs)?;
+                    Ok(bytes.to_vec())
+                });
+
+                Ok(Box::new(BufferedFile::new_read(
                     key,
-                    bytes,
-                    Arc::clone(&self.store),
+                    fetcher,
+                    Some(file_size),
+                    CacheType::ReadAhead,
+                    opts.block_size as u64,
+                    opts.max_blocks,
                 )))
             }
             OpenMode::Write | OpenMode::Exclusive => {
-                // If cache_type is set, use BufferedFile for writes
-                if opts.cache_type.is_some() {
-                    let store = Arc::clone(&self.store);
-                    let key_clone = key.clone();
-                    let uploader: Uploader = Box::new(move |data: &[u8]| {
-                        let obj_path = to_object_path(&key_clone);
-                        let payload = PutPayload::from(Bytes::from(data.to_vec()));
-                        let rt = Runtime::new().map_err(|e| FsError::Other(e.to_string()))?;
-                        rt.block_on(store.put(&obj_path, payload))
-                            .map_err(obj_err_to_fs)?;
-                        Ok(())
-                    });
-                    return Ok(Box::new(BufferedFile::new_write(
+                if mode == OpenMode::Exclusive {
+                    return Ok(Box::new(S3File::new_exclusive(
                         key,
-                        uploader,
-                        opts.autocommit,
+                        Arc::clone(&self.store),
+                        Arc::clone(&self.rt),
                     )));
                 }
 
                 Ok(Box::new(S3File::new_write(
                     key,
                     Arc::clone(&self.store),
-                    mode == OpenMode::Exclusive,
+                    Arc::clone(&self.rt),
+                    opts.block_size,
                 )))
             }
             OpenMode::Append => {
-                // Download existing content (if any), then open for write at end
                 let obj_path = to_object_path(&key);
-                let existing = match self.rt.block_on(self.store.get(&obj_path)) {
-                    Ok(result) => {
-                        let bytes = self.rt.block_on(result.bytes()).map_err(obj_err_to_fs)?;
-                        bytes.to_vec()
-                    }
-                    Err(object_store::Error::NotFound { .. }) => Vec::new(),
+                let existing_size = match self.rt.block_on(self.store.head(&obj_path)) {
+                    Ok(meta) => meta.size,
+                    Err(object_store::Error::NotFound { .. }) => 0,
                     Err(e) => return Err(obj_err_to_fs(e)),
                 };
-                let mut f = S3File::new_write(key, Arc::clone(&self.store), false);
-                f.buffer = existing.clone();
-                f.cursor = Cursor::new(existing);
-                // Seek to end
-                let len = f.cursor.get_ref().len() as u64;
-                f.cursor.set_position(len);
-                Ok(Box::new(f))
+                Ok(Box::new(S3File::new_append(
+                    key,
+                    Arc::clone(&self.store),
+                    Arc::clone(&self.rt),
+                    opts.block_size,
+                    existing_size,
+                )))
             }
         }
     }
@@ -499,84 +563,157 @@ impl FileSystem for S3Fs {
 // S3File
 // ---------------------------------------------------------------------------
 
-/// A file-like object for S3. Data is fully buffered in memory.
-///
-/// - **Read mode:** data fetched eagerly via GET.
-/// - **Write mode:** data collected in a buffer, uploaded on `commit()` / drop.
+/// A write-mode file-like object for S3.
 pub struct S3File {
-    key: String,
-    cursor: Cursor<Vec<u8>>,
-    /// The write buffer (only meaningful in write mode).
-    buffer: Vec<u8>,
-    store: Arc<AmazonS3>,
-    mode: S3FileMode,
-    committed: bool,
-    discarded: bool,
+    inner: S3FileInner,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum S3FileMode {
-    Read,
-    Write,
-    WriteExclusive,
+enum S3FileInner {
+    Buffered(Box<S3BufferedWriteFile>),
+    Streaming(Box<S3StreamingWriteFile>),
 }
 
 impl S3File {
-    fn new_read(key: String, data: Bytes, store: Arc<AmazonS3>) -> Self {
+    fn new_exclusive(key: String, store: Arc<dyn ObjectStore>, rt: Arc<Runtime>) -> Self {
         Self {
-            key,
-            cursor: Cursor::new(data.to_vec()),
-            buffer: Vec::new(),
-            store,
-            mode: S3FileMode::Read,
-            committed: false,
-            discarded: false,
+            inner: S3FileInner::Buffered(Box::new(S3BufferedWriteFile::new(key, store, rt))),
         }
     }
 
-    fn new_write(key: String, store: Arc<AmazonS3>, exclusive: bool) -> Self {
+    fn new_write(
+        key: String,
+        store: Arc<dyn ObjectStore>,
+        rt: Arc<Runtime>,
+        block_size: usize,
+    ) -> Self {
         Self {
-            key,
-            cursor: Cursor::new(Vec::new()),
-            buffer: Vec::new(),
-            store,
-            mode: if exclusive {
-                S3FileMode::WriteExclusive
-            } else {
-                S3FileMode::Write
-            },
-            committed: false,
-            discarded: false,
+            inner: S3FileInner::Streaming(Box::new(S3StreamingWriteFile::new_write(
+                key, store, rt, block_size,
+            ))),
         }
     }
 
-    /// Upload the buffer contents to S3.
-    fn upload(&mut self) -> FsResult<()> {
-        let data = self.cursor.get_ref().clone();
-        let payload = PutPayload::from(Bytes::from(data));
-        let obj_path = to_object_path(&self.key);
-
-        let rt = Runtime::new().map_err(|e| FsError::Other(e.to_string()))?;
-        rt.block_on(self.store.put(&obj_path, payload))
-            .map_err(obj_err_to_fs)?;
-        Ok(())
+    fn new_append(
+        key: String,
+        store: Arc<dyn ObjectStore>,
+        rt: Arc<Runtime>,
+        block_size: usize,
+        existing_size: u64,
+    ) -> Self {
+        Self {
+            inner: S3FileInner::Streaming(Box::new(S3StreamingWriteFile::new_append(
+                key,
+                store,
+                rt,
+                block_size,
+                existing_size,
+            ))),
+        }
     }
 }
 
 impl Read for S3File {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.cursor.read(buf)
+        match &mut self.inner {
+            S3FileInner::Buffered(file) => file.read(buf),
+            S3FileInner::Streaming(file) => file.read(buf),
+        }
     }
 }
 
 impl Write for S3File {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        if self.mode == S3FileMode::Read {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::PermissionDenied,
-                "file not opened for writing",
-            ));
+        match &mut self.inner {
+            S3FileInner::Buffered(file) => file.write(buf),
+            S3FileInner::Streaming(file) => file.write(buf),
         }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match &mut self.inner {
+            S3FileInner::Buffered(file) => file.flush(),
+            S3FileInner::Streaming(file) => file.flush(),
+        }
+    }
+}
+
+impl Seek for S3File {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        match &mut self.inner {
+            S3FileInner::Buffered(file) => file.seek(pos),
+            S3FileInner::Streaming(file) => file.seek(pos),
+        }
+    }
+}
+
+impl FsFile for S3File {
+    fn info(&self) -> FsResult<FileInfo> {
+        match &self.inner {
+            S3FileInner::Buffered(file) => file.info(),
+            S3FileInner::Streaming(file) => file.info(),
+        }
+    }
+
+    fn size(&self) -> FsResult<Option<u64>> {
+        match &self.inner {
+            S3FileInner::Buffered(file) => file.size(),
+            S3FileInner::Streaming(file) => file.size(),
+        }
+    }
+
+    fn commit(&mut self) -> FsResult<()> {
+        match &mut self.inner {
+            S3FileInner::Buffered(file) => file.commit(),
+            S3FileInner::Streaming(file) => file.commit(),
+        }
+    }
+
+    fn discard(&mut self) -> FsResult<()> {
+        match &mut self.inner {
+            S3FileInner::Buffered(file) => file.discard(),
+            S3FileInner::Streaming(file) => file.discard(),
+        }
+    }
+}
+
+struct S3BufferedWriteFile {
+    key: String,
+    cursor: Cursor<Vec<u8>>,
+    store: Arc<dyn ObjectStore>,
+    rt: Arc<Runtime>,
+    committed: bool,
+    discarded: bool,
+}
+
+impl S3BufferedWriteFile {
+    fn new(key: String, store: Arc<dyn ObjectStore>, rt: Arc<Runtime>) -> Self {
+        Self {
+            key,
+            cursor: Cursor::new(Vec::new()),
+            store,
+            rt,
+            committed: false,
+            discarded: false,
+        }
+    }
+
+    fn upload(&mut self) -> FsResult<()> {
+        let data = self.cursor.get_ref().clone();
+        let payload = PutPayload::from(Bytes::from(data));
+        let obj_path = to_object_path(&self.key);
+
+        put_object(&self.rt, self.store.as_ref(), &obj_path, payload, true)
+    }
+}
+
+impl Read for S3BufferedWriteFile {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.cursor.read(buf)
+    }
+}
+
+impl Write for S3BufferedWriteFile {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.cursor.write(buf)
     }
 
@@ -585,13 +722,13 @@ impl Write for S3File {
     }
 }
 
-impl Seek for S3File {
+impl Seek for S3BufferedWriteFile {
     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
         self.cursor.seek(pos)
     }
 }
 
-impl FsFile for S3File {
+impl FsFile for S3BufferedWriteFile {
     fn info(&self) -> FsResult<FileInfo> {
         Ok(FileInfo::file(
             self.key.clone(),
@@ -604,7 +741,7 @@ impl FsFile for S3File {
     }
 
     fn commit(&mut self) -> FsResult<()> {
-        if self.mode != S3FileMode::Read && !self.committed && !self.discarded {
+        if !self.committed && !self.discarded {
             self.upload()?;
             self.committed = true;
         }
@@ -617,12 +754,472 @@ impl FsFile for S3File {
     }
 }
 
-impl Drop for S3File {
+impl Drop for S3BufferedWriteFile {
     fn drop(&mut self) {
-        if self.mode != S3FileMode::Read && !self.committed && !self.discarded {
+        if !self.committed && !self.discarded {
             // Auto-commit on drop (best-effort)
             let _ = self.upload();
             self.committed = true;
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum S3StreamingWriteMode {
+    Write,
+    Append,
+}
+
+struct S3StreamingWriteFile {
+    key: String,
+    store: Arc<dyn ObjectStore>,
+    rt: Arc<Runtime>,
+    mode: S3StreamingWriteMode,
+    part_size: usize,
+    buffer: Vec<u8>,
+    upload: Option<Box<dyn MultipartUpload>>,
+    existing_size: u64,
+    copied_existing: bool,
+    position: u64,
+    size: u64,
+    dirty: bool,
+    committed: bool,
+    discarded: bool,
+}
+
+impl S3StreamingWriteFile {
+    fn new_write(
+        key: String,
+        store: Arc<dyn ObjectStore>,
+        rt: Arc<Runtime>,
+        block_size: usize,
+    ) -> Self {
+        Self {
+            key,
+            store,
+            rt,
+            mode: S3StreamingWriteMode::Write,
+            part_size: block_size.max(S3_MIN_MULTIPART_PART_SIZE),
+            buffer: Vec::new(),
+            upload: None,
+            existing_size: 0,
+            copied_existing: true,
+            position: 0,
+            size: 0,
+            dirty: false,
+            committed: false,
+            discarded: false,
+        }
+    }
+
+    fn new_append(
+        key: String,
+        store: Arc<dyn ObjectStore>,
+        rt: Arc<Runtime>,
+        block_size: usize,
+        existing_size: u64,
+    ) -> Self {
+        Self {
+            key,
+            store,
+            rt,
+            mode: S3StreamingWriteMode::Append,
+            part_size: block_size.max(S3_MIN_MULTIPART_PART_SIZE),
+            buffer: Vec::new(),
+            upload: None,
+            existing_size,
+            copied_existing: existing_size == 0,
+            position: existing_size,
+            size: existing_size,
+            dirty: false,
+            committed: false,
+            discarded: false,
+        }
+    }
+
+    fn io_error(err: FsError) -> std::io::Error {
+        std::io::Error::other(err.to_string())
+    }
+
+    fn object_path(&self) -> ObjectPath {
+        to_object_path(&self.key)
+    }
+
+    fn fetch_range(&self, start: u64, end: u64) -> FsResult<Vec<u8>> {
+        use object_store::GetOptions;
+        use object_store::GetRange;
+
+        let opts = GetOptions {
+            range: Some(GetRange::Bounded(start..end)),
+            ..Default::default()
+        };
+        let result = self
+            .rt
+            .block_on(self.store.get_opts(&self.object_path(), opts))
+            .map_err(obj_err_to_fs)?;
+        let bytes = self.rt.block_on(result.bytes()).map_err(obj_err_to_fs)?;
+        Ok(bytes.to_vec())
+    }
+
+    fn ensure_upload(&mut self) -> FsResult<&mut Box<dyn MultipartUpload>> {
+        if self.upload.is_none() {
+            let upload = self
+                .rt
+                .block_on(self.store.put_multipart(&self.object_path()))
+                .map_err(obj_err_to_fs)?;
+            self.upload = Some(upload);
+        }
+        Ok(self.upload.as_mut().expect("upload initialized"))
+    }
+
+    fn upload_part(&mut self, data: Vec<u8>) -> FsResult<()> {
+        let rt = Arc::clone(&self.rt);
+        let upload = self.ensure_upload()?;
+        rt.block_on(upload.put_part(PutPayload::from(Bytes::from(data))))
+            .map_err(obj_err_to_fs)
+    }
+
+    fn flush_buffer_part(&mut self) -> FsResult<()> {
+        if self.buffer.is_empty() {
+            return Ok(());
+        }
+        let part = std::mem::take(&mut self.buffer);
+        self.upload_part(part)
+    }
+
+    fn append_bytes(&mut self, mut data: &[u8]) -> FsResult<()> {
+        while !data.is_empty() {
+            if self.buffer.len() == self.part_size {
+                self.flush_buffer_part()?;
+            }
+            let room = self.part_size - self.buffer.len();
+            let take = data.len().min(room);
+            self.buffer.extend_from_slice(&data[..take]);
+            data = &data[take..];
+            if self.buffer.len() == self.part_size && !data.is_empty() {
+                self.flush_buffer_part()?;
+            }
+        }
+        Ok(())
+    }
+
+    fn copy_existing_for_append(&mut self) -> FsResult<()> {
+        if self.copied_existing {
+            return Ok(());
+        }
+
+        let mut offset = 0;
+        while self.existing_size - offset > self.part_size as u64 {
+            let end = offset + self.part_size as u64;
+            let data = self.fetch_range(offset, end)?;
+            self.upload_part(data)?;
+            offset = end;
+        }
+
+        if offset < self.existing_size {
+            let data = self.fetch_range(offset, self.existing_size)?;
+            self.append_bytes(&data)?;
+        }
+
+        self.copied_existing = true;
+        Ok(())
+    }
+
+    fn abort_upload(&mut self) -> FsResult<()> {
+        if let Some(mut upload) = self.upload.take() {
+            self.rt.block_on(upload.abort()).map_err(obj_err_to_fs)?;
+        }
+        Ok(())
+    }
+}
+
+impl Read for S3StreamingWriteFile {
+    fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "file not opened for reading",
+        ))
+    }
+}
+
+impl Write for S3StreamingWriteFile {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+        if self.position != self.size {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "S3 streaming writes only support writing at the end of the file",
+            ));
+        }
+        if self.mode == S3StreamingWriteMode::Append && !self.copied_existing {
+            self.copy_existing_for_append().map_err(Self::io_error)?;
+        }
+        self.append_bytes(buf).map_err(Self::io_error)?;
+        self.position += buf.len() as u64;
+        self.size += buf.len() as u64;
+        self.dirty = true;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Seek for S3StreamingWriteFile {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        let next = match pos {
+            SeekFrom::Start(pos) => pos,
+            SeekFrom::Current(0) => self.position,
+            SeekFrom::End(0) => self.size,
+            SeekFrom::Current(offset) if offset > 0 => self.position + offset as u64,
+            SeekFrom::End(offset) if offset > 0 => self.size + offset as u64,
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "S3 streaming writes do not support seeking before the current end",
+                ))
+            }
+        };
+
+        if next != self.size {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "S3 streaming writes only support seeking to the current end",
+            ));
+        }
+        self.position = next;
+        Ok(self.position)
+    }
+}
+
+impl FsFile for S3StreamingWriteFile {
+    fn info(&self) -> FsResult<FileInfo> {
+        Ok(FileInfo::file(self.key.clone(), self.size))
+    }
+
+    fn size(&self) -> FsResult<Option<u64>> {
+        Ok(Some(self.size))
+    }
+
+    fn commit(&mut self) -> FsResult<()> {
+        if self.committed || self.discarded {
+            return Ok(());
+        }
+        if self.mode == S3StreamingWriteMode::Append && !self.dirty {
+            self.committed = true;
+            return Ok(());
+        }
+        if self.mode == S3StreamingWriteMode::Append && !self.copied_existing {
+            self.copy_existing_for_append()?;
+        }
+
+        if self.upload.is_none() {
+            put_object(
+                &self.rt,
+                self.store.as_ref(),
+                &self.object_path(),
+                PutPayload::from(Bytes::from(self.buffer.clone())),
+                false,
+            )?;
+        } else {
+            if !self.buffer.is_empty() {
+                self.flush_buffer_part()?;
+            }
+            if let Some(upload) = self.upload.as_mut() {
+                self.rt.block_on(upload.complete()).map_err(obj_err_to_fs)?;
+            }
+            self.upload = None;
+        }
+
+        self.buffer.clear();
+        self.committed = true;
+        Ok(())
+    }
+
+    fn discard(&mut self) -> FsResult<()> {
+        self.abort_upload()?;
+        self.buffer.clear();
+        self.discarded = true;
+        Ok(())
+    }
+}
+
+impl Drop for S3StreamingWriteFile {
+    fn drop(&mut self) {
+        if self.committed || self.discarded {
+            return;
+        }
+        if self.upload.is_some() {
+            // Multipart uploads cannot report completion errors from Drop. Abort
+            // unfinished parts instead; explicit close()/commit() is the
+            // supported path for durable writes and surfaced upload errors.
+            let _ = self.abort_upload();
+        } else if self.dirty && !self.buffer.is_empty() {
+            let _ = put_object(
+                &self.rt,
+                self.store.as_ref(),
+                &self.object_path(),
+                PutPayload::from(Bytes::from(self.buffer.clone())),
+                false,
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use object_store::memory::InMemory;
+    use std::io::{Read, Write};
+
+    #[test]
+    fn put_object_honors_exclusive_create() {
+        let rt = Runtime::new().unwrap();
+        let store = InMemory::new();
+        let path = ObjectPath::from("existing.txt");
+
+        put_object(
+            &rt,
+            &store,
+            &path,
+            PutPayload::from(Bytes::from_static(b"first")),
+            false,
+        )
+        .unwrap();
+
+        let err = put_object(
+            &rt,
+            &store,
+            &path,
+            PutPayload::from(Bytes::from_static(b"second")),
+            true,
+        )
+        .unwrap_err();
+        assert!(matches!(err, FsError::AlreadyExists(_)));
+
+        put_object(
+            &rt,
+            &store,
+            &ObjectPath::from("new.txt"),
+            PutPayload::from(Bytes::from_static(b"new")),
+            true,
+        )
+        .unwrap();
+    }
+
+    fn memory_fs() -> S3Fs {
+        S3Fs::from_object_store("bucket", Arc::new(InMemory::new())).unwrap()
+    }
+
+    fn seed_object(fs: &S3Fs, key: &str, data: &[u8]) {
+        let path = to_object_path(key);
+        put_object(
+            &fs.rt,
+            fs.store.as_ref(),
+            &path,
+            PutPayload::from(Bytes::from(data.to_vec())),
+            false,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn in_memory_s3fs_lists_and_infos_objects() {
+        let fs = memory_fs();
+        seed_object(&fs, "dir/file.txt", b"hello");
+        seed_object(&fs, "dir/nested/file.txt", b"world");
+
+        let info = fs.info("s3://bucket/dir/file.txt").unwrap();
+        assert!(info.is_file());
+        assert_eq!(info.size, 5);
+
+        let names: Vec<String> = fs
+            .ls("s3://bucket/dir", true)
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.name)
+            .collect();
+        assert_eq!(names, vec!["bucket/dir/file.txt", "bucket/dir/nested"]);
+    }
+
+    #[test]
+    fn default_read_open_uses_object_store_without_eager_s3file() {
+        let fs = memory_fs();
+        seed_object(&fs, "data.txt", b"abcdef");
+
+        let mut file = fs
+            .open("s3://bucket/data.txt", OpenMode::Read, None)
+            .unwrap();
+        assert_eq!(file.size().unwrap(), Some(6));
+
+        let mut first = [0; 3];
+        file.read_exact(&mut first).unwrap();
+        assert_eq!(&first, b"abc");
+
+        let mut rest = Vec::new();
+        file.read_to_end(&mut rest).unwrap();
+        assert_eq!(rest, b"def");
+    }
+
+    #[test]
+    fn in_memory_s3fs_write_commit_uploads_object() {
+        let fs = memory_fs();
+        let mut file = fs.open("out.txt", OpenMode::Write, None).unwrap();
+        file.write_all(b"written").unwrap();
+        file.commit().unwrap();
+
+        assert_eq!(fs.cat_file("out.txt", None, None).unwrap(), b"written");
+    }
+
+    #[test]
+    fn in_memory_s3fs_large_write_uses_multipart_path() {
+        let fs = memory_fs();
+        let mut data = vec![b'a'; S3_MIN_MULTIPART_PART_SIZE + 17];
+        data[S3_MIN_MULTIPART_PART_SIZE] = b'b';
+
+        let mut file = fs.open("large.txt", OpenMode::Write, None).unwrap();
+        file.write_all(&data).unwrap();
+        file.commit().unwrap();
+
+        let written = fs.cat_file("large.txt", None, None).unwrap();
+        assert_eq!(written.len(), data.len());
+        assert_eq!(written[0], b'a');
+        assert_eq!(written[S3_MIN_MULTIPART_PART_SIZE], b'b');
+        assert_eq!(written.last(), Some(&b'a'));
+    }
+
+    #[test]
+    fn in_memory_s3fs_append_preserves_existing_bytes() {
+        let fs = memory_fs();
+        seed_object(&fs, "append.txt", b"hello");
+
+        let mut file = fs.open("append.txt", OpenMode::Append, None).unwrap();
+        file.write_all(b" world").unwrap();
+        file.commit().unwrap();
+
+        assert_eq!(
+            fs.cat_file("append.txt", None, None).unwrap(),
+            b"hello world"
+        );
+    }
+
+    #[test]
+    fn in_memory_s3fs_large_append_rewrites_without_whole_object_buffer() {
+        let fs = memory_fs();
+        let mut existing = vec![b'x'; S3_MIN_MULTIPART_PART_SIZE + 9];
+        existing[S3_MIN_MULTIPART_PART_SIZE] = b'y';
+        seed_object(&fs, "large-append.txt", &existing);
+
+        let mut file = fs.open("large-append.txt", OpenMode::Append, None).unwrap();
+        file.write_all(b" tail").unwrap();
+        file.commit().unwrap();
+
+        let written = fs.cat_file("large-append.txt", None, None).unwrap();
+        assert_eq!(written.len(), existing.len() + 5);
+        assert_eq!(&written[..existing.len()], existing.as_slice());
+        assert_eq!(&written[existing.len()..], b" tail");
     }
 }

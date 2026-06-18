@@ -1,6 +1,7 @@
 //! Tests for the caching module and BufferedFile.
 
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::sync::{Arc, Mutex};
 
 use crate::buffered::BufferedFile;
 use crate::caching::*;
@@ -24,23 +25,36 @@ fn fake_fetcher(data: Vec<u8>) -> Fetcher {
     })
 }
 
+fn recording_fetcher(data: Vec<u8>, ranges: Arc<Mutex<Vec<(u64, u64)>>>) -> Fetcher {
+    Box::new(move |start: u64, end: u64| {
+        ranges.lock().unwrap().push((start, end));
+        let s = start as usize;
+        let e = (end as usize).min(data.len());
+        if s >= data.len() {
+            return Ok(Vec::new());
+        }
+        Ok(data[s..e].to_vec())
+    })
+}
+
 // ==========================================================================
 // CacheType parsing
 // ==========================================================================
 
 #[test]
 fn test_cache_type_from_str() {
-    assert_eq!(CacheType::from_str("none"), Some(CacheType::None));
-    assert_eq!(CacheType::from_str("readahead"), Some(CacheType::ReadAhead));
+    assert_eq!("none".parse::<CacheType>(), Ok(CacheType::None));
+    assert_eq!("readahead".parse::<CacheType>(), Ok(CacheType::ReadAhead));
+    assert_eq!("READ_AHEAD".parse::<CacheType>(), Ok(CacheType::ReadAhead));
+    assert_eq!("block".parse::<CacheType>(), Ok(CacheType::Block));
+    assert_eq!("BLOCKCACHE".parse::<CacheType>(), Ok(CacheType::Block));
+    assert_eq!("all".parse::<CacheType>(), Ok(CacheType::All));
+    assert_eq!("bytes".parse::<CacheType>(), Ok(CacheType::All));
+    let err = "unknown".parse::<CacheType>().unwrap_err();
     assert_eq!(
-        CacheType::from_str("READ_AHEAD"),
-        Some(CacheType::ReadAhead)
+        err.to_string(),
+        "unknown cache type \"unknown\"; valid values are none, readahead, block, and all"
     );
-    assert_eq!(CacheType::from_str("block"), Some(CacheType::Block));
-    assert_eq!(CacheType::from_str("BLOCKCACHE"), Some(CacheType::Block));
-    assert_eq!(CacheType::from_str("all"), Some(CacheType::All));
-    assert_eq!(CacheType::from_str("bytes"), Some(CacheType::All));
-    assert_eq!(CacheType::from_str("unknown"), None);
 }
 
 // ==========================================================================
@@ -92,6 +106,7 @@ fn test_readahead_sequential() {
     // Read beyond cached block: partial hit + extend
     let r3 = cache.fetch(200, 300).unwrap();
     assert_eq!(r3, &data[200..300]);
+    assert!(cache.cached_len() <= 256);
 }
 
 #[test]
@@ -105,6 +120,24 @@ fn test_readahead_miss_discards() {
     // Seek far away — miss, discards old cache
     let r = cache.fetch(500, 520).unwrap();
     assert_eq!(r, &data[500..520]);
+}
+
+#[test]
+fn test_readahead_partial_hit_does_not_fetch_discarded_bytes() {
+    let data = fake_data(1000);
+    let ranges = Arc::new(Mutex::new(Vec::new()));
+    let mut cache = ReadAheadCache::new(
+        recording_fetcher(data.clone(), ranges.clone()),
+        Some(1000),
+        100,
+    );
+
+    let _ = cache.fetch(0, 10).unwrap();
+    let r = cache.fetch(50, 180).unwrap();
+
+    assert_eq!(r, &data[50..180]);
+    assert_eq!(&*ranges.lock().unwrap(), &[(0, 100), (100, 180)]);
+    assert_eq!(cache.cached_len(), 130);
 }
 
 // ==========================================================================
@@ -274,10 +307,10 @@ fn test_buffered_file_read_sequential() {
     );
 
     let mut buf = vec![0u8; 50];
-    f.read(&mut buf).unwrap();
+    f.read_exact(&mut buf).unwrap();
     assert_eq!(&buf[..50], &data[0..50]);
 
-    f.read(&mut buf).unwrap();
+    f.read_exact(&mut buf).unwrap();
     assert_eq!(&buf[..50], &data[50..100]);
 }
 
