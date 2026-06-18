@@ -12,6 +12,14 @@ class TestVersion:
         assert isinstance(__version__, str)
 
 
+class TestS3Construction:
+    def test_s3_requires_bucket_without_url(self):
+        from fsspec_rs import S3FileSystem
+
+        with pytest.raises(ValueError, match="bucket is required"):
+            S3FileSystem()
+
+
 class TestFileType:
     """Test the FileType enum exposed from Rust."""
 

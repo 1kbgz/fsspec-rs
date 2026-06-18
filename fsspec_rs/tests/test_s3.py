@@ -14,8 +14,9 @@ pytestmark = pytest.mark.skipif(not _has_s3, reason=_SKIP_REASON)
 
 # Test data lives at s3://timkpaine-public/projects/organizeit2
 # with 4 subdirs and 64 total files (all 0-byte placeholders).
-BUCKET = "timkpaine-public"
-PREFIX = "projects/organizeit2"
+BUCKET = os.environ.get("FSSPEC_S3_BUCKET", "timkpaine-public")
+PREFIX = os.environ.get("FSSPEC_S3_PREFIX", "projects/organizeit2")
+EXPECTED_FILE_COUNT = int(os.environ.get("FSSPEC_S3_EXPECTED_FILE_COUNT", "64"))
 S3_ROOT = f"s3://{BUCKET}/{PREFIX}"
 SUBDIR1 = f"s3://{BUCKET}/{PREFIX}/subdir1"
 FILE1 = f"s3://{BUCKET}/{PREFIX}/subdir1/file1.txt"
@@ -153,7 +154,7 @@ class TestOpen:
 class TestFindWalk:
     def test_find(self, fs):
         files = fs.find(S3_ROOT)
-        assert len(files) == 64
+        assert len(files) == EXPECTED_FILE_COUNT
 
     def test_walk(self, fs):
         entries = list(fs.walk(S3_ROOT))

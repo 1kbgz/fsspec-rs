@@ -61,9 +61,13 @@ jobs:
     - name: Test
       run: make coverage
 
+    - name: Test S3 against MinIO
+      run: make test-s3
+      if: matrix.os == 'ubuntu-latest'
+
     - name: Stop MinIO
       run: make minio-stop
-      if: matrix.os == 'ubuntu-latest'
+      if: ${{ always() && matrix.os == 'ubuntu-latest' }}
 
     - name: Upload test results (Python)
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

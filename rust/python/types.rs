@@ -1,6 +1,6 @@
 use pyo3::exceptions::{
-    PyFileExistsError, PyFileNotFoundError, PyIsADirectoryError, PyNotADirectoryError, PyOSError,
-    PyPermissionError, PyValueError,
+    PyFileExistsError, PyFileNotFoundError, PyIsADirectoryError, PyNotADirectoryError,
+    PyNotImplementedError, PyOSError, PyPermissionError, PyValueError,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -192,7 +192,6 @@ impl PyFileInfo {
 // ---- Error conversion ----
 
 /// Convert an FsError into a Python exception.
-#[allow(dead_code)]
 pub fn fs_error_to_pyerr(err: FsError) -> PyErr {
     match err {
         FsError::NotFound(msg) => PyFileNotFoundError::new_err(msg),
@@ -202,7 +201,7 @@ pub fn fs_error_to_pyerr(err: FsError) -> PyErr {
         FsError::IsADirectory(msg) => PyIsADirectoryError::new_err(msg),
         FsError::IoError(err) => PyOSError::new_err(err.to_string()),
         FsError::InvalidArgument(msg) => PyValueError::new_err(msg),
-        FsError::NotSupported(msg) => PyOSError::new_err(format!("not supported: {msg}")),
+        FsError::NotSupported(msg) => PyNotImplementedError::new_err(msg),
         FsError::Other(msg) => PyOSError::new_err(msg),
     }
 }

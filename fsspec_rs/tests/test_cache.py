@@ -83,7 +83,7 @@ class TestLocalOpenCacheType:
         """Invalid cache_type raises ValueError."""
         path, _ = sample_file
         fs = LocalFileSystem()
-        with pytest.raises(ValueError, match="unknown cache_type"):
+        with pytest.raises(ValueError, match="unknown cache type"):
             fs.open(path, "rb", cache_type="bogus")
 
     def test_open_block_size(self, sample_file):
