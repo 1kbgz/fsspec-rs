@@ -66,7 +66,7 @@ with fsspec.open("file-rs:///tmp/example.txt", "rb") as f:
 
 - [Filesystems](docs/src/filesystems.md): local and S3 usage, configuration, caching, and path conventions.
 - [API reference](docs/src/api.md): Python API generated with yardang/Sphinx.
-- [Rust traits](docs/src/rust.md): Rust `FileSystem`, `AsyncFileSystem`, `FsFile`, and cache traits.
+- [Rust traits](docs/src/rust.md): Rust `FileSystem`, experimental `AsyncFileSystem`, `FsFile`, and cache traits.
 
 Build docs locally with:
 

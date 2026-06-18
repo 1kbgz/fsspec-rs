@@ -275,7 +275,7 @@ crate by path:</p>
 <td><p>Synchronous filesystem trait with primitive methods and default helpers.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">AsyncFileSystem</span></code></p></td>
-<td><p>Async mirror of <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> for async-native backends.</p></td>
+<td><p>Experimental async mirror of <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code>; no shipped backend implements it yet.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">FsFile</span></code></p></td>
 <td><p>File-like trait returned by <code class="docutils literal notranslate"><span class="pre">FileSystem::open()</span></code>.</p></td>
@@ -361,8 +361,8 @@ needs bucket-aware or authority-aware paths.</p>
 <section id="asyncfilesystem">
 <h2>AsyncFileSystem<a class="headerlink" href="#asyncfilesystem" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">AsyncFileSystem</span></code> mirrors <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code>, but primitive methods return futures
-and default helpers are <code class="docutils literal notranslate"><span class="pre">async</span> <span class="pre">fn</span></code>s. It is intended for backends whose native
-clients are async, such as object stores or HTTP services.</p>
+and default helpers are <code class="docutils literal notranslate"><span class="pre">async</span> <span class="pre">fn</span></code>s. It is experimental: the shipped <code class="docutils literal notranslate"><span class="pre">LocalFs</span></code>
+and <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> backends currently implement the synchronous <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> trait.</p>
 <p>The default async implementation avoids recursive async futures in <code class="docutils literal notranslate"><span class="pre">walk()</span></code> by
 using an explicit stack. Method semantics otherwise match <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code>.</p>
 </section>
@@ -473,7 +473,7 @@ API through an embedded Tokio runtime.</p>
 filesystem objects to the Rust <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> trait:</p>
 <div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[dependencies]</span>
 <span class="n">fsspec_rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;0.1.1&quot;</span>
-<span class="n">fsspec_rs_bridge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;0.1.1&quot;</span>
+<span class="n">fsspec_rs_bridge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;0.1.2&quot;</span>
 </pre></div>
 </div>
 <p>For local development in this repository:</p>
