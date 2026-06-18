@@ -1,6 +1,6 @@
 """fsspec-rs: fsspec-compatible backends with Rust acceleration."""
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 # Re-export Rust types
 # Register with fsspec so protocols are usable immediately after import
