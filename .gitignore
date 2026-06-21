@@ -147,10 +147,9 @@ emsdk
 .DS_Store
 
 # Hydra
-outputs/
-multirun/
+/outputs/
+/multirun/
 
-<<<<<<< before updating
 # Peer projects
 filesystem_spec
 fsspec-pydantic
