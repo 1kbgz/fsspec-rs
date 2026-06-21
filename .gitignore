@@ -150,7 +150,6 @@ emsdk
 /outputs/
 /multirun/
 
-<<<<<<< before updating
 # Peer projects
 filesystem_spec
 fsspec-pydantic
