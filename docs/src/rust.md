@@ -251,13 +251,11 @@ consume an installed fsspec implementation that does not yet have a native
 Rust backend.
 
 ```rust
-use std::collections::HashMap;
-
 use fsspec_rs::FileSystem;
-use fsspec_rs_bridge::url_to_fs;
+use fsspec_rs_bridge::{url_to_fs, StorageOptions};
 
 fn main() -> fsspec_rs::FsResult<()> {
-    let storage_options = HashMap::new();
+    let storage_options = StorageOptions::new();
     let (fs, start_path) = url_to_fs("memory://", &storage_options)?;
 
     fs.pipe_file("/example.txt", b"hello from Python fsspec")?;
@@ -272,13 +270,11 @@ fn main() -> fsspec_rs::FsResult<()> {
 You can also construct a bridge from a protocol name:
 
 ```rust
-use std::collections::HashMap;
-
 use fsspec_rs::FileSystem;
-use fsspec_rs_bridge::PyFsspecFs;
+use fsspec_rs_bridge::{PyFsspecFs, StorageOptions};
 
 fn main() -> fsspec_rs::FsResult<()> {
-    let fs = PyFsspecFs::from_protocol("memory", &HashMap::new())?;
+    let fs = PyFsspecFs::from_protocol("memory", &StorageOptions::new())?;
 
     assert_eq!(fs.protocol(), &["python"]);
     assert_eq!(fs.source_protocol(), "memory");
@@ -292,6 +288,23 @@ It delegates primitives such as `ls`, `info`, `open`, `cat_file`,
 `pipe_file`, `cp_file`, `rm_file`, `mkdir`, `rmdir`, `get_file`, and
 `put_file` to the underlying Python filesystem object. Python exceptions are
 mapped back into `FsError` variants where possible.
+
+`StorageOptions` values preserve Python-compatible null, boolean, signed and
+unsigned integer, floating-point, string, list, and nested-map types. Nested
+maps support per-protocol options for chained URLs:
+
+```rust
+use fsspec_rs_bridge::{url_to_fs, StorageOptions};
+
+let mut memory = StorageOptions::new();
+memory.insert("skip_instance_cache".to_string(), true.into());
+
+let mut options = StorageOptions::new();
+options.insert("memory".to_string(), memory.into());
+
+let (fs, path) = url_to_fs("simplecache::memory://bucket/data.csv", &options)?;
+# Ok::<(), fsspec_rs::FsError>(())
+```
 
 Because the bridge calls Python, it initializes and attaches to the Python
 interpreter internally. Consumers should still treat it as Python-backed I/O:

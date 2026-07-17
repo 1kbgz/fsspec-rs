@@ -3,9 +3,9 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use fsspec_rs::{FileSystem, FileType, FsError, OpenMode};
-use fsspec_rs_bridge::{url_to_fs, PyFsspecFs};
+use fsspec_rs_bridge::{url_to_fs, PyFsspecFs, StorageOptions};
 
-fn storage_options() -> HashMap<String, String> {
+fn storage_options() -> StorageOptions {
     HashMap::new()
 }
 
@@ -37,6 +37,37 @@ fn url_to_fs_builds_filesystem_and_start_path() {
 
     assert_eq!(fs.source_protocol(), "memory");
     assert_eq!(start, "/");
+}
+
+#[test]
+fn url_to_fs_builds_chained_filesystem() {
+    let cache = tempfile::tempdir().unwrap();
+    let mut cache_options = StorageOptions::new();
+    cache_options.insert(
+        "cache_storage".to_string(),
+        cache.path().to_string_lossy().into_owned().into(),
+    );
+    cache_options.insert("same_names".to_string(), true.into());
+    cache_options.insert("cache_check".to_string(), 0_i64.into());
+
+    let mut memory_options = StorageOptions::new();
+    memory_options.insert("skip_instance_cache".to_string(), true.into());
+
+    let mut options = StorageOptions::new();
+    options.insert("simplecache".to_string(), cache_options.into());
+    options.insert("memory".to_string(), memory_options.into());
+
+    let (fs, start) = url_to_fs(
+        "simplecache::memory://fsspec-rs-bridge/chained.txt",
+        &options,
+    )
+    .unwrap();
+
+    assert_eq!(fs.source_protocol(), "simplecache");
+    assert_eq!(start, "/fsspec-rs-bridge/chained.txt");
+
+    fs.pipe_file(&start, b"chained").unwrap();
+    assert_eq!(fs.cat_file(&start, None, None).unwrap(), b"chained");
 }
 
 #[test]
