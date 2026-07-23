@@ -131,7 +131,7 @@ def s3_bench_data(s3_bench_prefix):
     # Cleanup
     try:
         fs.rm(prefix, recursive=True)
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
 

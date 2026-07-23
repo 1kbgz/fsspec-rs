@@ -103,7 +103,7 @@ class TestInfo:
 
     def test_info_not_found(self, fs, tmp):
         assert isinstance(fs, fsspec.AbstractFileSystem)
-        with pytest.raises(Exception):
+        with pytest.raises(FileNotFoundError):
             fs.info(os.path.join(tmp, "nope"))
 
 

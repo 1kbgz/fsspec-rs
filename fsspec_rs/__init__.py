@@ -6,7 +6,7 @@ __version__ = "0.1.5"
 # Register with fsspec so protocols are usable immediately after import
 from fsspec.registry import register_implementation as _register
 
-from fsspec_rs.fsspec_rs import (  # noqa: F401
+from fsspec_rs.fsspec_rs import (
     FileInfo,
     FileType,
     RustLocalFile,
@@ -16,8 +16,8 @@ from fsspec_rs.fsspec_rs import (  # noqa: F401
 )
 
 # Re-export Python wrappers
-from fsspec_rs.local import LocalFile, LocalFileSystem  # noqa: F401
-from fsspec_rs.s3 import S3File, S3FileSystem  # noqa: F401
+from fsspec_rs.local import LocalFile, LocalFileSystem
+from fsspec_rs.s3 import S3File, S3FileSystem
 
 _register("file-rs", LocalFileSystem)
 _register("local-rs", LocalFileSystem)

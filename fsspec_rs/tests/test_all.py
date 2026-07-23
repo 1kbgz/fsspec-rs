@@ -58,7 +58,7 @@ class TestFileType:
 
         assert FileType.file() == FileType.file()
         assert FileType.directory() == FileType.directory()
-        assert not (FileType.file() == FileType.directory())
+        assert FileType.file() != FileType.directory()
 
     def test_file_type_directory_repr(self):
         from fsspec_rs import FileType
@@ -135,21 +135,21 @@ class TestFileInfo:
 
         a = FileInfo("a.txt", size=100, file_type="file")
         b = FileInfo("b.txt", size=100, file_type="file")
-        assert not (a == b)
+        assert a != b
 
     def test_file_info_neq_size(self):
         from fsspec_rs import FileInfo
 
         a = FileInfo("test.txt", size=100, file_type="file")
         b = FileInfo("test.txt", size=200, file_type="file")
-        assert not (a == b)
+        assert a != b
 
     def test_file_info_neq_type(self):
         from fsspec_rs import FileInfo
 
         a = FileInfo("test", size=0, file_type="file")
         b = FileInfo("test", size=0, file_type="directory")
-        assert not (a == b)
+        assert a != b
 
     def test_file_info_to_dict(self):
         from fsspec_rs import FileInfo

@@ -159,6 +159,6 @@ class TestFindWalk:
     def test_walk(self, fs):
         entries = list(fs.walk(S3_ROOT))
         assert len(entries) > 0
-        dirpath, dirnames, filenames = entries[0]
+        dirpath, dirnames, _filenames = entries[0]
         assert dirpath == S3_ROOT
         assert len(dirnames) >= 4
