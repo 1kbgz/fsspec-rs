@@ -1,4 +1,8 @@
+<<<<<<< before updating
 """Tests for fsspec_rs core types exposed via PyO3."""
+=======
+from fsspec_rs import *
+>>>>>>> after updating
 
 import pytest
 
