@@ -74,6 +74,10 @@ current_version = "0.1.5"
 commit = true
 tag = false 
 commit_args = "-s"
+pre_commit_hooks = [
+    "cargo update --workspace",
+    "git add Cargo.lock",
+]
 
 [[tool.bumpversion.files]]
 filename = "fsspec_rs/__init__.py"
