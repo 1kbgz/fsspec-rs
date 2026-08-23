@@ -244,50 +244,50 @@
 <div class="viewcode-block" id="S3FileSystem">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.S3FileSystem">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">S3FileSystem</span><span class="p">(</span><span class="n">fsspec</span><span class="o">.</span><span class="n">AbstractFileSystem</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;S3 filesystem backed by the Rust ``S3Fs`` implementation.</span>
+<span class="w">    </span><span class="sd">"""S3 filesystem backed by the Rust ``S3Fs`` implementation.</span>
 
-<span class="sd">    The protocol is registered as ``&quot;s3-rs&quot;`` so it can coexist with the</span>
-<span class="sd">    pure-Python ``s3fs.S3FileSystem`` which owns the ``&quot;s3&quot;`` protocol.</span>
+<span class="sd">    The protocol is registered as ``"s3-rs"`` so it can coexist with the</span>
+<span class="sd">    pure-Python ``s3fs.S3FileSystem`` which owns the ``"s3"`` protocol.</span>
 
 <span class="sd">    Credential resolution (matching s3fs conventions):</span>
 <span class="sd">      1. Explicit keyword arguments (``key``, ``secret``, ``endpoint_url``, …)</span>
-<span class="sd">      2. Values from ``fsspec.config.conf[&quot;s3&quot;]`` (populated from ``FSSPEC_S3_*``</span>
+<span class="sd">      2. Values from ``fsspec.config.conf["s3"]`` (populated from ``FSSPEC_S3_*``</span>
 <span class="sd">         environment variables)</span>
-<span class="sd">      3. Falls through to object_store&#39;s own credential chain (IAM roles, etc.)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">      3. Falls through to object_store's own credential chain (IAM roles, etc.)</span>
+<span class="sd">    """</span>
 
-    <span class="n">protocol</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;s3-rs&quot;</span><span class="p">,)</span>
+    <span class="n">protocol</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"s3-rs"</span><span class="p">,)</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_strip_protocol</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Strip ``s3-rs://`` prefix, returning ``bucket/key``.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Strip ``s3-rs://`` prefix, returning ``bucket/key``."""</span>
         <span class="k">for</span> <span class="n">proto</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">protocol</span><span class="p">:</span>
-            <span class="n">prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">proto</span><span class="si">}</span><span class="s2">://&quot;</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">proto</span><span class="si">}</span><span class="s2">://"</span>
             <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">prefix</span><span class="p">):</span>
-                <span class="k">return</span> <span class="n">path</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span> <span class="p">:]</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">path</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span> <span class="p">:]</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s2">"/"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">path</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_kwargs_from_urls</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract ``bucket`` from a ``s3-rs://bucket/key`` URL.&quot;&quot;&quot;</span>
-        <span class="k">for</span> <span class="n">proto</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;s3-rs&quot;</span><span class="p">,):</span>
-            <span class="n">prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">proto</span><span class="si">}</span><span class="s2">://&quot;</span>
+<span class="w">        </span><span class="sd">"""Extract ``bucket`` from a ``s3-rs://bucket/key`` URL."""</span>
+        <span class="k">for</span> <span class="n">proto</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"s3-rs"</span><span class="p">,):</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">proto</span><span class="si">}</span><span class="s2">://"</span>
             <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">prefix</span><span class="p">):</span>
-                <span class="n">rest</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span> <span class="p">:]</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span>
-                <span class="n">bucket</span> <span class="o">=</span> <span class="n">rest</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">rest</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span> <span class="p">:]</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s2">"/"</span><span class="p">)</span>
+                <span class="n">bucket</span> <span class="o">=</span> <span class="n">rest</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"/"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
                 <span class="k">if</span> <span class="n">bucket</span><span class="p">:</span>
-                    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;bucket&quot;</span><span class="p">:</span> <span class="n">bucket</span><span class="p">}</span>
+                    <span class="k">return</span> <span class="p">{</span><span class="s2">"bucket"</span><span class="p">:</span> <span class="n">bucket</span><span class="p">}</span>
         <span class="k">return</span> <span class="p">{}</span>
 
 <div class="viewcode-block" id="S3FileSystem.unstrip_protocol">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.S3FileSystem.unstrip_protocol">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">unstrip_protocol</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reconstruct ``s3-rs://bucket/key`` from ``bucket/key``.&quot;&quot;&quot;</span>
-        <span class="n">bucket_prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">/&quot;</span>
+<span class="w">        </span><span class="sd">"""Reconstruct ``s3-rs://bucket/key`` from ``bucket/key``."""</span>
+        <span class="n">bucket_prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">/"</span>
         <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">bucket_prefix</span><span class="p">):</span>
             <span class="n">key</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">bucket_prefix</span><span class="p">)</span> <span class="p">:]</span>
-            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;s3-rs://</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">key</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;s3-rs://</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">&quot;</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;s3-rs://</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">path</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;s3-rs://</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">&quot;</span></div>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">"s3-rs://</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">key</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"s3-rs://</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">"</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"s3-rs://</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">path</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"s3-rs://</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">"</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -304,19 +304,19 @@
     <span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">storage_options</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">bucket</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;bucket is required unless it is provided by an s3-rs:// URL&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"bucket is required unless it is provided by an s3-rs:// URL"</span><span class="p">)</span>
 
         <span class="c1"># Merge from fsspec.config.conf (populated by FSSPEC_S3_* env vars)</span>
-        <span class="n">s3_conf</span> <span class="o">=</span> <span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;s3&quot;</span><span class="p">,</span> <span class="p">{})</span>
-        <span class="n">key</span> <span class="o">=</span> <span class="n">key</span> <span class="ow">or</span> <span class="n">s3_conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;key&quot;</span><span class="p">)</span>
-        <span class="n">secret</span> <span class="o">=</span> <span class="n">secret</span> <span class="ow">or</span> <span class="n">s3_conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;secret&quot;</span><span class="p">)</span>
-        <span class="n">endpoint_url</span> <span class="o">=</span> <span class="n">endpoint_url</span> <span class="ow">or</span> <span class="n">s3_conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;endpoint_url&quot;</span><span class="p">)</span>
-        <span class="n">region</span> <span class="o">=</span> <span class="n">region</span> <span class="ow">or</span> <span class="n">s3_conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;region&quot;</span><span class="p">)</span>
-        <span class="n">token</span> <span class="o">=</span> <span class="n">token</span> <span class="ow">or</span> <span class="n">s3_conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;token&quot;</span><span class="p">)</span>
+        <span class="n">s3_conf</span> <span class="o">=</span> <span class="n">conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"s3"</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">key</span> <span class="ow">or</span> <span class="n">s3_conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"key"</span><span class="p">)</span>
+        <span class="n">secret</span> <span class="o">=</span> <span class="n">secret</span> <span class="ow">or</span> <span class="n">s3_conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"secret"</span><span class="p">)</span>
+        <span class="n">endpoint_url</span> <span class="o">=</span> <span class="n">endpoint_url</span> <span class="ow">or</span> <span class="n">s3_conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"endpoint_url"</span><span class="p">)</span>
+        <span class="n">region</span> <span class="o">=</span> <span class="n">region</span> <span class="ow">or</span> <span class="n">s3_conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"region"</span><span class="p">)</span>
+        <span class="n">token</span> <span class="o">=</span> <span class="n">token</span> <span class="ow">or</span> <span class="n">s3_conf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"token"</span><span class="p">)</span>
 
         <span class="c1"># Also honour client_kwargs.endpoint_url (s3fs convention)</span>
         <span class="k">if</span> <span class="n">client_kwargs</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">endpoint_url</span><span class="p">:</span>
-            <span class="n">endpoint_url</span> <span class="o">=</span> <span class="n">client_kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;endpoint_url&quot;</span><span class="p">)</span>
+            <span class="n">endpoint_url</span> <span class="o">=</span> <span class="n">client_kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"endpoint_url"</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span> <span class="o">=</span> <span class="n">RustS3Fs</span><span class="p">(</span>
             <span class="n">bucket</span><span class="o">=</span><span class="n">bucket</span><span class="p">,</span>
@@ -346,14 +346,14 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">_open</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-        <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;rb&quot;</span><span class="p">,</span>
+        <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"rb"</span><span class="p">,</span>
         <span class="n">block_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">autocommit</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">cache_options</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">cache_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a Rust-backed S3 file object.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return a Rust-backed S3 file object."""</span>
         <span class="k">return</span> <span class="n">S3File</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">path</span><span class="p">,</span>
@@ -465,27 +465,27 @@
 
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;S3FileSystem(bucket=&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">&#39;)&quot;</span></div>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"S3FileSystem(bucket='</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">')"</span></div>
 
 
 
 <div class="viewcode-block" id="S3File">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.S3File">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">S3File</span><span class="p">(</span><span class="n">AbstractBufferedFile</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;File-like wrapper delegating to the Rust ``RustS3File``.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""File-like wrapper delegating to the Rust ``RustS3File``."""</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fs</span><span class="p">:</span> <span class="n">S3FileSystem</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;rb&quot;</span><span class="p">,</span> <span class="n">cache_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">block_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_rust_file</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># set early so __del__/closed don&#39;t blow up</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fs</span><span class="p">:</span> <span class="n">S3FileSystem</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"rb"</span><span class="p">,</span> <span class="n">cache_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">block_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_rust_file</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># set early so __del__/closed don't blow up</span>
         <span class="n">open_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">if</span> <span class="n">cache_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">open_kwargs</span><span class="p">[</span><span class="s2">&quot;cache_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cache_type</span>
+            <span class="n">open_kwargs</span><span class="p">[</span><span class="s2">"cache_type"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cache_type</span>
         <span class="k">if</span> <span class="n">block_size</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">open_kwargs</span><span class="p">[</span><span class="s2">&quot;block_size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">block_size</span>
+            <span class="n">open_kwargs</span><span class="p">[</span><span class="s2">"block_size"</span><span class="p">]</span> <span class="o">=</span> <span class="n">block_size</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_rust_file</span> <span class="o">=</span> <span class="n">fs</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="o">**</span><span class="n">open_kwargs</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="n">path</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">mode</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fs</span> <span class="o">=</span> <span class="n">fs</span>
-        <span class="c1"># Minimal attributes — don&#39;t call super().__init__()</span>
+        <span class="c1"># Minimal attributes — don't call super().__init__()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">blocksize</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">loc</span> <span class="o">=</span> <span class="mi">0</span>
 
@@ -540,13 +540,13 @@
 <div class="viewcode-block" id="S3File.readable">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.S3File.readable">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">readable</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;r&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span></div>
+        <span class="k">return</span> <span class="s2">"r"</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span></div>
 
 
 <div class="viewcode-block" id="S3File.writable">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.S3File.writable">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">writable</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;w&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="ow">or</span> <span class="s2">&quot;a&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="ow">or</span> <span class="s2">&quot;x&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span></div>
+        <span class="k">return</span> <span class="s2">"w"</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="ow">or</span> <span class="s2">"a"</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="ow">or</span> <span class="s2">"x"</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span></div>
 
 
 <div class="viewcode-block" id="S3File.seekable">
@@ -562,8 +562,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="n">state</span> <span class="o">=</span> <span class="s2">&quot;closed&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">closed</span> <span class="k">else</span> <span class="s2">&quot;open&quot;</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;S3File(&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39;, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)&quot;</span></div>
+        <span class="n">state</span> <span class="o">=</span> <span class="s2">"closed"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">closed</span> <span class="k">else</span> <span class="s2">"open"</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"S3File('</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="si">}</span><span class="s2">', </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span></div>
 
 </pre></div>
         </article>

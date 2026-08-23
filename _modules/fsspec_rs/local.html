@@ -243,21 +243,21 @@
 <div class="viewcode-block" id="LocalFileSystem">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">LocalFileSystem</span><span class="p">(</span><span class="n">fsspec</span><span class="o">.</span><span class="n">AbstractFileSystem</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Local filesystem backed by the Rust ``LocalFs`` implementation.</span>
+<span class="w">    </span><span class="sd">"""Local filesystem backed by the Rust ``LocalFs`` implementation.</span>
 
-<span class="sd">    The protocol is registered as ``(&quot;file-rs&quot;, &quot;local-rs&quot;)`` so it can</span>
+<span class="sd">    The protocol is registered as ``("file-rs", "local-rs")`` so it can</span>
 <span class="sd">    coexist with the pure-Python ``fsspec.implementations.local.LocalFileSystem``</span>
-<span class="sd">    which owns the ``(&quot;file&quot;, &quot;local&quot;)`` protocol names.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    which owns the ``("file", "local")`` protocol names.</span>
+<span class="sd">    """</span>
 
-    <span class="n">protocol</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;file-rs&quot;</span><span class="p">,</span> <span class="s2">&quot;local-rs&quot;</span><span class="p">)</span>
+    <span class="n">protocol</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"file-rs"</span><span class="p">,</span> <span class="s2">"local-rs"</span><span class="p">)</span>
     <span class="n">local_file</span> <span class="o">=</span> <span class="kc">True</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_strip_protocol</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Strip ``file-rs://`` or ``local-rs://`` prefix.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Strip ``file-rs://`` or ``local-rs://`` prefix."""</span>
         <span class="k">for</span> <span class="n">proto</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">protocol</span><span class="p">:</span>
-            <span class="n">prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">proto</span><span class="si">}</span><span class="s2">://&quot;</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">proto</span><span class="si">}</span><span class="s2">://"</span>
             <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">prefix</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">path</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span> <span class="p">:]</span>
         <span class="k">return</span> <span class="n">path</span>
@@ -265,7 +265,7 @@
 <div class="viewcode-block" id="LocalFileSystem.unstrip_protocol">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.unstrip_protocol">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">unstrip_protocol</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">protocol</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">://</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span></div>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">protocol</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">://</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">auto_mkdir</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">storage_options</span><span class="p">):</span>
@@ -290,14 +290,14 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">_open</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-        <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;rb&quot;</span><span class="p">,</span>
+        <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"rb"</span><span class="p">,</span>
         <span class="n">block_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">autocommit</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">cache_options</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">cache_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a Rust-backed file object.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return a Rust-backed file object."""</span>
         <span class="k">return</span> <span class="n">LocalFile</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">path</span><span class="p">,</span>
@@ -461,22 +461,22 @@
 <div class="viewcode-block" id="LocalFile">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFile">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">LocalFile</span><span class="p">(</span><span class="n">AbstractBufferedFile</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;File-like wrapper delegating to the Rust ``RustLocalFile``.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""File-like wrapper delegating to the Rust ``RustLocalFile``."""</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fs</span><span class="p">:</span> <span class="n">LocalFileSystem</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;rb&quot;</span><span class="p">,</span> <span class="n">cache_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">block_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fs</span><span class="p">:</span> <span class="n">LocalFileSystem</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"rb"</span><span class="p">,</span> <span class="n">cache_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">block_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="c1"># Open the Rust file handle right away</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_rust_file</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># set early so __del__/closed don&#39;t blow up</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_rust_file</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># set early so __del__/closed don't blow up</span>
         <span class="n">open_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">if</span> <span class="n">cache_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">open_kwargs</span><span class="p">[</span><span class="s2">&quot;cache_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cache_type</span>
+            <span class="n">open_kwargs</span><span class="p">[</span><span class="s2">"cache_type"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cache_type</span>
         <span class="k">if</span> <span class="n">block_size</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">open_kwargs</span><span class="p">[</span><span class="s2">&quot;block_size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">block_size</span>
+            <span class="n">open_kwargs</span><span class="p">[</span><span class="s2">"block_size"</span><span class="p">]</span> <span class="o">=</span> <span class="n">block_size</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_rust_file</span> <span class="o">=</span> <span class="n">fs</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="o">**</span><span class="n">open_kwargs</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="n">path</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">mode</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fs</span> <span class="o">=</span> <span class="n">fs</span>
         <span class="c1"># Do NOT call super().__init__() — we are a thin wrapper, and</span>
-        <span class="c1"># AbstractBufferedFile&#39;s __init__ tries to call size() etc.</span>
+        <span class="c1"># AbstractBufferedFile's __init__ tries to call size() etc.</span>
         <span class="c1"># which does not apply for write-mode files. Instead we just</span>
         <span class="c1"># set the minimum attributes that __repr__ et al. need.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">blocksize</span> <span class="o">=</span> <span class="mi">0</span>
@@ -533,13 +533,13 @@
 <div class="viewcode-block" id="LocalFile.readable">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFile.readable">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">readable</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;r&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span></div>
+        <span class="k">return</span> <span class="s2">"r"</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span></div>
 
 
 <div class="viewcode-block" id="LocalFile.writable">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFile.writable">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">writable</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;w&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="ow">or</span> <span class="s2">&quot;a&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="ow">or</span> <span class="s2">&quot;x&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span></div>
+        <span class="k">return</span> <span class="s2">"w"</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="ow">or</span> <span class="s2">"a"</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="ow">or</span> <span class="s2">"x"</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span></div>
 
 
 <div class="viewcode-block" id="LocalFile.seekable">
@@ -555,8 +555,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;closed&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">closed</span> <span class="k">else</span> <span class="s2">&quot;open&quot;</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;LocalFile(&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="si">}</span><span class="s2">&#39;, mode=&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="si">}</span><span class="s2">&#39;, </span><span class="si">{</span><span class="n">status</span><span class="si">}</span><span class="s2">)&quot;</span></div>
+        <span class="n">status</span> <span class="o">=</span> <span class="s2">"closed"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">closed</span> <span class="k">else</span> <span class="s2">"open"</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"LocalFile('</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="si">}</span><span class="s2">', mode='</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="si">}</span><span class="s2">', </span><span class="si">{</span><span class="n">status</span><span class="si">}</span><span class="s2">)"</span></div>
 
 </pre></div>
         </article>

@@ -291,13 +291,13 @@ dask, xarray, and direct <code class="docutils literal notranslate"><span class=
 <span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">S3FileSystem</span>
 
 <span class="n">fs</span> <span class="o">=</span> <span class="n">LocalFileSystem</span><span class="p">()</span>
-<span class="n">fs</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">&quot;/tmp/example.txt&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;hello&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">fs</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s2">&quot;/tmp/example.txt&quot;</span><span class="p">))</span>
+<span class="n">fs</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">"/tmp/example.txt"</span><span class="p">,</span> <span class="sa">b</span><span class="s2">"hello"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">fs</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s2">"/tmp/example.txt"</span><span class="p">))</span>
 
-<span class="n">s3</span> <span class="o">=</span> <span class="n">S3FileSystem</span><span class="p">(</span><span class="n">bucket</span><span class="o">=</span><span class="s2">&quot;my-bucket&quot;</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;us-east-1&quot;</span><span class="p">)</span>
-<span class="n">s3</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">&quot;path/to/output.txt&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;hello&quot;</span><span class="p">)</span>
+<span class="n">s3</span> <span class="o">=</span> <span class="n">S3FileSystem</span><span class="p">(</span><span class="n">bucket</span><span class="o">=</span><span class="s2">"my-bucket"</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">"us-east-1"</span><span class="p">)</span>
+<span class="n">s3</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">"path/to/output.txt"</span><span class="p">,</span> <span class="sa">b</span><span class="s2">"hello"</span><span class="p">)</span>
 
-<span class="k">with</span> <span class="n">fsspec</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;file-rs:///tmp/example.txt&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="k">with</span> <span class="n">fsspec</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"file-rs:///tmp/example.txt"</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
 </pre></div>
 </div>

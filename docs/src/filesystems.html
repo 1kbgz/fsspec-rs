@@ -268,7 +268,7 @@ and s3fs.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">fsspec</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">fsspec_rs</span>
 
-<span class="k">with</span> <span class="n">fsspec</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;file-rs:///tmp/example.txt&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="k">with</span> <span class="n">fsspec</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"file-rs:///tmp/example.txt"</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="n">data</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
 </pre></div>
 </div>
@@ -280,21 +280,21 @@ supports the common fsspec primitives.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">LocalFileSystem</span>
 
 <span class="n">fs</span> <span class="o">=</span> <span class="n">LocalFileSystem</span><span class="p">(</span><span class="n">auto_mkdir</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">fs</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">&quot;/tmp/fsspec-rs/example.txt&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;hello&quot;</span><span class="p">)</span>
+<span class="n">fs</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">"/tmp/fsspec-rs/example.txt"</span><span class="p">,</span> <span class="sa">b</span><span class="s2">"hello"</span><span class="p">)</span>
 
-<span class="k">assert</span> <span class="n">fs</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;/tmp/fsspec-rs/example.txt&quot;</span><span class="p">)</span>
-<span class="k">assert</span> <span class="n">fs</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s2">&quot;/tmp/fsspec-rs/example.txt&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">fs</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;/tmp/fsspec-rs/example.txt&quot;</span><span class="p">))</span>
+<span class="k">assert</span> <span class="n">fs</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">"/tmp/fsspec-rs/example.txt"</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">fs</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s2">"/tmp/fsspec-rs/example.txt"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">fs</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"/tmp/fsspec-rs/example.txt"</span><span class="p">))</span>
 </pre></div>
 </div>
 <section id="paths">
 <h3>Paths<a class="headerlink" href="#paths" title="Link to this heading">¶</a></h3>
 <p>Direct method calls use normal local paths:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fs</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s2">&quot;/tmp/fsspec-rs/example.txt&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fs</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s2">"/tmp/fsspec-rs/example.txt"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>fsspec URLs use <code class="docutils literal notranslate"><span class="pre">file-rs://</span></code> or <code class="docutils literal notranslate"><span class="pre">local-rs://</span></code>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">fsspec</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;local-rs:///tmp/fsspec-rs/example.txt&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">fsspec</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"local-rs:///tmp/fsspec-rs/example.txt"</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
 </pre></div>
 </div>
@@ -308,10 +308,10 @@ fsspec’s Python implementation.</p>
 <code class="docutils literal notranslate"><span class="pre">r</span></code>, <code class="docutils literal notranslate"><span class="pre">w</span></code>, <code class="docutils literal notranslate"><span class="pre">a</span></code>, and <code class="docutils literal notranslate"><span class="pre">x</span></code> at the Rust layer. Python wrappers expose binary file
 objects that implement <code class="docutils literal notranslate"><span class="pre">read</span></code>, <code class="docutils literal notranslate"><span class="pre">write</span></code>, <code class="docutils literal notranslate"><span class="pre">seek</span></code>, <code class="docutils literal notranslate"><span class="pre">tell</span></code>, <code class="docutils literal notranslate"><span class="pre">flush</span></code>, <code class="docutils literal notranslate"><span class="pre">close</span></code>,
 <code class="docutils literal notranslate"><span class="pre">readable</span></code>, <code class="docutils literal notranslate"><span class="pre">writable</span></code>, and <code class="docutils literal notranslate"><span class="pre">seekable</span></code>.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">fs</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;/tmp/fsspec-rs/out.bin&quot;</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;payload&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">fs</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"/tmp/fsspec-rs/out.bin"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s2">"payload"</span><span class="p">)</span>
 
-<span class="k">with</span> <span class="n">fs</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;/tmp/fsspec-rs/out.bin&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="k">with</span> <span class="n">fs</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"/tmp/fsspec-rs/out.bin"</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="n">f</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
 </pre></div>
@@ -343,25 +343,25 @@ operations, so those cache options do not change local read behavior.</p>
 runtime. The Python protocol is <code class="docutils literal notranslate"><span class="pre">s3-rs</span></code>, so it can coexist with <code class="docutils literal notranslate"><span class="pre">s3fs</span></code>.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">S3FileSystem</span>
 
-<span class="n">fs</span> <span class="o">=</span> <span class="n">S3FileSystem</span><span class="p">(</span><span class="n">bucket</span><span class="o">=</span><span class="s2">&quot;my-bucket&quot;</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;us-east-1&quot;</span><span class="p">)</span>
-<span class="n">fs</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">&quot;reports/hello.txt&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;hello&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">fs</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s2">&quot;reports/hello.txt&quot;</span><span class="p">))</span>
+<span class="n">fs</span> <span class="o">=</span> <span class="n">S3FileSystem</span><span class="p">(</span><span class="n">bucket</span><span class="o">=</span><span class="s2">"my-bucket"</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">"us-east-1"</span><span class="p">)</span>
+<span class="n">fs</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">"reports/hello.txt"</span><span class="p">,</span> <span class="sa">b</span><span class="s2">"hello"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">fs</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s2">"reports/hello.txt"</span><span class="p">))</span>
 </pre></div>
 </div>
 <section id="id1">
 <h3>Paths<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
 <p><code class="docutils literal notranslate"><span class="pre">S3FileSystem</span></code> is constructed for one bucket. Method calls can use keys within
 that bucket:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fs</span><span class="o">.</span><span class="n">ls</span><span class="p">(</span><span class="s2">&quot;reports&quot;</span><span class="p">)</span>
-<span class="n">fs</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;reports/hello.txt&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fs</span><span class="o">.</span><span class="n">ls</span><span class="p">(</span><span class="s2">"reports"</span><span class="p">)</span>
+<span class="n">fs</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"reports/hello.txt"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>fsspec URLs include the bucket and can infer constructor options through
 <code class="docutils literal notranslate"><span class="pre">_get_kwargs_from_urls()</span></code>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">fsspec</span><span class="o">.</span><span class="n">open</span><span class="p">(</span>
-    <span class="s2">&quot;s3-rs://my-bucket/reports/hello.txt&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;rb&quot;</span><span class="p">,</span>
-    <span class="n">region</span><span class="o">=</span><span class="s2">&quot;us-east-1&quot;</span><span class="p">,</span>
+    <span class="s2">"s3-rs://my-bucket/reports/hello.txt"</span><span class="p">,</span>
+    <span class="s2">"rb"</span><span class="p">,</span>
+    <span class="n">region</span><span class="o">=</span><span class="s2">"us-east-1"</span><span class="p">,</span>
 <span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
 </pre></div>
@@ -385,11 +385,11 @@ profiles, and instance or task roles</p></li>
 endpoint starts with <code class="docutils literal notranslate"><span class="pre">http://</span></code>, the Rust backend allows plain HTTP
 automatically for local S3-compatible services.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fs</span> <span class="o">=</span> <span class="n">S3FileSystem</span><span class="p">(</span>
-    <span class="n">bucket</span><span class="o">=</span><span class="s2">&quot;benchmark&quot;</span><span class="p">,</span>
-    <span class="n">key</span><span class="o">=</span><span class="s2">&quot;minioadmin&quot;</span><span class="p">,</span>
-    <span class="n">secret</span><span class="o">=</span><span class="s2">&quot;minioadmin&quot;</span><span class="p">,</span>
-    <span class="n">endpoint_url</span><span class="o">=</span><span class="s2">&quot;http://localhost:9000&quot;</span><span class="p">,</span>
-    <span class="n">region</span><span class="o">=</span><span class="s2">&quot;us-east-1&quot;</span><span class="p">,</span>
+    <span class="n">bucket</span><span class="o">=</span><span class="s2">"benchmark"</span><span class="p">,</span>
+    <span class="n">key</span><span class="o">=</span><span class="s2">"minioadmin"</span><span class="p">,</span>
+    <span class="n">secret</span><span class="o">=</span><span class="s2">"minioadmin"</span><span class="p">,</span>
+    <span class="n">endpoint_url</span><span class="o">=</span><span class="s2">"http://localhost:9000"</span><span class="p">,</span>
+    <span class="n">region</span><span class="o">=</span><span class="s2">"us-east-1"</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -422,9 +422,9 @@ automatically for local S3-compatible services.</p>
 </table>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">fs</span><span class="o">.</span><span class="n">open</span><span class="p">(</span>
-    <span class="s2">&quot;large/table.parquet&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;rb&quot;</span><span class="p">,</span>
-    <span class="n">cache_type</span><span class="o">=</span><span class="s2">&quot;block&quot;</span><span class="p">,</span>
+    <span class="s2">"large/table.parquet"</span><span class="p">,</span>
+    <span class="s2">"rb"</span><span class="p">,</span>
+    <span class="n">cache_type</span><span class="o">=</span><span class="s2">"block"</span><span class="p">,</span>
     <span class="n">block_size</span><span class="o">=</span><span class="mi">8</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">,</span>
 <span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="n">header</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">4096</span><span class="p">)</span>
