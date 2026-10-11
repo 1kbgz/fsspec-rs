@@ -23,6 +23,7 @@ target-capi
 
 # Distribution / packaging
 .Python
+fsspec_rs/licenses/cargo.json
 build/
 develop-eggs/
 dist/
