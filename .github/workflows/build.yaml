@@ -67,6 +67,10 @@ jobs:
       - name: Setup Rust
         uses: actions-ext/rust/setup@10df15e12bbd1cc1cf48089f2e232349f98c74e7
 
+      - name: Install Cargo license collector
+        run: cargo install cargo-bundle-licenses --version 4.2.0 --locked
+        if: matrix.target == 'native'
+
       - name: Install dependencies
         run: make develop
         if: matrix.target == 'native'

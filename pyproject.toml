@@ -1,7 +1,7 @@
 [build-system]
 requires = [
     "hatchling",
-    "hatch-rs>=0.1.4",
+    "hatch-rs>=0.4.3",
 ]
 build-backend = "hatchling.build"
 
@@ -41,7 +41,7 @@ develop = [
     "check-dist",
     "cibuildwheel",
     "codespell",
-    "hatch-rs",
+    "hatch-rs>=0.4.3",
     "hatchling",
     "laxate",
     "mdformat",
@@ -115,16 +115,19 @@ curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=m
 rustup target add aarch64-unknown-linux-gnu
 rustup target add x86_64-unknown-linux-gnu
 rustup show
+cargo install cargo-bundle-licenses --version 4.2.0 --locked
 """
 before-build = "cargo clean --manifest-path {package}/Cargo.toml && rm -f {package}/fsspec_rs/*.so"
 environment = {PATH="$HOME/.cargo/bin:$PATH", CARGO_TERM_COLOR="always"}
 skip = "*i686* *musllinux*"
 
 [tool.cibuildwheel.macos]
+before-all = "cargo install cargo-bundle-licenses --version 4.2.0 --locked"
 environment = {PATH="$HOME/.cargo/bin:$PATH", CARGO_TERM_COLOR="always", MACOS_DEPLOYMENT_TARGET=11.0}
 archs = "arm64"
 
 [tool.cibuildwheel.windows]
+before-all = "cargo install cargo-bundle-licenses --version 4.2.0 --locked"
 environment = {PATH="$UserProfile\\.cargo\bin;$PATH", CARGO_TERM_COLOR="always"}
 skip = "*win32 *arm64"
 
@@ -159,6 +162,9 @@ verbose = true
 abi3 = true
 module = "fsspec_rs"
 path = "."
+
+[tool.hatch.build.hooks.hatch-rs.licenses]
+previous = "rust/license-overrides.json"
 
 [tool.hatch.build.targets.sdist]
 packages = [
