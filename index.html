@@ -284,6 +284,22 @@ dask, xarray, and direct <code class="docutils literal notranslate"><span class=
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>fsspec-rs
 </pre></div>
 </div>
+<section id="building-from-source">
+<h3>Building from source<a class="headerlink" href="#building-from-source" title="Link to this heading">¶</a></h3>
+<p>Source builds require Rust, hatch-rs 0.4.3 or newer, and the Cargo license
+collector. Install the collector before building or installing an editable copy:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cargo<span class="w"> </span>install<span class="w"> </span>cargo-bundle-licenses<span class="w"> </span>--version<span class="w"> </span><span class="m">4</span>.2.0<span class="w"> </span>--locked
+</pre></div>
+</div>
+<p>Wheels include original Cargo dependency license texts in
+<code class="docutils literal notranslate"><span class="pre">fsspec_rs/licenses/cargo.json</span></code>. The collector includes dependencies for other
+targets, so this bundle is a superset of the wheel’s runtime dependencies.
+Python dependencies, native-library notices, and repaired-wheel libraries are
+outside its scope.</p>
+<p>The collector cannot find the <code class="docutils literal notranslate"><span class="pre">r-efi</span></code> notices in its AUTHORS files. Versioned
+overrides preserve those notices and supply full license terms through
+<code class="docutils literal notranslate"><span class="pre">licenses.previous</span></code>; see <a class="reference internal" href="rust/LICENSES.html"><span class="std std-doc">their sources and review requirements</span></a>.</p>
+</section>
 </section>
 <section id="quick-start">
 <h2>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h2>

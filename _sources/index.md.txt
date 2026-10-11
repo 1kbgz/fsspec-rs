@@ -44,6 +44,25 @@ The package currently includes:
 pip install fsspec-rs
 ```
 
+### Building from source
+
+Source builds require Rust, hatch-rs 0.4.3 or newer, and the Cargo license
+collector. Install the collector before building or installing an editable copy:
+
+```bash
+cargo install cargo-bundle-licenses --version 4.2.0 --locked
+```
+
+Wheels include original Cargo dependency license texts in
+`fsspec_rs/licenses/cargo.json`. The collector includes dependencies for other
+targets, so this bundle is a superset of the wheel's runtime dependencies.
+Python dependencies, native-library notices, and repaired-wheel libraries are
+outside its scope.
+
+The collector cannot find the `r-efi` notices in its AUTHORS files. Versioned
+overrides preserve those notices and supply full license terms through
+`licenses.previous`; see [their sources and review requirements](rust/LICENSES.md).
+
 ## Quick start
 
 ```python
