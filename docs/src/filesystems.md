@@ -8,9 +8,7 @@ Importing `fsspec_rs` registers the protocols with fsspec:
 | Local filesystem | `file-rs`, `local-rs` | `fsspec_rs.LocalFileSystem` |
 | Amazon S3        | `s3-rs`               | `fsspec_rs.S3FileSystem`    |
 
-Use these protocols when you want the Rust-backed implementation without
-changing the standard `file`, `local`, or `s3` protocol names owned by fsspec
-and s3fs.
+The standard `file`, `local`, and `s3` registrations remain unchanged.
 
 ```python
 import fsspec
@@ -142,7 +140,7 @@ Credential resolution follows this order:
 1. `object_store`'s own AWS credential chain, such as environment variables,
    profiles, and instance or task roles
 
-Use `client_kwargs={"endpoint_url": ...}` when porting code from s3fs. If the
+`client_kwargs={"endpoint_url": ...}` is accepted for s3fs-compatible configuration. If the
 endpoint starts with `http://`, the Rust backend allows plain HTTP
 automatically for local S3-compatible services.
 
@@ -179,12 +177,11 @@ with fs.open(
     header = f.read(4096)
 ```
 
-`block_size` defaults to 4 MiB. `max_blocks` defaults to 32 and only affects
-`cache_type="block"`.
+`block_size` defaults to 4 MiB. The Rust `max_blocks` default is 32. The Python file wrapper does not forward
+`max_blocks` from `open()`, so it cannot be configured through that call.
 
 Without an explicit `cache_type`, S3 read mode eagerly loads the whole object
-into memory. Use `readahead`, `block`, or `none` when reading selected ranges
-from large objects.
+into memory. Explicit `readahead`, `block`, and `none` select range-based reads.
 
 ### Supported operations
 
