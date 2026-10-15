@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Rust traits" href="rust.html"><link rel="prev" title="fsspec-rs" href="../../index.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Rust traits and types" href="rust.html"><link rel="prev" title="How to use the Rust crates" href="how-to-rust.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
         <title>fsspec-rs filesystems - fsspec-rs v0.1.5</title>
@@ -198,9 +198,16 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="how-to-build.html">How to build from source</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Read and write a local file with fsspec-rs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="how-to.html">How to use Rust-backed filesystems</a></li>
+<li class="toctree-l1"><a class="reference internal" href="how-to-rust.html">How to use the Rust crates</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">fsspec-rs filesystems</a></li>
-<li class="toctree-l1"><a class="reference internal" href="rust.html">Rust traits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rust.html">Rust traits and types</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="explanation.html">Why fsspec-rs uses explicit protocols and shared traits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="licenses.html">License bundle reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../rust/LICENSES.html">Cargo license overrides</a></li>
 </ul>
 
 </div>
@@ -263,9 +270,7 @@ Importing <code class="docutils literal notranslate"><span class="pre">fsspec_rs
 </tbody>
 </table>
 </div>
-<p>Use these protocols when you want the Rust-backed implementation without
-changing the standard <code class="docutils literal notranslate"><span class="pre">file</span></code>, <code class="docutils literal notranslate"><span class="pre">local</span></code>, or <code class="docutils literal notranslate"><span class="pre">s3</span></code> protocol names owned by fsspec
-and s3fs.</p>
+<p>The standard <code class="docutils literal notranslate"><span class="pre">file</span></code>, <code class="docutils literal notranslate"><span class="pre">local</span></code>, and <code class="docutils literal notranslate"><span class="pre">s3</span></code> registrations remain unchanged.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">fsspec</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">fsspec_rs</span>
 
@@ -382,7 +387,7 @@ environment variables</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">object_store</span></code>’s own AWS credential chain, such as environment variables,
 profiles, and instance or task roles</p></li>
 </ol>
-<p>Use <code class="docutils literal notranslate"><span class="pre">client_kwargs={&quot;endpoint_url&quot;:</span> <span class="pre">...}</span></code> when porting code from s3fs. If the
+<p><code class="docutils literal notranslate"><span class="pre">client_kwargs={&quot;endpoint_url&quot;:</span> <span class="pre">...}</span></code> is accepted for s3fs-compatible configuration. If the
 endpoint starts with <code class="docutils literal notranslate"><span class="pre">http://</span></code>, the Rust backend allows plain HTTP
 automatically for local S3-compatible services.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fs</span> <span class="o">=</span> <span class="n">S3FileSystem</span><span class="p">(</span>
@@ -431,11 +436,10 @@ automatically for local S3-compatible services.</p>
     <span class="n">header</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">4096</span><span class="p">)</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">block_size</span></code> defaults to 4 MiB. <code class="docutils literal notranslate"><span class="pre">max_blocks</span></code> defaults to 32 and only affects
-<code class="docutils literal notranslate"><span class="pre">cache_type=&quot;block&quot;</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">block_size</span></code> defaults to 4 MiB. The Rust <code class="docutils literal notranslate"><span class="pre">max_blocks</span></code> default is 32. The Python file wrapper does not forward
+<code class="docutils literal notranslate"><span class="pre">max_blocks</span></code> from <code class="docutils literal notranslate"><span class="pre">open()</span></code>, so it cannot be configured through that call.</p>
 <p>Without an explicit <code class="docutils literal notranslate"><span class="pre">cache_type</span></code>, S3 read mode eagerly loads the whole object
-into memory. Use <code class="docutils literal notranslate"><span class="pre">readahead</span></code>, <code class="docutils literal notranslate"><span class="pre">block</span></code>, or <code class="docutils literal notranslate"><span class="pre">none</span></code> when reading selected ranges
-from large objects.</p>
+into memory. Explicit <code class="docutils literal notranslate"><span class="pre">readahead</span></code>, <code class="docutils literal notranslate"><span class="pre">block</span></code>, and <code class="docutils literal notranslate"><span class="pre">none</span></code> select range-based reads.</p>
 </section>
 <section id="id2">
 <h3>Supported operations<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
@@ -463,18 +467,18 @@ concurrent uploads and signed URLs are not yet part of the public API.</p>
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Rust traits</div>
+                <div class="title">Rust traits and types</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="../../index.html">
+          <a class="prev-page" href="how-to-rust.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Home</div>
+                <div class="title">How to use the Rust crates</div>
                 
               </div>
             </a>

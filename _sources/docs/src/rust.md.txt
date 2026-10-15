@@ -1,21 +1,7 @@
-# Rust traits
+# Rust traits and types
 
-The Rust crate is named `fsspec_rs`. It can be used independently from the
-Python package and exposes the same template-method shape as fsspec:
-implement a small set of backend primitives, then get higher-level filesystem
-methods from default trait implementations.
-
-```toml
-[dependencies]
-fsspec_rs = "0.1.1"
-```
-
-For local development in this repository, the Python extension depends on the
-crate by path:
-
-```toml
-fsspec_rs = { path = "./rust", version = "*" }
-```
+The `fsspec_rs` crate is independent of Python. The `fsspec_rs_bridge` crate
+adapts Python fsspec objects to its synchronous filesystem trait.
 
 ## Core model
 
@@ -43,7 +29,7 @@ The main pieces are:
 ## FileSystem
 
 `FileSystem` is the sync trait implemented by `LocalFs` and `S3Fs`.
-Backends must provide seven core primitives plus protocol metadata:
+Required backend methods are seven primitives plus `protocol`:
 
 ```rust
 use fsspec_rs::{FileInfo, FileSystem, FsFile, FsResult, OpenMode, OpenOptions};
@@ -90,7 +76,7 @@ impl FileSystem for MyFs {
 }
 ```
 
-`root_marker()` defaults to `""` and `sep()` defaults to `"/"`. Override them
+`root_marker()` defaults to `""` and `sep()` defaults to `"/"`. Backends can override them
 for local or platform-specific behavior. `strip_protocol()` and
 `unstrip_protocol()` also have defaults and can be overridden when a backend
 needs bucket-aware or authority-aware paths.
@@ -116,35 +102,6 @@ using an explicit stack. Method semantics otherwise match `FileSystem`.
 ## FsFile
 
 Opened files implement `FsFile`:
-
-```rust
-use std::io::{Read, Seek, Write};
-use fsspec_rs::{FileInfo, FsFile, FsResult};
-
-struct MyFile;
-
-impl Read for MyFile {
-    /* ... */
-}
-
-impl Write for MyFile {
-    /* ... */
-}
-
-impl Seek for MyFile {
-    /* ... */
-}
-
-impl FsFile for MyFile {
-    fn info(&self) -> FsResult<FileInfo> {
-        todo!()
-    }
-
-    fn size(&self) -> FsResult<Option<u64>> {
-        todo!()
-    }
-}
-```
 
 `FsFile` requires `Read + Write + Seek + Send`. `commit()` and `discard()`
 default to no-ops and are available for buffered writes or future transaction
@@ -175,38 +132,13 @@ single-letter forms. `OpenOptions::default()` uses a 4 MiB block size,
 
 `LocalFs` uses `std::fs` and implements `FileSystem`.
 
-```rust
-use fsspec_rs::{FileSystem, LocalFs};
-
-fn main() -> fsspec_rs::FsResult<()> {
-    let fs = LocalFs::with_auto_mkdir(true);
-    fs.pipe_file("/tmp/fsspec-rs.txt", b"hello")?;
-    let _data = fs.cat_file("/tmp/fsspec-rs.txt", None, None)?;
-    Ok(())
-}
-```
-
-`LocalFs::new()` starts with `auto_mkdir = false`. Use
-`LocalFs::with_auto_mkdir(true)` to create missing parent directories during
+`LocalFs::new()` starts with `auto_mkdir = false`. `LocalFs::with_auto_mkdir(true)` creates missing parent directories during
 write, append, exclusive-create, and copy operations.
 
 ## S3Fs
 
 `S3Fs` wraps `object_store::aws::AmazonS3` and presents a sync `FileSystem`
 API through an embedded Tokio runtime.
-
-```rust
-use fsspec_rs::{FileSystem, S3Config, S3Fs};
-
-fn main() -> fsspec_rs::FsResult<()> {
-    let mut cfg = S3Config::new("my-bucket");
-    cfg.region = Some("us-east-1".to_string());
-
-    let fs = S3Fs::new(cfg)?;
-    let _objects = fs.ls("", true)?;
-    Ok(())
-}
-```
 
 `S3Config` supports:
 
@@ -224,92 +156,21 @@ Plain HTTP is allowed automatically when `endpoint_url` starts with
 
 ## Python fsspec bridge
 
-The optional bridge crate is named `fsspec_rs_bridge`. It adapts Python fsspec
-filesystem objects to the Rust `FileSystem` trait:
+`fsspec_rs_bridge` exports `PyFsspecFs`, `url_to_fs`, and `StorageOptions`. It is an
+`rlib` using PyO3 and Python fsspec at runtime, with no `#[pyclass]` exports.
 
-```toml
-[dependencies]
-fsspec_rs = "0.1.1"
-fsspec_rs_bridge = "0.1.2"
-```
+`url_to_fs(url, options)` returns a filesystem adapter and start path.
+`PyFsspecFs::from_protocol(protocol, options)` constructs an adapter by protocol.
+Its trait protocol is `python`; `source_protocol()` reports the wrapped protocol.
+The bridge initializes and attaches to the Python interpreter internally.
 
-For local development in this repository:
+`PyFsspecFs` implements `FileSystem` and delegates `ls`, `info`, `open`, `cat_file`,
+`pipe_file`, `cp_file`, `rm_file`, `mkdir`, `rmdir`, `get_file`, and `put_file` to
+Python. Common Python exceptions map to `FsError` categories.
 
-```toml
-fsspec_rs = { path = "./rust", version = "*" }
-fsspec_rs_bridge = { path = "./rust/bridge", version = "*" }
-```
-
-The bridge is intentionally separate from the pure Rust core crate. It depends
-on PyO3 and Python fsspec at runtime, but it is an `rlib` helper crate rather
-than a Python extension module. It defines no `#[pyclass]` types, which keeps
-downstream PyO3 extension modules from sharing Python class statistics across
-crate boundaries.
-
-Use the bridge when Rust code is running inside a Python process and needs to
-consume an installed fsspec implementation that does not yet have a native
-Rust backend.
-
-```rust
-use fsspec_rs::FileSystem;
-use fsspec_rs_bridge::{url_to_fs, StorageOptions};
-
-fn main() -> fsspec_rs::FsResult<()> {
-    let storage_options = StorageOptions::new();
-    let (fs, start_path) = url_to_fs("memory://", &storage_options)?;
-
-    fs.pipe_file("/example.txt", b"hello from Python fsspec")?;
-    let data = fs.cat_file("/example.txt", None, None)?;
-
-    assert_eq!(start_path, "/");
-    assert_eq!(data, b"hello from Python fsspec");
-    Ok(())
-}
-```
-
-You can also construct a bridge from a protocol name:
-
-```rust
-use fsspec_rs::FileSystem;
-use fsspec_rs_bridge::{PyFsspecFs, StorageOptions};
-
-fn main() -> fsspec_rs::FsResult<()> {
-    let fs = PyFsspecFs::from_protocol("memory", &StorageOptions::new())?;
-
-    assert_eq!(fs.protocol(), &["python"]);
-    assert_eq!(fs.source_protocol(), "memory");
-    assert_eq!(fs.root_marker(), "/");
-    Ok(())
-}
-```
-
-`PyFsspecFs` implements the same `FileSystem` trait as `LocalFs` and `S3Fs`.
-It delegates primitives such as `ls`, `info`, `open`, `cat_file`,
-`pipe_file`, `cp_file`, `rm_file`, `mkdir`, `rmdir`, `get_file`, and
-`put_file` to the underlying Python filesystem object. Python exceptions are
-mapped back into `FsError` variants where possible.
-
-`StorageOptions` values preserve Python-compatible null, boolean, signed and
-unsigned integer, floating-point, string, list, and nested-map types. Nested
-maps support per-protocol options for chained URLs:
-
-```rust
-use fsspec_rs_bridge::{url_to_fs, StorageOptions};
-
-let mut memory = StorageOptions::new();
-memory.insert("skip_instance_cache".to_string(), true.into());
-
-let mut options = StorageOptions::new();
-options.insert("memory".to_string(), memory.into());
-
-let (fs, path) = url_to_fs("simplecache::memory://bucket/data.csv", &options)?;
-# Ok::<(), fsspec_rs::FsError>(())
-```
-
-Because the bridge calls Python, it initializes and attaches to the Python
-interpreter internally. Consumers should still treat it as Python-backed I/O:
-it is best suited for Python extension crates or embedded-Python contexts, not
-standalone Rust binaries that need a Python-free dependency graph.
+`StorageOptions` values support nulls, booleans, signed and unsigned integers,
+floats, strings, lists, and nested maps. Per-protocol maps configure chained URLs.
+The [Rust guide](how-to-rust.md) includes dependency and invocation examples.
 
 ## Caching
 

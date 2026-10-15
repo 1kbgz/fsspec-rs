@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="API reference" href="api.html"><link rel="prev" title="fsspec-rs filesystems" href="filesystems.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>Rust traits - fsspec-rs v0.1.5</title>
+        <title>Rust traits and types - fsspec-rs v0.1.5</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -198,9 +198,16 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="how-to-build.html">How to build from source</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Read and write a local file with fsspec-rs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="how-to.html">How to use Rust-backed filesystems</a></li>
+<li class="toctree-l1"><a class="reference internal" href="how-to-rust.html">How to use the Rust crates</a></li>
 <li class="toctree-l1"><a class="reference internal" href="filesystems.html">fsspec-rs filesystems</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Rust traits</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Rust traits and types</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="explanation.html">Why fsspec-rs uses explicit protocols and shared traits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="licenses.html">License bundle reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../rust/LICENSES.html">Cargo license overrides</a></li>
 </ul>
 
 </div>
@@ -239,21 +246,10 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section class="tex2jax_ignore mathjax_ignore" id="rust-traits">
-<h1>Rust traits<a class="headerlink" href="#rust-traits" title="Link to this heading">¶</a></h1>
-<p>The Rust crate is named <code class="docutils literal notranslate"><span class="pre">fsspec_rs</span></code>. It can be used independently from the
-Python package and exposes the same template-method shape as fsspec:
-implement a small set of backend primitives, then get higher-level filesystem
-methods from default trait implementations.</p>
-<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[dependencies]</span>
-<span class="n">fsspec_rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.1.1"</span>
-</pre></div>
-</div>
-<p>For local development in this repository, the Python extension depends on the
-crate by path:</p>
-<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="n">fsspec_rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"./rust"</span><span class="p">,</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"> </span><span class="p">}</span>
-</pre></div>
-</div>
+          <section class="tex2jax_ignore mathjax_ignore" id="rust-traits-and-types">
+<h1>Rust traits and types<a class="headerlink" href="#rust-traits-and-types" title="Link to this heading">¶</a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">fsspec_rs</span></code> crate is independent of Python. The <code class="docutils literal notranslate"><span class="pre">fsspec_rs_bridge</span></code> crate
+adapts Python fsspec objects to its synchronous filesystem trait.</p>
 <section id="core-model">
 <h2>Core model<a class="headerlink" href="#core-model" title="Link to this heading">¶</a></h2>
 <p>Most public Rust types are re-exported from the crate root:</p>
@@ -300,7 +296,7 @@ crate by path:</p>
 <section id="filesystem">
 <h2>FileSystem<a class="headerlink" href="#filesystem" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> is the sync trait implemented by <code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> and <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code>.
-Backends must provide seven core primitives plus protocol metadata:</p>
+Required backend methods are seven primitives plus <code class="docutils literal notranslate"><span class="pre">protocol</span></code>:</p>
 <div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::{</span><span class="n">FileInfo</span><span class="p">,</span><span class="w"> </span><span class="n">FileSystem</span><span class="p">,</span><span class="w"> </span><span class="n">FsFile</span><span class="p">,</span><span class="w"> </span><span class="n">FsResult</span><span class="p">,</span><span class="w"> </span><span class="n">OpenMode</span><span class="p">,</span><span class="w"> </span><span class="n">OpenOptions</span><span class="p">};</span>
 
 <span class="k">struct</span><span class="w"> </span><span class="nc">MyFs</span><span class="p">;</span>
@@ -345,7 +341,7 @@ Backends must provide seven core primitives plus protocol metadata:</p>
 <span class="p">}</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">root_marker()</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">&quot;&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">sep()</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">&quot;/&quot;</span></code>. Override them
+<p><code class="docutils literal notranslate"><span class="pre">root_marker()</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">&quot;&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">sep()</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">&quot;/&quot;</span></code>. Backends can override them
 for local or platform-specific behavior. <code class="docutils literal notranslate"><span class="pre">strip_protocol()</span></code> and
 <code class="docutils literal notranslate"><span class="pre">unstrip_protocol()</span></code> also have defaults and can be overridden when a backend
 needs bucket-aware or authority-aware paths.</p>
@@ -370,34 +366,6 @@ using an explicit stack. Method semantics otherwise match <code class="docutils 
 <section id="fsfile">
 <h2>FsFile<a class="headerlink" href="#fsfile" title="Link to this heading">¶</a></h2>
 <p>Opened files implement <code class="docutils literal notranslate"><span class="pre">FsFile</span></code>:</p>
-<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">io</span><span class="p">::{</span><span class="n">Read</span><span class="p">,</span><span class="w"> </span><span class="n">Seek</span><span class="p">,</span><span class="w"> </span><span class="n">Write</span><span class="p">};</span>
-<span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::{</span><span class="n">FileInfo</span><span class="p">,</span><span class="w"> </span><span class="n">FsFile</span><span class="p">,</span><span class="w"> </span><span class="n">FsResult</span><span class="p">};</span>
-
-<span class="k">struct</span><span class="w"> </span><span class="nc">MyFile</span><span class="p">;</span>
-
-<span class="k">impl</span><span class="w"> </span><span class="n">Read</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">MyFile</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="cm">/* ... */</span>
-<span class="p">}</span>
-
-<span class="k">impl</span><span class="w"> </span><span class="n">Write</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">MyFile</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="cm">/* ... */</span>
-<span class="p">}</span>
-
-<span class="k">impl</span><span class="w"> </span><span class="n">Seek</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">MyFile</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="cm">/* ... */</span>
-<span class="p">}</span>
-
-<span class="k">impl</span><span class="w"> </span><span class="n">FsFile</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">MyFile</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">info</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">FsResult</span><span class="o">&lt;</span><span class="n">FileInfo</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="fm">todo!</span><span class="p">()</span>
-<span class="w">    </span><span class="p">}</span>
-
-<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">size</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">FsResult</span><span class="o">&lt;</span><span class="nb">Option</span><span class="o">&lt;</span><span class="kt">u64</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="fm">todo!</span><span class="p">()</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="p">}</span>
-</pre></div>
-</div>
 <p><code class="docutils literal notranslate"><span class="pre">FsFile</span></code> requires <code class="docutils literal notranslate"><span class="pre">Read</span> <span class="pre">+</span> <span class="pre">Write</span> <span class="pre">+</span> <span class="pre">Seek</span> <span class="pre">+</span> <span class="pre">Send</span></code>. <code class="docutils literal notranslate"><span class="pre">commit()</span></code> and <code class="docutils literal notranslate"><span class="pre">discard()</span></code>
 default to no-ops and are available for buffered writes or future transaction
 support.</p>
@@ -424,36 +392,13 @@ single-letter forms. <code class="docutils literal notranslate"><span class="pre
 <section id="localfs">
 <h2>LocalFs<a class="headerlink" href="#localfs" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> uses <code class="docutils literal notranslate"><span class="pre">std::fs</span></code> and implements <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code>.</p>
-<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::{</span><span class="n">FileSystem</span><span class="p">,</span><span class="w"> </span><span class="n">LocalFs</span><span class="p">};</span>
-
-<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">fsspec_rs</span><span class="p">::</span><span class="n">FsResult</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">fs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LocalFs</span><span class="p">::</span><span class="n">with_auto_mkdir</span><span class="p">(</span><span class="kc">true</span><span class="p">);</span>
-<span class="w">    </span><span class="n">fs</span><span class="p">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s">"/tmp/fsspec-rs.txt"</span><span class="p">,</span><span class="w"> </span><span class="s">b"hello"</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">_data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fs</span><span class="p">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s">"/tmp/fsspec-rs.txt"</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-<p><code class="docutils literal notranslate"><span class="pre">LocalFs::new()</span></code> starts with <code class="docutils literal notranslate"><span class="pre">auto_mkdir</span> <span class="pre">=</span> <span class="pre">false</span></code>. Use
-<code class="docutils literal notranslate"><span class="pre">LocalFs::with_auto_mkdir(true)</span></code> to create missing parent directories during
+<p><code class="docutils literal notranslate"><span class="pre">LocalFs::new()</span></code> starts with <code class="docutils literal notranslate"><span class="pre">auto_mkdir</span> <span class="pre">=</span> <span class="pre">false</span></code>. <code class="docutils literal notranslate"><span class="pre">LocalFs::with_auto_mkdir(true)</span></code> creates missing parent directories during
 write, append, exclusive-create, and copy operations.</p>
 </section>
 <section id="s3fs">
 <h2>S3Fs<a class="headerlink" href="#s3fs" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> wraps <code class="docutils literal notranslate"><span class="pre">object_store::aws::AmazonS3</span></code> and presents a sync <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code>
 API through an embedded Tokio runtime.</p>
-<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::{</span><span class="n">FileSystem</span><span class="p">,</span><span class="w"> </span><span class="n">S3Config</span><span class="p">,</span><span class="w"> </span><span class="n">S3Fs</span><span class="p">};</span>
-
-<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">fsspec_rs</span><span class="p">::</span><span class="n">FsResult</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">cfg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">S3Config</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="s">"my-bucket"</span><span class="p">);</span>
-<span class="w">    </span><span class="n">cfg</span><span class="p">.</span><span class="n">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="s">"us-east-1"</span><span class="p">.</span><span class="n">to_string</span><span class="p">());</span>
-
-<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">fs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">S3Fs</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">_objects</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fs</span><span class="p">.</span><span class="n">ls</span><span class="p">(</span><span class="s">""</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
-<span class="p">}</span>
-</pre></div>
-</div>
 <p><code class="docutils literal notranslate"><span class="pre">S3Config</span></code> supports:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">bucket</span></code></p></li>
@@ -470,80 +415,18 @@ API through an embedded Tokio runtime.</p>
 </section>
 <section id="python-fsspec-bridge">
 <h2>Python fsspec bridge<a class="headerlink" href="#python-fsspec-bridge" title="Link to this heading">¶</a></h2>
-<p>The optional bridge crate is named <code class="docutils literal notranslate"><span class="pre">fsspec_rs_bridge</span></code>. It adapts Python fsspec
-filesystem objects to the Rust <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> trait:</p>
-<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[dependencies]</span>
-<span class="n">fsspec_rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.1.1"</span>
-<span class="n">fsspec_rs_bridge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.1.2"</span>
-</pre></div>
-</div>
-<p>For local development in this repository:</p>
-<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="n">fsspec_rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"./rust"</span><span class="p">,</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"> </span><span class="p">}</span>
-<span class="n">fsspec_rs_bridge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"./rust/bridge"</span><span class="p">,</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"> </span><span class="p">}</span>
-</pre></div>
-</div>
-<p>The bridge is intentionally separate from the pure Rust core crate. It depends
-on PyO3 and Python fsspec at runtime, but it is an <code class="docutils literal notranslate"><span class="pre">rlib</span></code> helper crate rather
-than a Python extension module. It defines no <code class="docutils literal notranslate"><span class="pre">#[pyclass]</span></code> types, which keeps
-downstream PyO3 extension modules from sharing Python class statistics across
-crate boundaries.</p>
-<p>Use the bridge when Rust code is running inside a Python process and needs to
-consume an installed fsspec implementation that does not yet have a native
-Rust backend.</p>
-<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::</span><span class="n">FileSystem</span><span class="p">;</span>
-<span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs_bridge</span><span class="p">::{</span><span class="n">url_to_fs</span><span class="p">,</span><span class="w"> </span><span class="n">StorageOptions</span><span class="p">};</span>
-
-<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">fsspec_rs</span><span class="p">::</span><span class="n">FsResult</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">storage_options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">StorageOptions</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
-<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="p">(</span><span class="n">fs</span><span class="p">,</span><span class="w"> </span><span class="n">start_path</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">url_to_fs</span><span class="p">(</span><span class="s">"memory://"</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">storage_options</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-
-<span class="w">    </span><span class="n">fs</span><span class="p">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s">"/example.txt"</span><span class="p">,</span><span class="w"> </span><span class="s">b"hello from Python fsspec"</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fs</span><span class="p">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s">"/example.txt"</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-
-<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">start_path</span><span class="p">,</span><span class="w"> </span><span class="s">"/"</span><span class="p">);</span>
-<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="s">b"hello from Python fsspec"</span><span class="p">);</span>
-<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-<p>You can also construct a bridge from a protocol name:</p>
-<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::</span><span class="n">FileSystem</span><span class="p">;</span>
-<span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs_bridge</span><span class="p">::{</span><span class="n">PyFsspecFs</span><span class="p">,</span><span class="w"> </span><span class="n">StorageOptions</span><span class="p">};</span>
-
-<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">fsspec_rs</span><span class="p">::</span><span class="n">FsResult</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">fs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PyFsspecFs</span><span class="p">::</span><span class="n">from_protocol</span><span class="p">(</span><span class="s">"memory"</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">StorageOptions</span><span class="p">::</span><span class="n">new</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
-
-<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">fs</span><span class="p">.</span><span class="n">protocol</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="p">[</span><span class="s">"python"</span><span class="p">]);</span>
-<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">fs</span><span class="p">.</span><span class="n">source_protocol</span><span class="p">(),</span><span class="w"> </span><span class="s">"memory"</span><span class="p">);</span>
-<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">fs</span><span class="p">.</span><span class="n">root_marker</span><span class="p">(),</span><span class="w"> </span><span class="s">"/"</span><span class="p">);</span>
-<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-<p><code class="docutils literal notranslate"><span class="pre">PyFsspecFs</span></code> implements the same <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> trait as <code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> and <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code>.
-It delegates primitives such as <code class="docutils literal notranslate"><span class="pre">ls</span></code>, <code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">open</span></code>, <code class="docutils literal notranslate"><span class="pre">cat_file</span></code>,
-<code class="docutils literal notranslate"><span class="pre">pipe_file</span></code>, <code class="docutils literal notranslate"><span class="pre">cp_file</span></code>, <code class="docutils literal notranslate"><span class="pre">rm_file</span></code>, <code class="docutils literal notranslate"><span class="pre">mkdir</span></code>, <code class="docutils literal notranslate"><span class="pre">rmdir</span></code>, <code class="docutils literal notranslate"><span class="pre">get_file</span></code>, and
-<code class="docutils literal notranslate"><span class="pre">put_file</span></code> to the underlying Python filesystem object. Python exceptions are
-mapped back into <code class="docutils literal notranslate"><span class="pre">FsError</span></code> variants where possible.</p>
-<p><code class="docutils literal notranslate"><span class="pre">StorageOptions</span></code> values preserve Python-compatible null, boolean, signed and
-unsigned integer, floating-point, string, list, and nested-map types. Nested
-maps support per-protocol options for chained URLs:</p>
-<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs_bridge</span><span class="p">::{</span><span class="n">url_to_fs</span><span class="p">,</span><span class="w"> </span><span class="n">StorageOptions</span><span class="p">};</span>
-
-<span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">memory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">StorageOptions</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
-<span class="n">memory</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="s">"skip_instance_cache"</span><span class="p">.</span><span class="n">to_string</span><span class="p">(),</span><span class="w"> </span><span class="kc">true</span><span class="p">.</span><span class="n">into</span><span class="p">());</span>
-
-<span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">StorageOptions</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
-<span class="n">options</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="s">"memory"</span><span class="p">.</span><span class="n">to_string</span><span class="p">(),</span><span class="w"> </span><span class="n">memory</span><span class="p">.</span><span class="n">into</span><span class="p">());</span>
-
-<span class="kd">let</span><span class="w"> </span><span class="p">(</span><span class="n">fs</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">url_to_fs</span><span class="p">(</span><span class="s">"simplecache::memory://bucket/data.csv"</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">options</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-<span class="p">#</span><span class="w"> </span><span class="nb">Ok</span><span class="p">::</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::</span><span class="n">FsError</span><span class="o">&gt;</span><span class="p">(())</span>
-</pre></div>
-</div>
-<p>Because the bridge calls Python, it initializes and attaches to the Python
-interpreter internally. Consumers should still treat it as Python-backed I/O:
-it is best suited for Python extension crates or embedded-Python contexts, not
-standalone Rust binaries that need a Python-free dependency graph.</p>
+<p><code class="docutils literal notranslate"><span class="pre">fsspec_rs_bridge</span></code> exports <code class="docutils literal notranslate"><span class="pre">PyFsspecFs</span></code>, <code class="docutils literal notranslate"><span class="pre">url_to_fs</span></code>, and <code class="docutils literal notranslate"><span class="pre">StorageOptions</span></code>. It is an
+<code class="docutils literal notranslate"><span class="pre">rlib</span></code> using PyO3 and Python fsspec at runtime, with no <code class="docutils literal notranslate"><span class="pre">#[pyclass]</span></code> exports.</p>
+<p><code class="docutils literal notranslate"><span class="pre">url_to_fs(url,</span> <span class="pre">options)</span></code> returns a filesystem adapter and start path.
+<code class="docutils literal notranslate"><span class="pre">PyFsspecFs::from_protocol(protocol,</span> <span class="pre">options)</span></code> constructs an adapter by protocol.
+Its trait protocol is <code class="docutils literal notranslate"><span class="pre">python</span></code>; <code class="docutils literal notranslate"><span class="pre">source_protocol()</span></code> reports the wrapped protocol.
+The bridge initializes and attaches to the Python interpreter internally.</p>
+<p><code class="docutils literal notranslate"><span class="pre">PyFsspecFs</span></code> implements <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> and delegates <code class="docutils literal notranslate"><span class="pre">ls</span></code>, <code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">open</span></code>, <code class="docutils literal notranslate"><span class="pre">cat_file</span></code>,
+<code class="docutils literal notranslate"><span class="pre">pipe_file</span></code>, <code class="docutils literal notranslate"><span class="pre">cp_file</span></code>, <code class="docutils literal notranslate"><span class="pre">rm_file</span></code>, <code class="docutils literal notranslate"><span class="pre">mkdir</span></code>, <code class="docutils literal notranslate"><span class="pre">rmdir</span></code>, <code class="docutils literal notranslate"><span class="pre">get_file</span></code>, and <code class="docutils literal notranslate"><span class="pre">put_file</span></code> to
+Python. Common Python exceptions map to <code class="docutils literal notranslate"><span class="pre">FsError</span></code> categories.</p>
+<p><code class="docutils literal notranslate"><span class="pre">StorageOptions</span></code> values support nulls, booleans, signed and unsigned integers,
+floats, strings, lists, and nested maps. Per-protocol maps configure chained URLs.
+The <a class="reference internal" href="how-to-rust.html"><span class="std std-doc">Rust guide</span></a> includes dependency and invocation examples.</p>
 </section>
 <section id="caching">
 <h2>Caching<a class="headerlink" href="#caching" title="Link to this heading">¶</a></h2>
@@ -651,7 +534,7 @@ common filesystem semantics into stable variants:</p>
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Rust traits</a><ul>
+<li><a class="reference internal" href="#">Rust traits and types</a><ul>
 <li><a class="reference internal" href="#core-model">Core model</a></li>
 <li><a class="reference internal" href="#filesystem">FileSystem</a></li>
 <li><a class="reference internal" href="#asyncfilesystem">AsyncFileSystem</a></li>

@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="fsspec-rs filesystems" href="docs/src/filesystems.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="How to build from source" href="docs/src/how-to-build.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
         <title>fsspec-rs v0.1.5</title>
@@ -198,9 +198,16 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/how-to-build.html">How to build from source</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/tutorial.html">Read and write a local file with fsspec-rs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/how-to.html">How to use Rust-backed filesystems</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/how-to-rust.html">How to use the Rust crates</a></li>
 <li class="toctree-l1"><a class="reference internal" href="docs/src/filesystems.html">fsspec-rs filesystems</a></li>
-<li class="toctree-l1"><a class="reference internal" href="docs/src/rust.html">Rust traits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/rust.html">Rust traits and types</a></li>
 <li class="toctree-l1"><a class="reference internal" href="docs/src/api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/explanation.html">Why fsspec-rs uses explicit protocols and shared traits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/licenses.html">License bundle reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rust/LICENSES.html">Cargo license overrides</a></li>
 </ul>
 
 </div>
@@ -243,93 +250,28 @@
 </div>
 <section class="tex2jax_ignore mathjax_ignore" id="fsspec-rs">
 <h1>fsspec-rs<a class="headerlink" href="#fsspec-rs" title="Link to this heading">¶</a></h1>
-<p>fsspec-compatible filesystem backends with Rust acceleration.</p>
+<p>Use Rust-backed local and S3 filesystems through fsspec.</p>
 <p><a class="reference external" href="https://github.com/1kbgz/fsspec-rs/actions/workflows/build.yaml"><img alt="Build Status" src="https://github.com/1kbgz/fsspec-rs/actions/workflows/build.yaml/badge.svg?branch=main&amp;event=push" /></a>
 <a class="reference external" href="https://codecov.io/gh/1kbgz/fsspec-rs"><img alt="codecov" src="https://codecov.io/gh/1kbgz/fsspec-rs/branch/main/graph/badge.svg" /></a>
 <a class="reference external" href="https://github.com/1kbgz/fsspec-rs"><img alt="License" src="https://img.shields.io/github/license/1kbgz/fsspec-rs" /></a>
 <a class="reference external" href="https://pypi.python.org/pypi/fsspec-rs"><img alt="PyPI" src="https://img.shields.io/pypi/v/fsspec-rs.svg" /></a></p>
-<section id="overview">
-<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">fsspec-rs</span></code> provides Python filesystem classes that inherit from
-<code class="docutils literal notranslate"><span class="pre">fsspec.spec.AbstractFileSystem</span></code> while delegating core operations to Rust.
-They can be used anywhere fsspec filesystems are accepted, including pandas,
-dask, xarray, and direct <code class="docutils literal notranslate"><span class="pre">fsspec.open()</span></code> calls.</p>
-<p>The package currently includes:</p>
-<div class="table-wrapper colwidths-auto docutils container">
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>Backend</p></th>
-<th class="head"><p>Protocol</p></th>
-<th class="head"><p>Python class</p></th>
-<th class="head"><p>Replaces</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>Local filesystem</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">file-rs</span></code>, <code class="docutils literal notranslate"><span class="pre">local-rs</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">fsspec_rs.LocalFileSystem</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">fsspec.implementations.local.LocalFileSystem</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p>Amazon S3</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">s3-rs</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">fsspec_rs.S3FileSystem</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">s3fs.S3FileSystem</span></code></p></td>
-</tr>
-</tbody>
-</table>
-</div>
-</section>
-<section id="install">
-<h2>Install<a class="headerlink" href="#install" title="Link to this heading">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>fsspec-rs
-</pre></div>
-</div>
-<section id="building-from-source">
-<h3>Building from source<a class="headerlink" href="#building-from-source" title="Link to this heading">¶</a></h3>
-<p>Source builds require Rust, hatch-rs 0.4.3 or newer, and the Cargo license
-collector. Install the collector before building or installing an editable copy:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cargo<span class="w"> </span>install<span class="w"> </span>cargo-bundle-licenses<span class="w"> </span>--version<span class="w"> </span><span class="m">4</span>.2.0<span class="w"> </span>--locked
-</pre></div>
-</div>
-<p>Wheels include original Cargo dependency license texts in
-<code class="docutils literal notranslate"><span class="pre">fsspec_rs/licenses/cargo.json</span></code>. The collector includes dependencies for other
-targets, so this bundle is a superset of the wheel’s runtime dependencies.
-Python dependencies, native-library notices, and repaired-wheel libraries are
-outside its scope.</p>
-<p>The collector cannot find the <code class="docutils literal notranslate"><span class="pre">r-efi</span></code> notices in its AUTHORS files. Versioned
-overrides preserve those notices and supply full license terms through
-<code class="docutils literal notranslate"><span class="pre">licenses.previous</span></code>; see <a class="reference internal" href="rust/LICENSES.html"><span class="std std-doc">their sources and review requirements</span></a>.</p>
-</section>
-</section>
-<section id="quick-start">
-<h2>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">fsspec</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">LocalFileSystem</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">S3FileSystem</span>
-
-<span class="n">fs</span> <span class="o">=</span> <span class="n">LocalFileSystem</span><span class="p">()</span>
-<span class="n">fs</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">"/tmp/example.txt"</span><span class="p">,</span> <span class="sa">b</span><span class="s2">"hello"</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">fs</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="s2">"/tmp/example.txt"</span><span class="p">))</span>
-
-<span class="n">s3</span> <span class="o">=</span> <span class="n">S3FileSystem</span><span class="p">(</span><span class="n">bucket</span><span class="o">=</span><span class="s2">"my-bucket"</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">"us-east-1"</span><span class="p">)</span>
-<span class="n">s3</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">"path/to/output.txt"</span><span class="p">,</span> <span class="sa">b</span><span class="s2">"hello"</span><span class="p">)</span>
-
-<span class="k">with</span> <span class="n">fsspec</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"file-rs:///tmp/example.txt"</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
-</pre></div>
-</div>
-</section>
+<p><code class="docutils literal notranslate"><span class="pre">fsspec-rs</span></code> provides Python classes that inherit from <code class="docutils literal notranslate"><span class="pre">fsspec.AbstractFileSystem</span></code>
+and delegate core I/O to Rust. Its native Rust crate exposes shared filesystem
+traits, local and S3 backends, and read caches. A separate bridge crate adapts
+Python fsspec implementations for Rust callers.</p>
 <section id="documentation">
 <h2>Documentation<a class="headerlink" href="#documentation" title="Link to this heading">¶</a></h2>
-<ul class="simple">
-<li><p><a class="reference internal" href="docs/src/filesystems.html"><span class="std std-doc">Filesystems</span></a>: local and S3 usage, configuration, caching, and path conventions.</p></li>
-<li><p><a class="reference internal" href="docs/src/api.html"><span class="std std-doc">API reference</span></a>: Python API generated with yardang/Sphinx.</p></li>
-<li><p><a class="reference internal" href="docs/src/rust.html"><span class="std std-doc">Rust traits</span></a>: Rust <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code>, experimental <code class="docutils literal notranslate"><span class="pre">AsyncFileSystem</span></code>, <code class="docutils literal notranslate"><span class="pre">FsFile</span></code>, and cache traits.</p></li>
-</ul>
-<p>Build docs locally with:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>yardang<span class="w"> </span>build
-</pre></div>
-</div>
+<p><a class="reference internal" href="docs/src/tutorial.html"><span class="std std-doc">Read and write a local file</span></a> walks through the Python API.
+<a class="reference internal" href="docs/src/how-to.html"><span class="std std-doc">Use Rust-backed filesystems</span></a> covers backend selection, S3
+endpoints, and caching. <a class="reference internal" href="docs/src/how-to-rust.html"><span class="std std-doc">Use the Rust crates</span></a> covers native
+and Python-backed Rust access.</p>
+<p>Look up <a class="reference internal" href="docs/src/filesystems.html"><span class="std std-doc">filesystem behavior</span></a>,
+<a class="reference internal" href="docs/src/rust.html"><span class="std std-doc">Rust traits and types</span></a>, or the <a class="reference internal" href="docs/src/api.html"><span class="std std-doc">Python API</span></a>.
+Read <a class="reference internal" href="docs/src/explanation.html"><span class="std std-doc">Why fsspec-rs uses explicit protocols and shared traits</span></a>
+for the design.</p>
+<p>For source installations, follow <a class="reference internal" href="docs/src/how-to-build.html"><span class="std std-doc">How to build from source</span></a>.
+<a class="reference internal" href="docs/src/licenses.html"><span class="std std-doc">License bundle reference</span></a> describes the included inventories
+and their coverage.</p>
 </section>
 </section>
 
@@ -338,12 +280,12 @@ overrides preserve those notices and supply full license terms through
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="docs/src/filesystems.html">
+          <a class="next-page" href="docs/src/how-to-build.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">fsspec-rs filesystems</div>
+                <div class="title">How to build from source</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
