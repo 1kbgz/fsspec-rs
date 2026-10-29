@@ -1,6 +1,6 @@
 # fsspec-rs filesystems
 
-`fsspec-rs` exposes Rust-backed filesystems through normal fsspec classes.
+`fsspec-rs` provides Rust-backed filesystems through fsspec classes.
 Importing `fsspec_rs` registers the protocols with fsspec:
 
 | Filesystem       | Protocols             | Class                       |
@@ -22,7 +22,7 @@ with fsspec.open("file-rs:///tmp/example.txt", "rb") as f:
 
 `LocalFileSystem` wraps the Rust `LocalFs` backend, which uses `std::fs` for
 local paths. It is marked as a local filesystem (`local_file = True`) and
-supports the common fsspec primitives.
+implements fsspec's core filesystem operations.
 
 ```python
 from fsspec_rs import LocalFileSystem
@@ -35,7 +35,7 @@ assert fs.isfile("/tmp/fsspec-rs/example.txt")
 print(fs.info("/tmp/fsspec-rs/example.txt"))
 ```
 
-### Paths
+### Local paths
 
 Direct method calls use normal local paths:
 
@@ -51,12 +51,12 @@ with fsspec.open("local-rs:///tmp/fsspec-rs/example.txt", "rb") as f:
 ```
 
 `LocalFileSystem._strip_protocol()` removes only the Rust-specific local
-protocols. The regular `file://` and `local://` protocols remain owned by
-fsspec's Python implementation.
+protocols. The `file://` and `local://` protocols still select fsspec's Python
+implementation.
 
 ### Opening files
 
-Supported modes are `rb`, `wb`, `ab`, and `xb`, plus their textless aliases
+Supported modes are `rb`, `wb`, `ab`, and `xb`, plus the aliases
 `r`, `w`, `a`, and `x` at the Rust layer. Python wrappers expose binary file
 objects that implement `read`, `write`, `seek`, `tell`, `flush`, `close`,
 `readable`, `writable`, and `seekable`.
@@ -72,9 +72,9 @@ with fs.open("/tmp/fsspec-rs/out.bin", "rb") as f:
 
 `auto_mkdir=True` creates missing parent directories for write, append,
 exclusive-create, and copy operations. With the default `auto_mkdir=False`,
-missing parents are reported by the operating system.
+the operating system reports an error if a parent directory is missing.
 
-### Supported operations
+### Local operations
 
 Local filesystem methods delegated to Rust include:
 
@@ -86,8 +86,8 @@ Local filesystem methods delegated to Rust include:
   `put_file`
 
 The `cache_type`, `block_size`, and `max_blocks` options are accepted by
-`open()` for API compatibility. Local reads are already direct local file
-operations, so those cache options do not change local read behavior.
+`open()` for API compatibility but do not change local read behavior. Local
+reads use direct filesystem operations.
 
 ## S3
 
@@ -103,7 +103,7 @@ fs.pipe_file("reports/hello.txt", b"hello")
 print(fs.cat_file("reports/hello.txt"))
 ```
 
-### Paths
+### S3 paths
 
 `S3FileSystem` is constructed for one bucket. Method calls can use keys within
 that bucket:
@@ -113,8 +113,8 @@ fs.ls("reports")
 fs.info("reports/hello.txt")
 ```
 
-fsspec URLs include the bucket and can infer constructor options through
-`_get_kwargs_from_urls()`:
+fsspec URLs include the bucket. `_get_kwargs_from_urls()` extracts constructor
+options from the URL:
 
 ```python
 with fsspec.open(
@@ -125,7 +125,7 @@ with fsspec.open(
     print(f.read())
 ```
 
-Internally, object names are normalized without a leading slash. Directory
+Object names are stored internally without a leading slash. Directory
 entries are S3 prefixes, not real directories; `mkdir()` and `rmdir()` are
 no-ops.
 
@@ -140,9 +140,9 @@ Credential resolution follows this order:
 1. `object_store`'s own AWS credential chain, such as environment variables,
    profiles, and instance or task roles
 
-`client_kwargs={"endpoint_url": ...}` is accepted for s3fs-compatible configuration. If the
-endpoint starts with `http://`, the Rust backend allows plain HTTP
-automatically for local S3-compatible services.
+`client_kwargs={"endpoint_url": ...}` is accepted for compatibility with s3fs.
+The Rust backend allows plain HTTP when the endpoint starts with `http://`,
+as used by local S3-compatible services.
 
 ```python
 fs = S3FileSystem(
@@ -177,13 +177,14 @@ with fs.open(
     header = f.read(4096)
 ```
 
-`block_size` defaults to 4 MiB. The Rust `max_blocks` default is 32. The Python file wrapper does not forward
-`max_blocks` from `open()`, so it cannot be configured through that call.
+`block_size` defaults to 4 MiB, and the Rust `max_blocks` default is 32. The
+Python file wrapper does not forward `max_blocks` from `open()`, so callers
+cannot change it through that method.
 
 Without an explicit `cache_type`, S3 read mode eagerly loads the whole object
 into memory. Explicit `readahead`, `block`, and `none` select range-based reads.
 
-### Supported operations
+### S3 operations
 
 S3 methods delegated to Rust include:
 
@@ -193,5 +194,5 @@ S3 methods delegated to Rust include:
 - Prefix traversal: `walk`, `find`
 - Object mutation: `rm_file`, `rm`, `cp_file`
 
-Current S3 writes buffer object contents in memory before upload. Multipart
-concurrent uploads and signed URLs are not yet part of the public API.
+S3 writes buffer object contents in memory before upload. The public API does
+not support concurrent multipart uploads or signed URLs.

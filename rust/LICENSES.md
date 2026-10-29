@@ -1,6 +1,6 @@
 # Cargo license overrides
 
-The hatch-rs build hook uses `license-overrides.json` to fill license texts
+The hatch-rs build hook uses `license-overrides.json` to supply license texts
 that cargo-bundle-licenses 4.2.0 cannot discover. The file contains only
 `r-efi` 5.3.0 and 6.0.0, matched by package name, version, and license identifier.
 Other dependencies are collected from their source distributions at build time.
@@ -27,5 +27,5 @@ the original notice retains the "or later" permission.
 
 The source distribution includes these overrides so wheels rebuilt from it
 use the same inputs. The wheel includes the resulting bundle, not the override
-source. New crate versions with undiscovered texts fail the build until their
-sources and notices are reviewed and added.
+source. If the collector cannot find license texts for a new crate version, the
+build fails until its sources and notices are reviewed and added.

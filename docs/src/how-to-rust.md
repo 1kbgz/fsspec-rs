@@ -60,7 +60,7 @@ assert_eq!(fs.cat_file("/example.txt", None, None)?, b"hello from Python fsspec"
 # Ok::<(), fsspec_rs::FsError>(())
 ```
 
-Pass per-protocol options as nested maps for chained URLs:
+For chained URLs, pass options in nested maps keyed by protocol:
 
 ```rust
 use fsspec_rs_bridge::{url_to_fs, StorageOptions};
@@ -73,6 +73,6 @@ let (fs, path) = url_to_fs("simplecache::memory://bucket/data.csv", &options)?;
 # Ok::<(), fsspec_rs::FsError>(())
 ```
 
-From this repository's workspace, use path dependencies `./rust` and
+Within this repository's workspace, use path dependencies `./rust` and
 `./rust/bridge` instead of registry versions. See [Rust traits](rust.md) for backend
 primitives and bridge value types.

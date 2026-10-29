@@ -1,11 +1,11 @@
 # How to use Rust-backed filesystems
 
-Use these recipes when replacing a local or S3 filesystem with its `fsspec-rs`
-equivalent.
+Replace a local or S3 filesystem with its `fsspec-rs` equivalent, configure an
+S3-compatible endpoint, or choose a read cache.
 
 ## Select a backend by protocol
 
-Construct filesystems through fsspec when an application accepts a protocol:
+Use fsspec to construct a filesystem when an application accepts a protocol:
 
 ```python
 import fsspec
@@ -49,7 +49,7 @@ Use the `-rs` protocols to select the Rust-backed implementations explicitly.
 
 ## Configure an S3-compatible service
 
-Pass the endpoint and credentials accepted by `S3FileSystem`:
+Pass the service's endpoint and credentials to `S3FileSystem`:
 
 ```python
 from fsspec_rs import S3FileSystem
@@ -64,9 +64,9 @@ fs = S3FileSystem(
 ```
 
 Use `anon=True` for anonymous access. For AWS, omit explicit credentials to use the
-credential chain provided by the underlying object-store implementation.
+`object_store` credential chain.
 
-## Bound S3 read caching
+## Limit memory use for S3 reads
 
 Choose an explicit cache strategy when opening large objects. Omitting
 `cache_type` eagerly reads the whole S3 object:
@@ -82,6 +82,7 @@ with fs.open(
 ```
 
 The Python wrapper uses the Rust default of 32 cached blocks; it does not forward
-`max_blocks`. Use `none` for direct range fetches, `readahead` for sequential access, `block` for
-repeated random access, or `all` to fetch the complete object on first read. See the
-[filesystem reference](filesystems.md) for exact behavior and supported operations.
+`max_blocks`. Choose `none` for direct range fetches, `readahead` for sequential
+access, or `block` for repeated random access. Use `all` only when you want to
+fetch the whole object on first read. See the [filesystem reference](filesystems.md)
+for cache behavior and supported operations.
