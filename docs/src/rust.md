@@ -14,8 +14,6 @@ use fsspec_rs::{
 };
 ```
 
-The main pieces are:
-
 | Type                         | Purpose                                                                          |
 | ---------------------------- | -------------------------------------------------------------------------------- |
 | `FileSystem`                 | Synchronous filesystem trait with primitive methods and default helpers.         |
@@ -28,8 +26,8 @@ The main pieces are:
 
 ## FileSystem
 
-`FileSystem` is the sync trait implemented by `LocalFs` and `S3Fs`.
-Required backend methods are seven primitives plus `protocol`:
+`LocalFs` and `S3Fs` implement the synchronous `FileSystem` trait. Backends must
+implement seven primitive methods and `protocol`:
 
 ```rust
 use fsspec_rs::{FileInfo, FileSystem, FsFile, FsResult, OpenMode, OpenOptions};
@@ -92,20 +90,18 @@ The default methods built on those primitives include:
 
 ## AsyncFileSystem
 
-`AsyncFileSystem` mirrors `FileSystem`, but primitive methods return futures
-and default helpers are `async fn`s. It is experimental: the shipped `LocalFs`
-and `S3Fs` backends currently implement the synchronous `FileSystem` trait.
+`AsyncFileSystem` is the experimental async version of `FileSystem`. Its
+primitive methods return futures, and its default helpers are `async fn`s.
+`LocalFs` and `S3Fs` implement only the synchronous `FileSystem` trait.
 
 The default async implementation avoids recursive async futures in `walk()` by
 using an explicit stack. Method semantics otherwise match `FileSystem`.
 
 ## FsFile
 
-Opened files implement `FsFile`:
-
-`FsFile` requires `Read + Write + Seek + Send`. `commit()` and `discard()`
-default to no-ops and are available for buffered writes or future transaction
-support.
+`FileSystem::open()` returns a file implementing `FsFile`, which requires
+`Read + Write + Seek + Send`. `commit()` and `discard()` default to no-ops and
+are available for buffered writes or future transaction support.
 
 ## Metadata and open options
 
@@ -137,8 +133,8 @@ write, append, exclusive-create, and copy operations.
 
 ## S3Fs
 
-`S3Fs` wraps `object_store::aws::AmazonS3` and presents a sync `FileSystem`
-API through an embedded Tokio runtime.
+`S3Fs` wraps `object_store::aws::AmazonS3` and runs its async calls through an
+embedded Tokio runtime to implement the synchronous `FileSystem` trait.
 
 `S3Config` supports:
 
@@ -161,16 +157,18 @@ Plain HTTP is allowed automatically when `endpoint_url` starts with
 
 `url_to_fs(url, options)` returns a filesystem adapter and start path.
 `PyFsspecFs::from_protocol(protocol, options)` constructs an adapter by protocol.
-Its trait protocol is `python`; `source_protocol()` reports the wrapped protocol.
-The bridge initializes and attaches to the Python interpreter internally.
+The adapter's trait protocol is `python`; `source_protocol()` reports the
+wrapped protocol. The bridge initializes and attaches to the Python interpreter
+internally.
 
 `PyFsspecFs` implements `FileSystem` and delegates `ls`, `info`, `open`, `cat_file`,
 `pipe_file`, `cp_file`, `rm_file`, `mkdir`, `rmdir`, `get_file`, and `put_file` to
 Python. Common Python exceptions map to `FsError` categories.
 
 `StorageOptions` values support nulls, booleans, signed and unsigned integers,
-floats, strings, lists, and nested maps. Per-protocol maps configure chained URLs.
-The [Rust guide](how-to-rust.md) includes dependency and invocation examples.
+floats, strings, lists, and nested maps. Nested maps keyed by protocol configure
+chained URLs. The [Rust guide](how-to-rust.md) includes dependency and invocation
+examples.
 
 ## Caching
 
@@ -188,8 +186,8 @@ retrieves the half-open byte range `[start, end)` from the backend.
 
 ## Error handling
 
-All trait methods return `FsResult<T> = Result<T, FsError>`. `FsError` maps
-common filesystem semantics into stable variants:
+All trait methods return `FsResult<T> = Result<T, FsError>`. `FsError` represents
+filesystem errors with these variants:
 
 - `NotFound`
 - `PermissionDenied`
