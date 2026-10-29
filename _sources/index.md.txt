@@ -39,22 +39,22 @@ Use Rust-backed local and S3 filesystems through fsspec.
 [![PyPI](https://img.shields.io/pypi/v/fsspec-rs.svg)](https://pypi.python.org/pypi/fsspec-rs)
 
 `fsspec-rs` provides Python classes that inherit from `fsspec.AbstractFileSystem`
-and delegate core I/O to Rust. Its native Rust crate exposes shared filesystem
+and delegate core I/O to Rust. The native Rust crate provides shared filesystem
 traits, local and S3 backends, and read caches. A separate bridge crate adapts
 Python fsspec implementations for Rust callers.
 
 ## Documentation
 
-[Read and write a local file](docs/src/tutorial.md) walks through the Python API.
+Start with [Read and write a local file](docs/src/tutorial.md) for a Python example.
 [Use Rust-backed filesystems](docs/src/how-to.md) covers backend selection, S3
 endpoints, and caching. [Use the Rust crates](docs/src/how-to-rust.md) covers native
 and Python-backed Rust access.
 
 Look up [filesystem behavior](docs/src/filesystems.md),
 [Rust traits and types](docs/src/rust.md), or the [Python API](docs/src/api.md).
-Read [Why fsspec-rs uses explicit protocols and shared traits](docs/src/explanation.md)
-for the design.
+[Why fsspec-rs uses explicit protocols and shared traits](docs/src/explanation.md)
+explains the design decisions.
 
 For source installations, follow [How to build from source](docs/src/how-to-build.md).
-[License bundle reference](docs/src/licenses.md) describes the included inventories
-and their coverage.
+[License bundle reference](docs/src/licenses.md) describes which dependency licenses
+are included in wheels.

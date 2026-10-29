@@ -1,7 +1,7 @@
 # Read and write a local file with fsspec-rs
 
-This tutorial creates a file through the Rust-backed local filesystem, reads it through
-an fsspec URL, and inspects its metadata.
+Create a file with the Rust-backed local filesystem, then read it through an
+fsspec URL and inspect its metadata.
 
 ## Before you start
 
@@ -11,7 +11,7 @@ Install `fsspec-rs` in a Python 3.10 or newer environment:
 python -m pip install fsspec-rs
 ```
 
-## Create a workspace
+## Create the script
 
 Create `local_demo.py` with these imports and a temporary directory:
 
