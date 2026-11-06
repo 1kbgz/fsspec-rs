@@ -143,8 +143,8 @@ benchmarks: benchmark
 
 CONTAINER_ENGINE ?= $(shell command -v podman >/dev/null 2>&1 && echo podman || echo docker)
 MINIO_CONTAINER := fsspec-rs-minio
-MINIO_IMAGE ?= docker.io/minio/minio:latest
-MINIO_MC_IMAGE ?= docker.io/minio/mc:latest
+# docker.io/minio/minio is no longer published; this image bundles the server and mc.
+MINIO_IMAGE ?= docker.io/bitnamilegacy/minio:2025.5.24
 MINIO_ROOT_USER ?= minioadmin
 MINIO_ROOT_PASSWORD ?= minioadmin
 MINIO_ENDPOINT ?= http://localhost:9000
@@ -158,12 +158,11 @@ minio-start:  ## start MinIO via podman/docker for local S3 tests and benchmarks
 		-p 9000:9000 -p 9001:9001 \
 		-e MINIO_ROOT_USER=$(MINIO_ROOT_USER) \
 		-e MINIO_ROOT_PASSWORD=$(MINIO_ROOT_PASSWORD) \
-		$(MINIO_IMAGE) server /data --console-address ":9001"
+		$(MINIO_IMAGE)
 	@echo "Waiting for MinIO to be ready..."
 	@ready=0; \
 	for i in $$(seq 1 30); do \
-		if $(CONTAINER_ENGINE) run --rm --network=host --entrypoint="" $(MINIO_MC_IMAGE) \
-			sh -c 'mc alias set local $(MINIO_ENDPOINT) $(MINIO_ROOT_USER) $(MINIO_ROOT_PASSWORD) >/dev/null && mc ready local >/dev/null' >/dev/null 2>&1; then ready=1; break; fi; \
+		if curl -sf $(MINIO_ENDPOINT)/minio/health/ready >/dev/null; then ready=1; break; fi; \
 		sleep 1; \
 	done; \
 	test $$ready -eq 1
@@ -171,9 +170,8 @@ minio-start:  ## start MinIO via podman/docker for local S3 tests and benchmarks
 	@echo "MinIO ready at http://localhost:9000 (console: http://localhost:9001)"
 
 minio-seed:  ## seed MinIO with the S3 integration-test fixture
-	$(CONTAINER_ENGINE) run --rm --network=host --entrypoint="" \
-		$(MINIO_MC_IMAGE) \
-		sh -c 'mc alias set local $(MINIO_ENDPOINT) $(MINIO_ROOT_USER) $(MINIO_ROOT_PASSWORD) && \
+	$(CONTAINER_ENGINE) exec $(MINIO_CONTAINER) \
+		sh -c 'mc alias set local http://localhost:9000 $(MINIO_ROOT_USER) $(MINIO_ROOT_PASSWORD) && \
 			mc mb --ignore-existing local/$(MINIO_BUCKET) && \
 			tmp=$$(mktemp) && : > $$tmp && \
 			for d in subdir1 subdir2 subdir3 subdir4; do \
