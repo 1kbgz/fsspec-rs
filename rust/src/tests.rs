@@ -727,3 +727,101 @@ fn test_file_seek() {
     f.read_to_string(&mut buf).unwrap();
     assert_eq!(buf, "world");
 }
+
+// ---- Commit failures ----
+
+/// A file whose commit always fails, like an upload rejected by the server.
+struct FailingCommitFile(Cursor<Vec<u8>>);
+
+impl Read for FailingCommitFile {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.0.read(buf)
+    }
+}
+
+impl Write for FailingCommitFile {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Seek for FailingCommitFile {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        self.0.seek(pos)
+    }
+}
+
+impl FsFile for FailingCommitFile {
+    fn info(&self) -> FsResult<FileInfo> {
+        Ok(FileInfo::file("failing", 0))
+    }
+
+    fn size(&self) -> FsResult<Option<u64>> {
+        Ok(None)
+    }
+
+    fn commit(&mut self) -> FsResult<()> {
+        Err(FsError::Other("upload rejected".into()))
+    }
+}
+
+struct FailingCommitFs;
+
+impl FileSystem for FailingCommitFs {
+    fn protocol(&self) -> &[&str] {
+        &["failing"]
+    }
+
+    fn ls(&self, _path: &str, _detail: bool) -> FsResult<Vec<FileInfo>> {
+        Ok(Vec::new())
+    }
+
+    fn rm_file(&self, _path: &str) -> FsResult<()> {
+        Ok(())
+    }
+
+    fn cp_file(&self, _src: &str, _dst: &str) -> FsResult<()> {
+        Ok(())
+    }
+
+    fn open(
+        &self,
+        _path: &str,
+        _mode: OpenMode,
+        _opts: Option<OpenOptions>,
+    ) -> FsResult<Box<dyn FsFile>> {
+        Ok(Box::new(FailingCommitFile(Cursor::new(Vec::new()))))
+    }
+
+    fn info(&self, path: &str) -> FsResult<FileInfo> {
+        Err(FsError::NotFound(path.to_string()))
+    }
+
+    fn mkdir(&self, _path: &str, _create_parents: bool) -> FsResult<()> {
+        Ok(())
+    }
+
+    fn rmdir(&self, _path: &str) -> FsResult<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn pipe_file_returns_commit_errors() {
+    let error = FailingCommitFs.pipe_file("key", b"value").unwrap_err();
+    assert!(error.to_string().contains("upload rejected"));
+}
+
+#[test]
+fn put_file_returns_commit_errors() {
+    let source = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(source.path(), b"value").unwrap();
+    let error = FailingCommitFs
+        .put_file(source.path().to_str().unwrap(), "key")
+        .unwrap_err();
+    assert!(error.to_string().contains("upload rejected"));
+}

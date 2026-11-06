@@ -213,6 +213,7 @@ version = "0.1.5"
 dependencies = [
  "bytes",
  "object_store",
+ "percent-encoding",
  "tokio",
  "url",
 ]

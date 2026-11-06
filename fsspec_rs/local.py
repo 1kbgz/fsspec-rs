@@ -1,9 +1,23 @@
 from __future__ import annotations
 
+import os
+
 import fsspec
 from fsspec.spec import AbstractBufferedFile
 
 from fsspec_rs.fsspec_rs import RustLocalFs
+
+_WINDOWS = os.sep == "\\"
+
+
+def _posix(path: str) -> str:
+    """Use "/" in paths, as fsspec's local filesystem does on Windows."""
+    return path.replace("\\", "/") if _WINDOWS else path
+
+
+def _posix_info(info: dict) -> dict:
+    info["name"] = _posix(info["name"])
+    return info
 
 
 class LocalFileSystem(fsspec.AbstractFileSystem):
@@ -23,8 +37,9 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
         for proto in cls.protocol:
             prefix = f"{proto}://"
             if path.startswith(prefix):
-                return path[len(prefix) :]
-        return path
+                path = path[len(prefix) :]
+                break
+        return _posix(path)
 
     def unstrip_protocol(self, path):
         return f"{self.protocol[0]}://{path}"
@@ -37,10 +52,11 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
     # Core primitives — delegated to Rust
 
     def ls(self, path: str, detail: bool = True, **kwargs):
-        return self._rust.ls(path, detail=detail)
+        entries = self._rust.ls(self._strip_protocol(path), detail=detail)
+        return [_posix_info(entry) for entry in entries] if detail else [_posix(name) for name in entries]
 
     def info(self, path: str, **kwargs):
-        return self._rust.info(path)
+        return _posix_info(self._rust.info(self._strip_protocol(path)))
 
     def _open(
         self,
@@ -55,89 +71,91 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
         """Return a Rust-backed file object."""
         return LocalFile(
             self,
-            path,
+            self._strip_protocol(path),
             mode=mode,
             cache_type=cache_type,
             block_size=block_size,
         )
 
     def mkdir(self, path: str, create_parents: bool = True, **kwargs):
-        return self._rust.mkdir(path, create_parents=create_parents)
+        return self._rust.mkdir(self._strip_protocol(path), create_parents=create_parents)
 
     def makedirs(self, path: str, exist_ok: bool = False):
-        return self._rust.makedirs(path, exist_ok=exist_ok)
+        return self._rust.makedirs(self._strip_protocol(path), exist_ok=exist_ok)
 
     def rmdir(self, path: str):
-        return self._rust.rmdir(path)
+        return self._rust.rmdir(self._strip_protocol(path))
 
     def rm_file(self, path: str):
-        return self._rust.rm_file(path)
+        return self._rust.rm_file(self._strip_protocol(path))
 
     def rm(self, path, recursive: bool = False, maxdepth=None):
         if isinstance(path, str):
-            return self._rust.rm(path, recursive=recursive)
+            return self._rust.rm(self._strip_protocol(path), recursive=recursive)
         for p in path:
-            self._rust.rm(p, recursive=recursive)
+            self._rust.rm(self._strip_protocol(p), recursive=recursive)
 
     def cp_file(self, path1: str, path2: str, **kwargs):
-        return self._rust.cp_file(path1, path2)
+        return self._rust.cp_file(self._strip_protocol(path1), self._strip_protocol(path2))
 
     def copy(self, path1: str, path2: str, recursive: bool = False, **kwargs):
-        return self._rust.copy(path1, path2, recursive=recursive)
+        return self._rust.copy(self._strip_protocol(path1), self._strip_protocol(path2), recursive=recursive)
 
     def mv(self, path1: str, path2: str, **kwargs):
-        return self._rust.mv(path1, path2)
+        return self._rust.mv(self._strip_protocol(path1), self._strip_protocol(path2))
 
     # Higher-level helpers — delegated to Rust for speed
 
     def exists(self, path: str, **kwargs) -> bool:
-        return self._rust.exists(path)
+        return self._rust.exists(self._strip_protocol(path))
 
     def isdir(self, path: str) -> bool:
-        return self._rust.isdir(path)
+        return self._rust.isdir(self._strip_protocol(path))
 
     def isfile(self, path: str) -> bool:
-        return self._rust.isfile(path)
+        return self._rust.isfile(self._strip_protocol(path))
 
     def size(self, path: str) -> int:
-        return self._rust.size(path)
+        return self._rust.size(self._strip_protocol(path))
 
     def cat_file(self, path: str, start=None, end=None, **kwargs) -> bytes:
-        return bytes(self._rust.cat_file(path, start=start, end=end))
+        return bytes(self._rust.cat_file(self._strip_protocol(path), start=start, end=end))
 
     def pipe_file(self, path: str, value: bytes, **kwargs):
-        return self._rust.pipe_file(path, value)
+        return self._rust.pipe_file(self._strip_protocol(path), value)
 
     def head(self, path: str, size: int = 1024) -> bytes:
-        return bytes(self._rust.head(path, size))
+        return bytes(self._rust.head(self._strip_protocol(path), size))
 
     def tail(self, path: str, size: int = 1024) -> bytes:
-        return bytes(self._rust.tail(path, size))
+        return bytes(self._rust.tail(self._strip_protocol(path), size))
 
     def touch(self, path: str, truncate: bool = True, **kwargs):
-        return self._rust.touch(path, truncate=truncate)
+        return self._rust.touch(self._strip_protocol(path), truncate=truncate)
 
     def walk(self, path: str, maxdepth=None, topdown: bool = True, **kwargs):
-        entries = self._rust.walk(path, max_depth=maxdepth, topdown=topdown)
-        yield from entries
+        entries = self._rust.walk(self._strip_protocol(path), max_depth=maxdepth, topdown=topdown)
+        for dirpath, dirnames, filenames in entries:
+            yield _posix(dirpath), dirnames, filenames
 
     def find(self, path: str, maxdepth=None, withdirs: bool = False, **kwargs):
-        return self._rust.find(path, max_depth=maxdepth, with_dirs=withdirs)
+        return [_posix(name) for name in self._rust.find(self._strip_protocol(path), max_depth=maxdepth, with_dirs=withdirs)]
 
     def du(self, path: str, total: bool = True, maxdepth=None, **kwargs):
-        return self._rust.du(path, total=total)
+        result = self._rust.du(self._strip_protocol(path), total=total)
+        return result if total else {_posix(name): size for name, size in result.items()}
 
     def read_text(self, path: str, encoding=None, errors=None, newline=None, **kwargs) -> str:
-        return self._rust.read_text(path)
+        return self._rust.read_text(self._strip_protocol(path))
 
     def write_text(self, path: str, value: str, encoding=None, errors=None, newline=None, **kwargs):
-        return self._rust.write_text(path, value)
+        return self._rust.write_text(self._strip_protocol(path), value)
 
     def get_file(self, rpath: str, lpath: str, **kwargs):
-        return self._rust.get_file(rpath, lpath)
+        return self._rust.get_file(self._strip_protocol(rpath), lpath)
 
     def put_file(self, lpath: str, rpath: str, **kwargs):
-        return self._rust.put_file(lpath, rpath)
+        return self._rust.put_file(lpath, self._strip_protocol(rpath))
 
 
 class LocalFile(AbstractBufferedFile):

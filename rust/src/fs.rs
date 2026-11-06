@@ -177,12 +177,14 @@ pub trait FileSystem {
     }
 
     /// Write bytes directly to a file.
+    ///
+    /// Commits explicitly so write errors are returned; `Drop` cannot report them.
     fn pipe_file(&self, path: &str, data: &[u8]) -> FsResult<()> {
         use std::io::Write;
         let mut f = self.open(path, OpenMode::Write, None)?;
         f.write_all(data)?;
         f.flush()?;
-        Ok(())
+        f.commit()
     }
 
     /// Read the first `size` bytes of a file.
@@ -432,6 +434,6 @@ pub trait FileSystem {
             dst.write_all(&buf[..n])?;
         }
         dst.flush()?;
-        Ok(())
+        dst.commit()
     }
 }

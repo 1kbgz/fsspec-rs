@@ -11,6 +11,7 @@ import os
 
 import fsspec
 import pytest
+from fsspec.implementations.local import make_path_posix
 
 from fsspec_rs import LocalFile, LocalFileSystem, RustLocalFile, RustLocalFs
 
@@ -92,7 +93,7 @@ class TestInfo:
         path = os.path.join(tmp, "info.txt")
         fs.pipe_file(path, b"hello")
         info = fs.info(path)
-        assert info["name"] == path
+        assert info["name"] == make_path_posix(path)
         assert info["type"] == "file"
         assert info["size"] == 5
 
@@ -115,8 +116,8 @@ class TestLs:
         entries = fs.ls(tmp, detail=True)
         assert isinstance(entries, list)
         assert len(entries) >= 1
-        assert any(e["name"] == path for e in entries)
-        entry = next(e for e in entries if e["name"] == path)
+        assert any(e["name"] == make_path_posix(path) for e in entries)
+        entry = next(e for e in entries if e["name"] == make_path_posix(path))
         assert "modified" in entry
 
     def test_ls_names_only(self, fs, tmp):
@@ -353,7 +354,7 @@ class TestWalkFind:
         sub = self._make_tree(fs, tmp)
         entries = list(fs.walk(sub, maxdepth=1))
         # maxdepth=1 → only the top-level directory
-        dirs = [e for e in entries if e[0] == sub]
+        dirs = [e for e in entries if e[0] == make_path_posix(sub)]
         assert len(dirs) == 1
 
 
@@ -398,3 +399,58 @@ class TestAutoMkdir:
         path = os.path.join(tmp, "deep", "nested", "auto.txt")
         fs_auto.pipe_file(path, b"auto")
         assert fs_auto.cat_file(path) == b"auto"
+
+
+class TestWindowsPaths:
+    """file-rs uses "/" in paths on Windows, as fsspec's local filesystem does."""
+
+    class FakeRust:
+        """Returns paths the way Rust's std::fs builds them on Windows."""
+
+        def __init__(self):
+            self.calls = []
+
+        def ls(self, path, detail):
+            self.calls.append(path)
+            names = [path + "\\a.txt", path + "\\sub"]
+            return [{"name": name, "type": "file"} for name in names] if detail else names
+
+        def info(self, path):
+            self.calls.append(path)
+            return {"name": path.replace("/", "\\"), "type": "file"}
+
+        def walk(self, path, max_depth, topdown):
+            self.calls.append(path)
+            return [(path, ["sub"], ["a.txt"]), (path + "\\sub", [], ["b.txt"])]
+
+        def find(self, path, max_depth, with_dirs):
+            self.calls.append(path)
+            return [path + "\\a.txt", path + "\\sub\\b.txt"]
+
+        def du(self, path, total):
+            self.calls.append(path)
+            return 3 if total else {path + "\\a.txt": 1, path + "\\sub\\b.txt": 2}
+
+    @pytest.fixture
+    def windows_fs(self, monkeypatch):
+        import fsspec_rs.local
+
+        monkeypatch.setattr(fsspec_rs.local, "_WINDOWS", True)
+        fs = LocalFileSystem(skip_instance_cache=True)
+        fs._rust = self.FakeRust()
+        return fs
+
+    def test_inputs_use_forward_slashes(self, windows_fs):
+        windows_fs.ls("file-rs://C:\\data\\records")
+        windows_fs.info("C:\\data\\records\\a.txt")
+        assert windows_fs._rust.calls == ["C:/data/records", "C:/data/records/a.txt"]
+
+    def test_outputs_use_forward_slashes(self, windows_fs):
+        root = "C:\\data"
+        assert windows_fs.ls(root, detail=False) == ["C:/data/a.txt", "C:/data/sub"]
+        assert [entry["name"] for entry in windows_fs.ls(root)] == ["C:/data/a.txt", "C:/data/sub"]
+        assert windows_fs.info("C:\\data\\a.txt")["name"] == "C:/data/a.txt"
+        assert [entry[0] for entry in windows_fs.walk(root)] == ["C:/data", "C:/data/sub"]
+        assert windows_fs.find(root) == ["C:/data/a.txt", "C:/data/sub/b.txt"]
+        assert windows_fs.du(root, total=False) == {"C:/data/a.txt": 1, "C:/data/sub/b.txt": 2}
+        assert windows_fs.du(root) == 3

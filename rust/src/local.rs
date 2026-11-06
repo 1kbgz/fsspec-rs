@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::SystemTime;
 
 use crate::error::{FsError, FsResult};
@@ -16,7 +17,7 @@ use crate::types::{FileInfo, FileType, OpenMode, OpenOptions};
 /// A file-like object for the local filesystem.
 ///
 /// Wraps either a real `std::fs::File` (for read/append) or a
-/// `Cursor<Vec<u8>>` that flushes to disk on commit/drop (for write/exclusive).
+/// `Cursor<Vec<u8>>` that is written atomically on commit/drop (for write/exclusive).
 pub enum LocalFile {
     /// Directly wraps a standard file handle.
     Direct {
@@ -24,12 +25,64 @@ pub enum LocalFile {
         inner: fs::File,
         mode: OpenMode,
     },
-    /// Buffered write: accumulates in memory, persists on flush/commit/drop.
+    /// Buffered write: accumulates in memory and replaces the target atomically on
+    /// commit/drop, so readers see either the old contents or the complete new contents.
     Buffered {
         path: String,
         cursor: Cursor<Vec<u8>>,
         committed: bool,
+        /// Fail instead of replacing an existing file.
+        exclusive: bool,
     },
+}
+
+static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
+
+/// Writes `data` to a synced temporary file next to `path`, then renames it over `path`.
+/// With `exclusive`, the temporary file is hard-linked instead, which fails if `path` exists.
+fn write_atomic(path: &str, data: &[u8], exclusive: bool) -> FsResult<()> {
+    let target = Path::new(path);
+    let name = target
+        .file_name()
+        .ok_or_else(|| FsError::InvalidArgument(format!("not a file path: {path}")))?;
+    let dir = target
+        .parent()
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let temp = dir.join(format!(
+        ".{}.{}.{}.tmp",
+        name.to_string_lossy(),
+        std::process::id(),
+        NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
+    ));
+    let result = (|| {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp)?;
+        file.write_all(data)?;
+        file.sync_all()?;
+        if exclusive {
+            fs::hard_link(&temp, target)?;
+        } else {
+            fs::rename(&temp, target)?;
+        }
+        sync_dir(dir)
+    })();
+    if exclusive || result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    result.map_err(FsError::from)
+}
+
+#[cfg(unix)]
+fn sync_dir(dir: &Path) -> std::io::Result<()> {
+    fs::File::open(dir)?.sync_all()
+}
+
+#[cfg(not(unix))]
+fn sync_dir(_dir: &Path) -> std::io::Result<()> {
+    Ok(())
 }
 
 impl Read for LocalFile {
@@ -52,11 +105,8 @@ impl Write for LocalFile {
     fn flush(&mut self) -> std::io::Result<()> {
         match self {
             LocalFile::Direct { inner, .. } => inner.flush(),
-            LocalFile::Buffered { path, cursor, .. } => {
-                let data = cursor.get_ref();
-                fs::write(path, data)?;
-                Ok(())
-            }
+            // Buffered contents become visible only on commit.
+            LocalFile::Buffered { .. } => Ok(()),
         }
     }
 }
@@ -92,11 +142,11 @@ impl FsFile for LocalFile {
             path,
             cursor,
             committed,
+            exclusive,
         } = self
         {
             if !*committed {
-                let data = cursor.get_ref();
-                fs::write(path, data)?;
+                write_atomic(path, cursor.get_ref(), *exclusive)?;
                 *committed = true;
             }
         }
@@ -117,11 +167,11 @@ impl Drop for LocalFile {
             path,
             cursor,
             committed,
+            exclusive,
         } = self
         {
             if !*committed {
-                let data = cursor.get_ref();
-                let _ = fs::write(path, data);
+                let _ = write_atomic(path, cursor.get_ref(), *exclusive);
             }
         }
     }
@@ -290,6 +340,7 @@ impl FileSystem for LocalFs {
                     path: path.to_string(),
                     cursor: Cursor::new(Vec::new()),
                     committed: false,
+                    exclusive: false,
                 }))
             }
             OpenMode::Append => {
@@ -322,6 +373,7 @@ impl FileSystem for LocalFs {
                     path: path.to_string(),
                     cursor: Cursor::new(Vec::new()),
                     committed: false,
+                    exclusive: true,
                 }))
             }
         }
