@@ -11,6 +11,7 @@ import os
 
 import fsspec
 import pytest
+from fsspec.implementations.local import make_path_posix
 
 from fsspec_rs import LocalFile, LocalFileSystem, RustLocalFile, RustLocalFs
 
@@ -92,7 +93,7 @@ class TestInfo:
         path = os.path.join(tmp, "info.txt")
         fs.pipe_file(path, b"hello")
         info = fs.info(path)
-        assert info["name"] == path
+        assert info["name"] == make_path_posix(path)
         assert info["type"] == "file"
         assert info["size"] == 5
 
@@ -115,8 +116,8 @@ class TestLs:
         entries = fs.ls(tmp, detail=True)
         assert isinstance(entries, list)
         assert len(entries) >= 1
-        assert any(e["name"] == path for e in entries)
-        entry = next(e for e in entries if e["name"] == path)
+        assert any(e["name"] == make_path_posix(path) for e in entries)
+        entry = next(e for e in entries if e["name"] == make_path_posix(path))
         assert "modified" in entry
 
     def test_ls_names_only(self, fs, tmp):

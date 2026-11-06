@@ -260,8 +260,9 @@ impl FileSystem for LocalFs {
         "/"
     }
 
+    /// `/` on every platform: names use `/`, as in fsspec's local filesystem.
     fn sep(&self) -> &str {
-        std::path::MAIN_SEPARATOR_STR
+        "/"
     }
 
     fn ls(&self, path: &str, _detail: bool) -> FsResult<Vec<FileInfo>> {

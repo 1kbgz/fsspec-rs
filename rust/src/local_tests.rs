@@ -61,7 +61,7 @@ fn test_root_marker() {
 #[test]
 fn test_sep() {
     let fs = LocalFs::new();
-    assert_eq!(fs.sep(), std::path::MAIN_SEPARATOR_STR);
+    assert_eq!(fs.sep(), "/");
 }
 
 #[test]
@@ -81,7 +81,7 @@ fn test_unstrip_protocol() {
 #[test]
 fn test_parent() {
     let fs = LocalFs::new();
-    let sep = std::path::MAIN_SEPARATOR_STR;
+    let sep = fs.sep();
     let grandchild = format!("{sep}tmp{sep}foo{sep}bar");
     let parent_of_gc = format!("{sep}tmp{sep}foo");
     let child = format!("{sep}tmp");
