@@ -354,7 +354,7 @@ class TestWalkFind:
         sub = self._make_tree(fs, tmp)
         entries = list(fs.walk(sub, maxdepth=1))
         # maxdepth=1 → only the top-level directory
-        dirs = [e for e in entries if e[0] == sub]
+        dirs = [e for e in entries if e[0] == make_path_posix(sub)]
         assert len(dirs) == 1
 
 
