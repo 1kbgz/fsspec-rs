@@ -259,6 +259,12 @@ objects that implement <code class="docutils literal notranslate"><span class="p
 <p><code class="docutils literal notranslate"><span class="pre">auto_mkdir=True</span></code> creates missing parent directories for write, append,
 exclusive-create, and copy operations. With the default <code class="docutils literal notranslate"><span class="pre">auto_mkdir=False</span></code>,
 the operating system reports an error if a parent directory is missing.</p>
+<p><code class="docutils literal notranslate"><span class="pre">wb</span></code> and <code class="docutils literal notranslate"><span class="pre">xb</span></code> files are buffered in memory and written when the file is closed.
+The contents go to a temporary file next to the target, which is synced and
+then renamed over the target, so other readers see either the previous contents
+or the complete new contents. <code class="docutils literal notranslate"><span class="pre">flush()</span></code> does not make partial contents visible.
+<code class="docutils literal notranslate"><span class="pre">xb</span></code> fails at close if another writer created the file after it was opened.
+<code class="docutils literal notranslate"><span class="pre">ab</span></code> files append to the target directly.</p>
 </section>
 <section id="local-operations">
 <h3>Local operations<a class="headerlink" href="#local-operations" title="Link to this heading">¶</a></h3>

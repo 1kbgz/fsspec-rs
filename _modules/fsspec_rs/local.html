@@ -563,10 +563,24 @@ window.runMermaid = runMermaid;</script>
   <h1>Source code for fsspec_rs.local</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
 <span class="kn">import</span><span class="w"> </span><span class="nn">fsspec</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">fsspec.spec</span><span class="w"> </span><span class="kn">import</span> <span class="n">AbstractBufferedFile</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs.fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">RustLocalFs</span>
+
+<span class="n">_WINDOWS</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">==</span> <span class="s2">"</span><span class="se">\\</span><span class="s2">"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_posix</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Use "/" in paths, as fsspec's local filesystem does on Windows."""</span>
+    <span class="k">return</span> <span class="n">path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"</span><span class="se">\\</span><span class="s2">"</span><span class="p">,</span> <span class="s2">"/"</span><span class="p">)</span> <span class="k">if</span> <span class="n">_WINDOWS</span> <span class="k">else</span> <span class="n">path</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_posix_info</span><span class="p">(</span><span class="n">info</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="n">info</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_posix</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s2">"name"</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">info</span>
 
 
 <div class="viewcode-block" id="LocalFileSystem">
@@ -588,8 +602,9 @@ window.runMermaid = runMermaid;</script>
         <span class="k">for</span> <span class="n">proto</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">protocol</span><span class="p">:</span>
             <span class="n">prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">proto</span><span class="si">}</span><span class="s2">://"</span>
             <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">prefix</span><span class="p">):</span>
-                <span class="k">return</span> <span class="n">path</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span> <span class="p">:]</span>
-        <span class="k">return</span> <span class="n">path</span>
+                <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span> <span class="p">:]</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">_posix</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
 
 <div class="viewcode-block" id="LocalFileSystem.unstrip_protocol">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.unstrip_protocol">[docs]</a>
@@ -607,13 +622,14 @@ window.runMermaid = runMermaid;</script>
 <div class="viewcode-block" id="LocalFileSystem.ls">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.ls">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">ls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">detail</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">ls</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">detail</span><span class="o">=</span><span class="n">detail</span><span class="p">)</span></div>
+        <span class="n">entries</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">ls</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">detail</span><span class="o">=</span><span class="n">detail</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">_posix_info</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">entries</span><span class="p">]</span> <span class="k">if</span> <span class="n">detail</span> <span class="k">else</span> <span class="p">[</span><span class="n">_posix</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">entries</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.info">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.info">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="n">_posix_info</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">)))</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_open</span><span class="p">(</span>
@@ -629,7 +645,7 @@ window.runMermaid = runMermaid;</script>
 <span class="w">        </span><span class="sd">"""Return a Rust-backed file object."""</span>
         <span class="k">return</span> <span class="n">LocalFile</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
-            <span class="n">path</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
             <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span>
             <span class="n">cache_type</span><span class="o">=</span><span class="n">cache_type</span><span class="p">,</span>
             <span class="n">block_size</span><span class="o">=</span><span class="n">block_size</span><span class="p">,</span>
@@ -638,52 +654,52 @@ window.runMermaid = runMermaid;</script>
 <div class="viewcode-block" id="LocalFileSystem.mkdir">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.mkdir">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">mkdir</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">create_parents</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">create_parents</span><span class="o">=</span><span class="n">create_parents</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">create_parents</span><span class="o">=</span><span class="n">create_parents</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.makedirs">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.makedirs">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">makedirs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">exist_ok</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="n">exist_ok</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="n">exist_ok</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.rmdir">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.rmdir">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">rmdir</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">rmdir</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">rmdir</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.rm_file">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.rm_file">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">rm_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">rm_file</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">rm_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.rm">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.rm">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">rm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">recursive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">maxdepth</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">rm</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">recursive</span><span class="o">=</span><span class="n">recursive</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">rm</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">recursive</span><span class="o">=</span><span class="n">recursive</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">rm</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">recursive</span><span class="o">=</span><span class="n">recursive</span><span class="p">)</span></div>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">rm</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">p</span><span class="p">),</span> <span class="n">recursive</span><span class="o">=</span><span class="n">recursive</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.cp_file">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.cp_file">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">cp_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path1</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">path2</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">cp_file</span><span class="p">(</span><span class="n">path1</span><span class="p">,</span> <span class="n">path2</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">cp_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path1</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path2</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.copy">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.copy">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path1</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">path2</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">recursive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">path1</span><span class="p">,</span> <span class="n">path2</span><span class="p">,</span> <span class="n">recursive</span><span class="o">=</span><span class="n">recursive</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path1</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path2</span><span class="p">),</span> <span class="n">recursive</span><span class="o">=</span><span class="n">recursive</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.mv">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.mv">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">mv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path1</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">path2</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">mv</span><span class="p">(</span><span class="n">path1</span><span class="p">,</span> <span class="n">path2</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">mv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path1</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path2</span><span class="p">))</span></div>
 
 
     <span class="c1"># Higher-level helpers — delegated to Rust for speed</span>
@@ -691,98 +707,100 @@ window.runMermaid = runMermaid;</script>
 <div class="viewcode-block" id="LocalFileSystem.exists">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.exists">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">exists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.isdir">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.isdir">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">isdir</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.isfile">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.isfile">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">isfile</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.size">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.size">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.cat_file">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.cat_file">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">cat_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
-        <span class="k">return</span> <span class="nb">bytes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="n">end</span><span class="p">))</span></div>
+        <span class="k">return</span> <span class="nb">bytes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">start</span><span class="o">=</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="n">end</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.pipe_file">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.pipe_file">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">pipe_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">value</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.head">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.head">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">head</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
-        <span class="k">return</span> <span class="nb">bytes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">size</span><span class="p">))</span></div>
+        <span class="k">return</span> <span class="nb">bytes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">size</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.tail">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.tail">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">tail</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
-        <span class="k">return</span> <span class="nb">bytes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">size</span><span class="p">))</span></div>
+        <span class="k">return</span> <span class="nb">bytes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">size</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.touch">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.touch">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">touch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">truncate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">touch</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">truncate</span><span class="o">=</span><span class="n">truncate</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">touch</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">truncate</span><span class="o">=</span><span class="n">truncate</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.walk">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.walk">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">walk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">maxdepth</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">topdown</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="n">entries</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">max_depth</span><span class="o">=</span><span class="n">maxdepth</span><span class="p">,</span> <span class="n">topdown</span><span class="o">=</span><span class="n">topdown</span><span class="p">)</span>
-        <span class="k">yield from</span> <span class="n">entries</span></div>
+        <span class="n">entries</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">max_depth</span><span class="o">=</span><span class="n">maxdepth</span><span class="p">,</span> <span class="n">topdown</span><span class="o">=</span><span class="n">topdown</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">dirnames</span><span class="p">,</span> <span class="n">filenames</span> <span class="ow">in</span> <span class="n">entries</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">_posix</span><span class="p">(</span><span class="n">dirpath</span><span class="p">),</span> <span class="n">dirnames</span><span class="p">,</span> <span class="n">filenames</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.find">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.find">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">find</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">maxdepth</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">withdirs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">max_depth</span><span class="o">=</span><span class="n">maxdepth</span><span class="p">,</span> <span class="n">with_dirs</span><span class="o">=</span><span class="n">withdirs</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="p">[</span><span class="n">_posix</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">max_depth</span><span class="o">=</span><span class="n">maxdepth</span><span class="p">,</span> <span class="n">with_dirs</span><span class="o">=</span><span class="n">withdirs</span><span class="p">)]</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.du">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.du">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">du</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">total</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">maxdepth</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">du</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="n">total</span><span class="p">)</span></div>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">du</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">total</span><span class="o">=</span><span class="n">total</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span> <span class="k">if</span> <span class="n">total</span> <span class="k">else</span> <span class="p">{</span><span class="n">_posix</span><span class="p">(</span><span class="n">name</span><span class="p">):</span> <span class="n">size</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">size</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.read_text">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.read_text">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">read_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.write_text">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.write_text">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">write_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">value</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.get_file">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.get_file">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rpath</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">lpath</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">get_file</span><span class="p">(</span><span class="n">rpath</span><span class="p">,</span> <span class="n">lpath</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">get_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">rpath</span><span class="p">),</span> <span class="n">lpath</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.put_file">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.put_file">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">put_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lpath</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">rpath</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">put_file</span><span class="p">(</span><span class="n">lpath</span><span class="p">,</span> <span class="n">rpath</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">put_file</span><span class="p">(</span><span class="n">lpath</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">rpath</span><span class="p">))</span></div>
 </div>
 
 

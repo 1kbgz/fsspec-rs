@@ -160,6 +160,9 @@
   <li class="fd-toc-item" data-depth="1">
     <a href="#limit-memory-use-for-s3-reads">Limit memory use for S3 reads</a>
   </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#check-a-filesystem-as-a-records-store">Check a filesystem as a records store</a>
+  </li>
 </ul>
 </div>
   </div>
@@ -246,6 +249,32 @@ access, or <code class="docutils literal notranslate"><span class="pre">block</s
 fetch the whole object on first read. See the <a class="reference internal" href="filesystems.html"><span class="std std-doc">filesystem reference</span></a>
 for cache behavior and supported operations.</p>
 </section>
+<section id="check-a-filesystem-as-a-records-store">
+<h2>Check a filesystem as a records store<a class="headerlink" href="#check-a-filesystem-as-a-records-store" title="Link to this heading">¶</a></h2>
+<p>Applications that keep one file per record, such as <code class="docutils literal notranslate"><span class="pre">fsspec.get_mapper</span></code> stores,
+need atomic replacement, durable writes, complete listings, and
+<code class="docutils literal notranslate"><span class="pre">FileNotFoundError</span></code> for missing records. <code class="docutils literal notranslate"><span class="pre">fsspec_rs.testing.records</span></code> checks
+these guarantees for any fsspec URL. Import its tests into a test module and
+define a unique empty root and its storage options:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs.testing.records</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>  <span class="c1"># noqa: F403</span>
+
+
+<span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">records_url</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">):</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">"file-rs://</span><span class="si">{</span><span class="n">tmp_path</span><span class="si">}</span><span class="s2">/records"</span>
+
+
+<span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">records_storage_options</span><span class="p">():</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"auto_mkdir"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>Storage options must be JSON-serializable, because one test reopens the store
+in a separate process. <code class="docutils literal notranslate"><span class="pre">file-rs</span></code>, <code class="docutils literal notranslate"><span class="pre">s3-rs</span></code>, and <code class="docutils literal notranslate"><span class="pre">s3fs</span></code> pass. fsspec’s <code class="docutils literal notranslate"><span class="pre">file</span></code>
+protocol fails the replacement test because it writes directly to the target.</p>
+</section>
 </section>
 
 
@@ -292,6 +321,9 @@ for cache behavior and supported operations.</p>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#limit-memory-use-for-s3-reads">Limit memory use for S3 reads</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#check-a-filesystem-as-a-records-store">Check a filesystem as a records store</a>
   </li>
 </ul>
 

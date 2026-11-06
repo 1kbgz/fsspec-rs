@@ -86,3 +86,31 @@ The Python wrapper uses the Rust default of 32 cached blocks; it does not forwar
 access, or `block` for repeated random access. Use `all` only when you want to
 fetch the whole object on first read. See the [filesystem reference](filesystems.md)
 for cache behavior and supported operations.
+
+## Check a filesystem as a records store
+
+Applications that keep one file per record, such as `fsspec.get_mapper` stores,
+need atomic replacement, durable writes, complete listings, and
+`FileNotFoundError` for missing records. `fsspec_rs.testing.records` checks
+these guarantees for any fsspec URL. Import its tests into a test module and
+define a unique empty root and its storage options:
+
+```python
+import pytest
+
+from fsspec_rs.testing.records import *  # noqa: F403
+
+
+@pytest.fixture
+def records_url(tmp_path):
+    return f"file-rs://{tmp_path}/records"
+
+
+@pytest.fixture
+def records_storage_options():
+    return {"auto_mkdir": True}
+```
+
+Storage options must be JSON-serializable, because one test reopens the store
+in a separate process. `file-rs`, `s3-rs`, and `s3fs` pass. fsspec's `file`
+protocol fails the replacement test because it writes directly to the target.
