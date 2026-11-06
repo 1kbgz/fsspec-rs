@@ -74,6 +74,13 @@ with fs.open("/tmp/fsspec-rs/out.bin", "rb") as f:
 exclusive-create, and copy operations. With the default `auto_mkdir=False`,
 the operating system reports an error if a parent directory is missing.
 
+`wb` and `xb` files are buffered in memory and written when the file is closed.
+The contents go to a temporary file next to the target, which is synced and
+then renamed over the target, so other readers see either the previous contents
+or the complete new contents. `flush()` does not make partial contents visible.
+`xb` fails at close if another writer created the file after it was opened.
+`ab` files append to the target directly.
+
 ### Local operations
 
 Local filesystem methods delegated to Rust include:

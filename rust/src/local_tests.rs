@@ -906,3 +906,80 @@ fn test_auto_mkdir_on_cp_file() {
     fs.cp_file(&src, &dst).unwrap();
     assert_eq!(std::fs::read_to_string(&dst).unwrap(), "data");
 }
+
+// ======================================================================
+// Atomic writes
+// ======================================================================
+
+fn entries(dir: &std::path::Path) -> Vec<String> {
+    let mut names = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    names.sort();
+    names
+}
+
+#[test]
+fn test_write_is_invisible_until_commit() {
+    let dir = tmp_dir();
+    let path = join(dir.path(), "record");
+    let fs = LocalFs::new();
+    fs.pipe_file(&path, b"old").unwrap();
+
+    let mut f = fs.open(&path, OpenMode::Write, None).unwrap();
+    f.write_all(b"new value").unwrap();
+    f.flush().unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), b"old");
+
+    f.commit().unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), b"new value");
+    assert_eq!(entries(dir.path()), ["record"]);
+}
+
+#[test]
+fn test_discarded_write_leaves_target_unchanged() {
+    let dir = tmp_dir();
+    let path = join(dir.path(), "record");
+    let fs = LocalFs::new();
+    fs.pipe_file(&path, b"old").unwrap();
+
+    let mut f = fs.open(&path, OpenMode::Write, None).unwrap();
+    f.write_all(b"new").unwrap();
+    f.discard().unwrap();
+    drop(f);
+
+    assert_eq!(std::fs::read(&path).unwrap(), b"old");
+    assert_eq!(entries(dir.path()), ["record"]);
+}
+
+#[test]
+fn test_exclusive_commit_does_not_replace_file_created_after_open() {
+    let dir = tmp_dir();
+    let path = join(dir.path(), "record");
+    let fs = LocalFs::new();
+
+    let mut f = fs.open(&path, OpenMode::Exclusive, None).unwrap();
+    f.write_all(b"mine").unwrap();
+    std::fs::write(&path, b"theirs").unwrap();
+
+    assert!(matches!(f.commit(), Err(FsError::AlreadyExists(_))));
+    assert_eq!(std::fs::read(&path).unwrap(), b"theirs");
+    f.discard().unwrap();
+    drop(f);
+    assert_eq!(entries(dir.path()), ["record"]);
+}
+
+#[test]
+fn test_exclusive_commit_creates_file() {
+    let dir = tmp_dir();
+    let path = join(dir.path(), "record");
+    let fs = LocalFs::new();
+
+    let mut f = fs.open(&path, OpenMode::Exclusive, None).unwrap();
+    f.write_all(b"mine").unwrap();
+    f.commit().unwrap();
+
+    assert_eq!(std::fs::read(&path).unwrap(), b"mine");
+    assert_eq!(entries(dir.path()), ["record"]);
+}

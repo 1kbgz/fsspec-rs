@@ -229,6 +229,7 @@ version = "0.1.5"
 dependencies = [
  "bytes",
  "object_store",
+ "percent-encoding",
  "tempfile",
  "tokio",
  "url",

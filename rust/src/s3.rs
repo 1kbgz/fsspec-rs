@@ -49,6 +49,18 @@ fn to_object_path(key: &str) -> ObjectPath {
     ObjectPath::from(normalise_key(key))
 }
 
+/// The key as written, undoing the percent-encoding `ObjectPath::from` applies to each part.
+fn from_object_path(path: &ObjectPath) -> String {
+    path.parts()
+        .map(|part| {
+            percent_encoding::percent_decode_str(part.as_ref())
+                .decode_utf8_lossy()
+                .into_owned()
+        })
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 const S3_MIN_MULTIPART_PART_SIZE: usize = 5 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
@@ -310,7 +322,7 @@ impl FileSystem for S3Fs {
 
         // Subdirectories (common prefixes)
         for prefix in &result.common_prefixes {
-            let dir_name = prefix.as_ref().trim_end_matches('/');
+            let dir_name = from_object_path(prefix);
             entries.push(FileInfo {
                 name: format!("{}/{dir_name}", self.bucket),
                 size: 0,
@@ -323,7 +335,7 @@ impl FileSystem for S3Fs {
 
         // Files (objects)
         for obj in &result.objects {
-            let obj_key = obj.location.as_ref();
+            let obj_key = from_object_path(&obj.location);
             entries.push(FileInfo {
                 name: format!("{}/{obj_key}", self.bucket),
                 size: obj.size,
@@ -1074,6 +1086,19 @@ mod tests {
     use super::*;
     use object_store::memory::InMemory;
     use std::io::{Read, Write};
+
+    #[test]
+    fn object_paths_round_trip_keys_that_object_store_encodes() {
+        for key in [
+            "ns/a%2Fb",
+            "ns/100%25",
+            "ns/with space",
+            "ns/UPPER-lower_~",
+            "ns/%E2%9C%93",
+        ] {
+            assert_eq!(from_object_path(&to_object_path(key)), key);
+        }
+    }
 
     #[test]
     fn put_object_honors_exclusive_create() {
