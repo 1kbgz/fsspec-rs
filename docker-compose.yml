@@ -13,28 +13,17 @@
 
 services:
   minio:
-    image: minio/minio:latest
+    # docker.io/minio/minio is no longer published; this image bundles the server and mc.
+    image: docker.io/bitnamilegacy/minio:2025.5.24
     ports:
       - "9000:9000"
       - "9001:9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
+      MINIO_DEFAULT_BUCKETS: benchmark
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  # One-shot container to create the benchmark bucket on startup
-  minio-setup:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 minioadmin minioadmin &&
-      mc mb --ignore-existing local/benchmark
-      "
