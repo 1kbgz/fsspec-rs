@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import fsspec
 from fsspec.spec import AbstractBufferedFile
 
@@ -23,7 +25,11 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
         for proto in cls.protocol:
             prefix = f"{proto}://"
             if path.startswith(prefix):
-                return path[len(prefix) :]
+                path = path[len(prefix) :]
+                break
+        # Match fsspec's local filesystem, which uses "/" on Windows too.
+        if os.sep == "\\":
+            path = path.replace("\\", "/")
         return path
 
     def unstrip_protocol(self, path):

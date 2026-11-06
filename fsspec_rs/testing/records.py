@@ -20,6 +20,9 @@ Import the tests into a test module and define two fixtures:
     def records_storage_options():
         return {"auto_mkdir": True}
 
+Windows removes trailing dots and spaces from file names, so portable callers must
+encode them as well.
+
 ``records_url`` must name an empty root that is unique to the test.
 ``records_storage_options`` must be JSON-serializable because one test reopens the store
 in a separate process. Filesystems that need parent directories created before writing
@@ -50,7 +53,7 @@ __all__ = (
 )
 
 BINARY = bytes(range(256))
-ENCODED_KEYS = ("a%2Fb", "with%20space", "100%25", "%E2%9C%93", "plus%2Bequals%3D", "dots..", "UPPER-lower_~")
+ENCODED_KEYS = ("a%2Fb", "with%20space", "100%25", "%E2%9C%93", "plus%2Bequals%3D", "dots..inside", "UPPER-lower_~")
 
 
 @pytest.fixture
