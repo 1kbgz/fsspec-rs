@@ -210,18 +210,6 @@ impl Default for LocalFs {
 }
 
 /// Convert `std::fs::Metadata` into `FileInfo`.
-/// Uses `/` as the separator in returned names, as fsspec's local filesystem does.
-/// Windows accepts `/`, so these names can be passed back to `LocalFs`.
-#[cfg(windows)]
-fn posix_path(path: &str) -> String {
-    path.replace('\\', "/")
-}
-
-#[cfg(not(windows))]
-fn posix_path(path: &str) -> String {
-    path.to_string()
-}
-
 fn metadata_to_info(path: &str, meta: &fs::Metadata) -> FileInfo {
     let file_type = if meta.is_dir() {
         FileType::Directory
@@ -234,7 +222,7 @@ fn metadata_to_info(path: &str, meta: &fs::Metadata) -> FileInfo {
     let size = if meta.is_file() { meta.len() } else { 0 };
 
     FileInfo {
-        name: posix_path(path),
+        name: path.to_string(),
         size,
         file_type,
         created: meta.created().ok(),
@@ -260,9 +248,8 @@ impl FileSystem for LocalFs {
         "/"
     }
 
-    /// `/` on every platform: names use `/`, as in fsspec's local filesystem.
     fn sep(&self) -> &str {
-        "/"
+        std::path::MAIN_SEPARATOR_STR
     }
 
     fn ls(&self, path: &str, _detail: bool) -> FsResult<Vec<FileInfo>> {

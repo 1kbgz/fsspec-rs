@@ -7,6 +7,18 @@ from fsspec.spec import AbstractBufferedFile
 
 from fsspec_rs.fsspec_rs import RustLocalFs
 
+_WINDOWS = os.sep == "\\"
+
+
+def _posix(path: str) -> str:
+    """Use "/" in paths, as fsspec's local filesystem does on Windows."""
+    return path.replace("\\", "/") if _WINDOWS else path
+
+
+def _posix_info(info: dict) -> dict:
+    info["name"] = _posix(info["name"])
+    return info
+
 
 class LocalFileSystem(fsspec.AbstractFileSystem):
     """Local filesystem backed by the Rust ``LocalFs`` implementation.
@@ -27,10 +39,7 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
             if path.startswith(prefix):
                 path = path[len(prefix) :]
                 break
-        # Match fsspec's local filesystem, which uses "/" on Windows too.
-        if os.sep == "\\":
-            path = path.replace("\\", "/")
-        return path
+        return _posix(path)
 
     def unstrip_protocol(self, path):
         return f"{self.protocol[0]}://{path}"
@@ -43,10 +52,11 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
     # Core primitives — delegated to Rust
 
     def ls(self, path: str, detail: bool = True, **kwargs):
-        return self._rust.ls(self._strip_protocol(path), detail=detail)
+        entries = self._rust.ls(self._strip_protocol(path), detail=detail)
+        return [_posix_info(entry) for entry in entries] if detail else [_posix(name) for name in entries]
 
     def info(self, path: str, **kwargs):
-        return self._rust.info(self._strip_protocol(path))
+        return _posix_info(self._rust.info(self._strip_protocol(path)))
 
     def _open(
         self,
@@ -125,13 +135,15 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
 
     def walk(self, path: str, maxdepth=None, topdown: bool = True, **kwargs):
         entries = self._rust.walk(self._strip_protocol(path), max_depth=maxdepth, topdown=topdown)
-        yield from entries
+        for dirpath, dirnames, filenames in entries:
+            yield _posix(dirpath), dirnames, filenames
 
     def find(self, path: str, maxdepth=None, withdirs: bool = False, **kwargs):
-        return self._rust.find(self._strip_protocol(path), max_depth=maxdepth, with_dirs=withdirs)
+        return [_posix(name) for name in self._rust.find(self._strip_protocol(path), max_depth=maxdepth, with_dirs=withdirs)]
 
     def du(self, path: str, total: bool = True, maxdepth=None, **kwargs):
-        return self._rust.du(self._strip_protocol(path), total=total)
+        result = self._rust.du(self._strip_protocol(path), total=total)
+        return result if total else {_posix(name): size for name, size in result.items()}
 
     def read_text(self, path: str, encoding=None, errors=None, newline=None, **kwargs) -> str:
         return self._rust.read_text(self._strip_protocol(path))

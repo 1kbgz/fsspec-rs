@@ -61,7 +61,7 @@ fn test_root_marker() {
 #[test]
 fn test_sep() {
     let fs = LocalFs::new();
-    assert_eq!(fs.sep(), "/");
+    assert_eq!(fs.sep(), std::path::MAIN_SEPARATOR_STR);
 }
 
 #[test]
@@ -81,7 +81,7 @@ fn test_unstrip_protocol() {
 #[test]
 fn test_parent() {
     let fs = LocalFs::new();
-    let sep = fs.sep();
+    let sep = std::path::MAIN_SEPARATOR_STR;
     let grandchild = format!("{sep}tmp{sep}foo{sep}bar");
     let parent_of_gc = format!("{sep}tmp{sep}foo");
     let child = format!("{sep}tmp");
@@ -982,21 +982,4 @@ fn test_exclusive_commit_creates_file() {
 
     assert_eq!(std::fs::read(&path).unwrap(), b"mine");
     assert_eq!(entries(dir.path()), ["record"]);
-}
-
-#[cfg(windows)]
-#[test]
-fn test_names_use_forward_slashes_on_windows() {
-    let dir = tmp_dir();
-    let fs = LocalFs::new();
-    let path = join(dir.path(), "record");
-    fs.pipe_file(&path, b"x").unwrap();
-
-    let listed = fs.ls(dir.path().to_str().unwrap(), true).unwrap();
-    assert!(
-        listed.iter().all(|info| !info.name.contains('\\')),
-        "{listed:?}"
-    );
-    assert!(!fs.info(&path).unwrap().name.contains('\\'));
-    assert_eq!(fs.cat_file(&listed[0].name, None, None).unwrap(), b"x");
 }
