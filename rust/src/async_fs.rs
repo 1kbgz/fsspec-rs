@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::error::{FsError, FsResult};
 use crate::file::FsFile;
+use crate::fs::byte_range;
 use crate::types::{DuResult, FileInfo, FileType, OpenMode, OpenOptions, WalkEntry};
 
 /// Async filesystem trait. Mirrors [`super::fs::FileSystem`] but with
@@ -164,18 +165,16 @@ pub trait AsyncFileSystem: Send + Sync {
     ) -> FsResult<Vec<u8>> {
         use std::io::{Read, Seek, SeekFrom};
         let mut f = self.open(path, OpenMode::Read, None).await?;
-        let file_size = f.size()?.unwrap_or(0) as i64;
-
-        let actual_start = match start {
-            Some(s) if s < 0 => (file_size + s).max(0) as u64,
-            Some(s) => s as u64,
-            None => 0,
+        let Some(file_size) = f.size()? else {
+            // Without a known size, read everything and take the range afterwards.
+            let mut data = Vec::new();
+            f.read_to_end(&mut data)?;
+            let (start, end) = byte_range(data.len() as u64, start, end);
+            data.truncate(end as usize);
+            data.drain(..start as usize);
+            return Ok(data);
         };
-        let actual_end = match end {
-            Some(e) if e < 0 => (file_size + e).max(0) as u64,
-            Some(e) => e as u64,
-            None => file_size as u64,
-        };
+        let (actual_start, actual_end) = byte_range(file_size, start, end);
 
         if actual_start > 0 {
             f.seek(SeekFrom::Start(actual_start))?;

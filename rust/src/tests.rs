@@ -52,7 +52,11 @@ impl FsFile for MockFile {
         Ok(FileInfo::file(&self.name, size))
     }
 
+    /// Files under `/stream/` report an unknown size, like data encoded while it is read.
     fn size(&self) -> FsResult<Option<u64>> {
+        if self.name.starts_with("/stream/") {
+            return Ok(None);
+        }
         let store = self.store.lock().unwrap();
         Ok(store.get(&self.name).map(|d| d.len() as u64))
     }
@@ -443,6 +447,27 @@ fn test_cat_file_negative_range() {
     let fs = MockFs::new().with_files(&[("/tmp/a.txt", b"hello world")]);
     let data = fs.cat_file("/tmp/a.txt", Some(-5), None).unwrap();
     assert_eq!(data, b"world");
+}
+
+#[test]
+fn test_cat_file_unknown_size() {
+    let fs = MockFs::new().with_files(&[("/stream/a.txt", b"hello world")]);
+    let cat = |start, end| fs.cat_file("/stream/a.txt", start, end).unwrap();
+    assert_eq!(cat(None, None), b"hello world");
+    assert_eq!(cat(Some(-5), None), b"world");
+    assert_eq!(cat(Some(2), Some(-6)), b"llo");
+}
+
+#[test]
+fn test_cat_file_end_before_start() {
+    let fs = MockFs::new().with_files(&[
+        ("/tmp/a.txt", b"hello world"),
+        ("/stream/a.txt", b"hello world"),
+    ]);
+    for path in ["/tmp/a.txt", "/stream/a.txt"] {
+        assert!(fs.cat_file(path, Some(5), Some(2)).unwrap().is_empty());
+        assert!(fs.cat_file(path, Some(20), None).unwrap().is_empty());
+    }
 }
 
 #[test]
