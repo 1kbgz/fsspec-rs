@@ -45,7 +45,7 @@ develop = [
     "hatchling",
     "laxate",
     "mdformat",
-    "mdformat-frontmatter",
+    "mdformat-myst",
     "mdformat-tables>=1",
     "pytest",
     "pytest-benchmark",
