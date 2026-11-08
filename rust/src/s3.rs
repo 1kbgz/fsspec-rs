@@ -11,7 +11,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use object_store::aws::AmazonS3Builder;
 use object_store::path::Path as ObjectPath;
-use object_store::{MultipartUpload, ObjectStore, PutMode, PutPayload};
+use object_store::{MultipartUpload, ObjectStore, ObjectStoreExt, PutMode, PutPayload};
 use tokio::runtime::Runtime;
 
 use crate::buffered::BufferedFile;

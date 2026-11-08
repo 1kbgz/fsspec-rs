@@ -9,7 +9,7 @@ def test_cargo_license_bundle_contains_dependency_texts():
     assert bundle["root_name"] == "fsspec_rs_py"
     libraries = bundle["third_party_libraries"]
     assert {"fsspec_rs", "pyo3", "object_store", "tokio"} <= {library["package_name"] for library in libraries}
-    assert {library["package_version"] for library in libraries if library["package_name"] == "r-efi"} == {"5.3.0", "6.0.0"}
+    assert {library["package_version"] for library in libraries if library["package_name"] == "r-efi"} == {"6.0.0"}
     for library in libraries:
         assert library["licenses"], library["package_name"]
         for license in library["licenses"]:

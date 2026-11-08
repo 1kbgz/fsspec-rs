@@ -14,7 +14,7 @@ path = "src/lib.rs"
 crate-type = ["rlib"]
 
 [dependencies]
-object_store = { version = "0.12", features = ["aws"] }
+object_store = { version = "0.14", features = ["aws"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
 bytes = "1"
 url = "2"
