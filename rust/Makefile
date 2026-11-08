@@ -31,11 +31,7 @@ checks: check
 
 .PHONY: test tests test-ci tests-ci
 test:  ## run the tests
-<<<<<<< before updating
-	cargo llvm-cov nextest --workspace --cobertura --output-path  junit.xml
-=======
-	cargo llvm-cov nextest --cobertura --output-path coverage.xml
->>>>>>> after updating
+	cargo llvm-cov nextest --workspace --cobertura --output-path coverage.xml
 
 # alias
 tests: test
