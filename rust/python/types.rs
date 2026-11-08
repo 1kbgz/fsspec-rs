@@ -11,7 +11,7 @@ use fsspec_rs::FsError;
 // ---- FileType ----
 
 /// Python-visible enum for file types.
-#[pyclass(name = "FileType", skip_from_py_object)]
+#[pyclass(name = "FileType")]
 #[derive(Clone, Debug)]
 pub struct PyFileType {
     inner: FileType,
@@ -78,7 +78,7 @@ impl PyFileType {
 // ---- FileInfo ----
 
 /// Python-visible file metadata, analogous to the dict returned by fsspec's info().
-#[pyclass(name = "FileInfo", skip_from_py_object)]
+#[pyclass(name = "FileInfo")]
 #[derive(Clone, Debug)]
 pub struct PyFileInfo {
     inner: FileInfo,
