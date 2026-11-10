@@ -11,6 +11,7 @@ pub mod buffered;
 pub mod caching;
 pub mod error;
 pub mod file;
+pub mod registry;
 pub mod types;
 
 mod async_fs;
@@ -23,6 +24,8 @@ mod cache_tests;
 #[cfg(test)]
 mod local_tests;
 #[cfg(test)]
+mod registry_tests;
+#[cfg(test)]
 mod s3_tests;
 #[cfg(test)]
 mod tests;
@@ -34,5 +37,9 @@ pub use error::{FsError, FsResult};
 pub use file::FsFile;
 pub use fs::FileSystem;
 pub use local::{LocalFile, LocalFs};
+pub use registry::{
+    register_filesystem, url_to_fs, FilesystemFactory, FilesystemRegistry, FsOptions,
+    SharedFileSystem, DEFAULT_FILESYSTEMS,
+};
 pub use s3::{S3Config, S3File, S3Fs};
 pub use types::{DuResult, FileInfo, FileType, OpenMode, OpenOptions, WalkEntry};
