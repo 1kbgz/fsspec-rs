@@ -6,171 +6,22 @@ use std::ffi::{c_char, c_void, CStr};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::mem::{size_of, MaybeUninit};
 use std::ptr;
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use fsspec_rs::{
     FileInfo, FileSystem, FilesystemFactory, FsError, FsFile, FsOptions, FsResult, OpenMode,
     OpenOptions, SharedFileSystem, DEFAULT_FILESYSTEMS,
 };
-
-use crate::file::fsspec_file;
-use crate::filesystem::fsspec_fs;
-use crate::memory::{fsspec_file_info, fsspec_file_info_list, fsspec_string, fsspec_string_list};
-use crate::options::fsspec_options;
-use crate::status::{
-    check, fsspec_status, guard, guard_ptr, invalid, io_error, str_arg, write_out,
-    FSSPEC_ABI_VERSION,
+use fsspec_sys::types::{
+    fsspec_file, fsspec_file_info, fsspec_file_info_list, fsspec_file_vtable, fsspec_fs,
+    fsspec_fs_factory, fsspec_fs_vtable, fsspec_options, fsspec_status, fsspec_string,
+    fsspec_string_list,
 };
 
-/// Builds filesystems for one protocol. `struct_size` is
-/// `sizeof(fsspec_fs_factory)` and `abi_version` is `FSSPEC_ABI_VERSION` as
-/// seen by the caller; new members are appended, so older callers keep
-/// working. `create` receives the URL path without `protocol://` and returns
-/// a handle from `fsspec_fs_from_vtable` or another `fsspec_fs` function.
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct fsspec_fs_factory {
-    pub struct_size: usize,
-    pub abi_version: u32,
-    pub data: *mut c_void,
-    pub create: Option<
-        unsafe extern "C" fn(
-            data: *mut c_void,
-            path: *const c_char,
-            path_len: usize,
-            options: *const fsspec_options,
-            out: *mut *mut fsspec_fs,
-        ) -> fsspec_status,
-    >,
-    /// The part of the path that needs its own instance, such as a bucket.
-    /// Optional; the registry caches one instance per protocol, scope, and
-    /// option set.
-    pub instance_scope: Option<
-        unsafe extern "C" fn(
-            data: *mut c_void,
-            path: *const c_char,
-            path_len: usize,
-            out: *mut fsspec_string,
-        ) -> fsspec_status,
-    >,
-    pub release: Option<unsafe extern "C" fn(data: *mut c_void)>,
-}
-
-/// A foreign filesystem. `protocol` is a NUL-terminated, comma-separated list
-/// such as `"file,local"`; `root_marker` and `sep` may be null. The
-/// operations mirror the `FileSystem` primitives; everything else is derived
-/// from them. Output values are allocated with libfsspec's own functions and
-/// freed by libfsspec.
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct fsspec_fs_vtable {
-    pub struct_size: usize,
-    pub abi_version: u32,
-    pub protocol: *const c_char,
-    pub root_marker: *const c_char,
-    pub sep: *const c_char,
-    pub ls: Option<
-        unsafe extern "C" fn(
-            data: *mut c_void,
-            path: *const c_char,
-            path_len: usize,
-            detail: bool,
-            out: *mut fsspec_file_info_list,
-        ) -> fsspec_status,
-    >,
-    pub info: Option<
-        unsafe extern "C" fn(
-            data: *mut c_void,
-            path: *const c_char,
-            path_len: usize,
-            out: *mut fsspec_file_info,
-        ) -> fsspec_status,
-    >,
-    pub rm_file: Option<
-        unsafe extern "C" fn(
-            data: *mut c_void,
-            path: *const c_char,
-            path_len: usize,
-        ) -> fsspec_status,
-    >,
-    pub cp_file: Option<
-        unsafe extern "C" fn(
-            data: *mut c_void,
-            src: *const c_char,
-            src_len: usize,
-            dst: *const c_char,
-            dst_len: usize,
-        ) -> fsspec_status,
-    >,
-    pub mkdir: Option<
-        unsafe extern "C" fn(
-            data: *mut c_void,
-            path: *const c_char,
-            path_len: usize,
-            create_parents: bool,
-        ) -> fsspec_status,
-    >,
-    pub rmdir: Option<
-        unsafe extern "C" fn(
-            data: *mut c_void,
-            path: *const c_char,
-            path_len: usize,
-        ) -> fsspec_status,
-    >,
-    pub open: Option<
-        unsafe extern "C" fn(
-            data: *mut c_void,
-            path: *const c_char,
-            path_len: usize,
-            mode: *const c_char,
-            mode_len: usize,
-            out: *mut *mut fsspec_file,
-        ) -> fsspec_status,
-    >,
-    pub release: Option<unsafe extern "C" fn(data: *mut c_void)>,
-}
-
-/// A foreign open file. `read` and `write` move at most `len` bytes and
-/// report the count; `seek` takes `whence` as in `fseek`. `size` reports -1
-/// when unknown. Optional members may be null.
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct fsspec_file_vtable {
-    pub struct_size: usize,
-    pub abi_version: u32,
-    pub read: Option<
-        unsafe extern "C" fn(
-            data: *mut c_void,
-            buf: *mut u8,
-            len: usize,
-            out_read: *mut usize,
-        ) -> fsspec_status,
-    >,
-    pub write: Option<
-        unsafe extern "C" fn(
-            data: *mut c_void,
-            buf: *const u8,
-            len: usize,
-            out_written: *mut usize,
-        ) -> fsspec_status,
-    >,
-    pub seek: Option<
-        unsafe extern "C" fn(
-            data: *mut c_void,
-            offset: i64,
-            whence: i32,
-            out_position: *mut u64,
-        ) -> fsspec_status,
-    >,
-    pub flush: Option<unsafe extern "C" fn(data: *mut c_void) -> fsspec_status>,
-    pub size: Option<unsafe extern "C" fn(data: *mut c_void, out_size: *mut i64) -> fsspec_status>,
-    pub info: Option<
-        unsafe extern "C" fn(data: *mut c_void, out: *mut fsspec_file_info) -> fsspec_status,
-    >,
-    pub commit: Option<unsafe extern "C" fn(data: *mut c_void) -> fsspec_status>,
-    pub discard: Option<unsafe extern "C" fn(data: *mut c_void) -> fsspec_status>,
-    pub release: Option<unsafe extern "C" fn(data: *mut c_void)>,
-}
+use crate::file::FileData;
+use crate::filesystem::FsData;
+use crate::options::OptionsData;
+use crate::status::{check, guard, guard_ptr, invalid, str_arg, write_out, FSSPEC_ABI_VERSION};
 
 /// Copies a versioned struct, honoring the caller's `struct_size` so a
 /// shorter struct from an older header reads as zero-filled.
@@ -236,7 +87,7 @@ impl FilesystemFactory for ForeignFactory {
         let create = self.factory.create.ok_or_else(|| {
             FsError::NotSupported("foreign factory has no create function".to_string())
         })?;
-        let options = fsspec_options {
+        let options = OptionsData {
             inner: options.clone(),
         };
         let mut out: *mut fsspec_fs = ptr::null_mut();
@@ -245,7 +96,7 @@ impl FilesystemFactory for ForeignFactory {
                 self.factory.data,
                 path.as_ptr() as *const c_char,
                 path.len(),
-                &options,
+                &options as *const OptionsData as *const fsspec_options,
                 &mut out,
             )
         };
@@ -255,7 +106,7 @@ impl FilesystemFactory for ForeignFactory {
                 "foreign factory returned no filesystem".to_string(),
             ));
         }
-        Ok(unsafe { Box::from_raw(out) }.inner)
+        Ok(unsafe { FsData::from_raw(out) }.inner)
     }
 
     fn instance_scope(&self, path: &str) -> String {
@@ -339,7 +190,9 @@ impl FileSystem for ForeignFileSystem {
             },
             "ls",
         )?;
-        Ok(unsafe { out.into_infos() })
+        let entries = unsafe { out.to_infos() };
+        unsafe { out.free() };
+        Ok(entries)
     }
 
     fn rm_file(&self, path: &str) -> FsResult<()> {
@@ -393,7 +246,7 @@ impl FileSystem for ForeignFileSystem {
                 "foreign backend returned no file".to_string(),
             ));
         }
-        Ok(unsafe { Box::from_raw(out) }.inner)
+        Ok(unsafe { FileData::from_raw(out) }.inner)
     }
 
     fn info(&self, path: &str) -> FsResult<FileInfo> {
@@ -410,7 +263,10 @@ impl FileSystem for ForeignFileSystem {
             },
             "info",
         )?;
-        Ok(unsafe { out.assume_init().into_info() })
+        let out = unsafe { out.assume_init() };
+        let entry = unsafe { out.to_info() };
+        unsafe { out.free() };
+        Ok(entry)
     }
 
     fn mkdir(&self, path: &str, create_parents: bool) -> FsResult<()> {
@@ -469,7 +325,7 @@ impl Read for ForeignFile {
             unsafe { read(self.data, buf.as_mut_ptr(), buf.len(), &mut count) },
             "read",
         )
-        .map_err(io_error)?;
+        .map_err(fsspec_sys::io_error)?;
         Ok(count.min(buf.len()))
     }
 }
@@ -485,13 +341,15 @@ impl Write for ForeignFile {
             unsafe { write(self.data, buf.as_ptr(), buf.len(), &mut count) },
             "write",
         )
-        .map_err(io_error)?;
+        .map_err(fsspec_sys::io_error)?;
         Ok(count.min(buf.len()))
     }
 
     fn flush(&mut self) -> io::Result<()> {
         match self.vtable.flush {
-            Some(flush) => check(unsafe { flush(self.data) }, "flush").map_err(io_error),
+            Some(flush) => {
+                check(unsafe { flush(self.data) }, "flush").map_err(fsspec_sys::io_error)
+            }
             None => Ok(()),
         }
     }
@@ -514,7 +372,7 @@ impl Seek for ForeignFile {
             unsafe { seek(self.data, offset, whence, &mut position) },
             "seek",
         )
-        .map_err(io_error)?;
+        .map_err(fsspec_sys::io_error)?;
         Ok(position)
     }
 }
@@ -526,7 +384,10 @@ impl FsFile for ForeignFile {
         })?;
         let mut out = MaybeUninit::<fsspec_file_info>::zeroed();
         check(unsafe { info(self.data, out.as_mut_ptr()) }, "info")?;
-        Ok(unsafe { out.assume_init().into_info() })
+        let out = unsafe { out.assume_init() };
+        let entry = unsafe { out.to_info() };
+        unsafe { out.free() };
+        Ok(entry)
     }
 
     fn size(&self) -> FsResult<Option<u64>> {
@@ -621,7 +482,7 @@ pub unsafe extern "C" fn fsspec_fs_from_vtable(
             data,
             protocols,
         };
-        Ok(fsspec_fs::into_raw(std::sync::Arc::new(fs)))
+        Ok(FsData::into_raw(Arc::new(fs)))
     })
 }
 
@@ -635,9 +496,6 @@ pub unsafe extern "C" fn fsspec_file_from_vtable(
 ) -> *mut fsspec_file {
     guard_ptr(|| {
         let vtable = copy_versioned(vtable, "file vtable")?;
-        Ok(fsspec_file::into_raw(Box::new(ForeignFile {
-            vtable,
-            data,
-        })))
+        Ok(FileData::into_raw(Box::new(ForeignFile { vtable, data })))
     })
 }

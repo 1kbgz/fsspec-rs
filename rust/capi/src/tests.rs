@@ -6,6 +6,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use fsspec_rs::{FileSystem, FsError, FsFile, LocalFs, OpenMode};
 
+use crate::file::FileData;
+use crate::options::OptionsData;
+use crate::status::{guard, invalid, str_arg, write_out};
 use crate::*;
 
 fn arg(text: &str) -> (*const c_char, usize) {
@@ -101,6 +104,7 @@ fn file_url(dir: &std::path::Path) -> String {
 #[test]
 fn abi_version_matches_header_constant() {
     assert_eq!(fsspec_abi_version(), FSSPEC_ABI_VERSION);
+    assert_eq!(FSSPEC_ABI_VERSION, fsspec_sys::FSSPEC_ABI_VERSION);
     assert_eq!(FSSPEC_OK as i32, 0);
     assert_eq!(FSSPEC_OTHER as i32, 9);
 }
@@ -114,7 +118,10 @@ fn options_round_trip() {
         unsafe { fsspec_options_set(options, key, key_len, value, value_len) },
         FSSPEC_OK
     );
-    assert_eq!(unsafe { &(*options).inner }["auto_mkdir"], "true");
+    assert_eq!(
+        unsafe { &(*(options as *const OptionsData)).inner }["auto_mkdir"],
+        "true"
+    );
     assert_eq!(
         unsafe { fsspec_options_set(ptr::null_mut(), key, key_len, value, value_len) },
         FSSPEC_INVALID_ARGUMENT
@@ -386,7 +393,7 @@ unsafe extern "C" fn vt_open(
         let mode =
             OpenMode::from_str_mode(str_arg(mode, mode_len)?).ok_or_else(|| invalid("bad mode"))?;
         let file = local(data).open(str_arg(path, len)?, mode, None)?;
-        write_out(out, fsspec_file::into_raw(file))
+        write_out(out, FileData::into_raw(file))
     })
 }
 
@@ -421,7 +428,7 @@ unsafe extern "C" fn factory_create(
     out: *mut *mut fsspec_fs,
 ) -> fsspec_status {
     guard(|| {
-        let auto_mkdir = (*options)
+        let auto_mkdir = (*(options as *const OptionsData))
             .inner
             .get("auto_mkdir")
             .is_some_and(|value| value == "true");
@@ -707,7 +714,7 @@ fn foreign_file_round_trip() {
         cursor: Cursor::new(b"rust".to_vec()),
         released: &mut released,
     })) as *mut c_void;
-    let file = unsafe { Box::from_raw(fsspec_file_from_vtable(&vtable, data)) };
+    let file = unsafe { FileData::from_raw(fsspec_file_from_vtable(&vtable, data)) };
     let mut inner: Box<dyn FsFile> = file.inner;
     let mut text = String::new();
     inner.read_to_string(&mut text).unwrap();

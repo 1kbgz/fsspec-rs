@@ -1,33 +1,16 @@
 use std::cell::RefCell;
 use std::ffi::{c_char, CString};
-use std::io;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 use std::slice;
 
 use fsspec_rs::{FsError, FsResult};
+use fsspec_sys::types::fsspec_status;
+use fsspec_sys::types::fsspec_status::*;
 
 /// The ABI version of this header and library. A caller built against a
 /// different version must not use the library.
 pub const FSSPEC_ABI_VERSION: u32 = 1;
-
-/// Status returned by every entry point. Non-zero values mirror `FsError`.
-#[repr(i32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum fsspec_status {
-    FSSPEC_OK = 0,
-    FSSPEC_NOT_FOUND = 1,
-    FSSPEC_PERMISSION_DENIED = 2,
-    FSSPEC_ALREADY_EXISTS = 3,
-    FSSPEC_NOT_A_DIRECTORY = 4,
-    FSSPEC_IS_A_DIRECTORY = 5,
-    FSSPEC_IO = 6,
-    FSSPEC_INVALID_ARGUMENT = 7,
-    FSSPEC_NOT_SUPPORTED = 8,
-    FSSPEC_OTHER = 9,
-}
-
-pub use fsspec_status::*;
 
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
@@ -47,58 +30,14 @@ fn take_last_error() -> Option<String> {
     })
 }
 
-pub(crate) fn status_code(error: &FsError) -> fsspec_status {
-    match error {
-        FsError::NotFound(_) => FSSPEC_NOT_FOUND,
-        FsError::PermissionDenied(_) => FSSPEC_PERMISSION_DENIED,
-        FsError::AlreadyExists(_) => FSSPEC_ALREADY_EXISTS,
-        FsError::NotADirectory(_) => FSSPEC_NOT_A_DIRECTORY,
-        FsError::IsADirectory(_) => FSSPEC_IS_A_DIRECTORY,
-        FsError::IoError(_) => FSSPEC_IO,
-        FsError::InvalidArgument(_) => FSSPEC_INVALID_ARGUMENT,
-        FsError::NotSupported(_) => FSSPEC_NOT_SUPPORTED,
-        FsError::Other(_) => FSSPEC_OTHER,
-    }
-}
-
-/// The error a foreign callback reported through its status and, when it set
-/// one, the thread's last error message.
-pub(crate) fn error_from_status(status: fsspec_status, context: &str) -> FsError {
-    let message = take_last_error()
-        .unwrap_or_else(|| format!("{context} failed with status {}", status as i32));
-    match status {
-        FSSPEC_OK | FSSPEC_OTHER => FsError::Other(message),
-        FSSPEC_NOT_FOUND => FsError::NotFound(message),
-        FSSPEC_PERMISSION_DENIED => FsError::PermissionDenied(message),
-        FSSPEC_ALREADY_EXISTS => FsError::AlreadyExists(message),
-        FSSPEC_NOT_A_DIRECTORY => FsError::NotADirectory(message),
-        FSSPEC_IS_A_DIRECTORY => FsError::IsADirectory(message),
-        FSSPEC_IO => FsError::IoError(io::Error::other(message)),
-        FSSPEC_INVALID_ARGUMENT => FsError::InvalidArgument(message),
-        FSSPEC_NOT_SUPPORTED => FsError::NotSupported(message),
-    }
-}
-
 /// Turns a foreign status into a result, consuming the thread's error message.
 pub(crate) fn check(status: fsspec_status, context: &str) -> FsResult<()> {
     if status == FSSPEC_OK {
-        Ok(())
-    } else {
-        Err(error_from_status(status, context))
+        return Ok(());
     }
-}
-
-pub(crate) fn io_error(error: FsError) -> io::Error {
-    let kind = match &error {
-        FsError::NotFound(_) => io::ErrorKind::NotFound,
-        FsError::PermissionDenied(_) => io::ErrorKind::PermissionDenied,
-        FsError::AlreadyExists(_) => io::ErrorKind::AlreadyExists,
-        FsError::InvalidArgument(_) => io::ErrorKind::InvalidInput,
-        FsError::NotSupported(_) => io::ErrorKind::Unsupported,
-        FsError::IoError(inner) => inner.kind(),
-        _ => io::ErrorKind::Other,
-    };
-    io::Error::new(kind, error.to_string())
+    let message = take_last_error()
+        .unwrap_or_else(|| format!("{context} failed with status {}", status as i32));
+    Err(fsspec_sys::error_from_status(status, message))
 }
 
 /// Runs an entry point, converting errors and panics into a status.
@@ -107,7 +46,7 @@ pub(crate) fn guard(body: impl FnOnce() -> FsResult<()>) -> fsspec_status {
         Ok(Ok(())) => FSSPEC_OK,
         Ok(Err(error)) => {
             set_last_error(&error.to_string());
-            status_code(&error)
+            fsspec_sys::status_code(&error)
         }
         Err(_) => {
             set_last_error("libfsspec: panic across the C boundary");
@@ -147,15 +86,15 @@ pub(crate) unsafe fn str_arg<'a>(pointer: *const c_char, len: usize) -> FsResult
         .map_err(|_| invalid("string is not UTF-8"))
 }
 
-/// A reference behind a handle pointer.
-pub(crate) unsafe fn handle_arg<'a, T>(pointer: *const T, what: &str) -> FsResult<&'a T> {
-    pointer
+/// The data behind an opaque handle pointer.
+pub(crate) unsafe fn handle_arg<'a, H, T>(pointer: *const H, what: &str) -> FsResult<&'a T> {
+    (pointer as *const T)
         .as_ref()
         .ok_or_else(|| invalid(&format!("{what} is null")))
 }
 
-pub(crate) unsafe fn handle_arg_mut<'a, T>(pointer: *mut T, what: &str) -> FsResult<&'a mut T> {
-    pointer
+pub(crate) unsafe fn handle_arg_mut<'a, H, T>(pointer: *mut H, what: &str) -> FsResult<&'a mut T> {
+    (pointer as *mut T)
         .as_mut()
         .ok_or_else(|| invalid(&format!("{what} is null")))
 }
