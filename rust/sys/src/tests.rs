@@ -98,7 +98,11 @@ fn foreign_file_round_trip() {
     file.flush().unwrap();
     drop(file);
 
-    let mut file = foreign.open(&path, OpenMode::Read, None).unwrap();
+    let opts = fsspec_rs::OpenOptions {
+        cache_type: Some(fsspec_rs::CacheType::All),
+        ..Default::default()
+    };
+    let mut file = foreign.open(&path, OpenMode::Read, Some(opts)).unwrap();
     assert_eq!(file.size().unwrap(), Some(6));
     assert_eq!(file.seek(SeekFrom::Start(2)).unwrap(), 2);
     let mut text = String::new();

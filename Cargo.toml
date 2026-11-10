@@ -11,7 +11,15 @@ crate-type = ["cdylib"]
 
 [dependencies]
 fsspec_rs = { path = "./rust", version = "*" }
+fsspec_sys = { path = "./rust/sys", version = "*", optional = true }
 pyo3 = { version = "0.30.1", features = ["abi3", "extension-module", "multiple-pymethods"] }
+
+# hatch-rs selects the route from HATCH_RS_LIBRARY_SOURCE: `capi` links the
+# shared libfsspec, `direct` compiles the backends and registry in.
+[features]
+default = ["direct"]
+capi = ["dep:fsspec_sys"]
+direct = []
 
 [profile.release]
 panic = 'abort'

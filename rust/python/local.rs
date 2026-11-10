@@ -4,7 +4,9 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::Mutex;
 
 use fsspec_rs::types::{OpenMode, OpenOptions};
-use fsspec_rs::{CacheType, FileSystem, LocalFs};
+use fsspec_rs::{CacheType, FileSystem, SharedFileSystem};
+
+use crate::backend;
 
 use crate::types::{fs_error_to_pyerr, PyFileInfo};
 
@@ -155,17 +157,19 @@ impl RustLocalFile {
 /// Python class.
 #[pyclass(name = "RustLocalFs")]
 pub struct RustLocalFs {
-    inner: LocalFs,
+    inner: SharedFileSystem,
+    auto_mkdir: bool,
 }
 
 #[pymethods]
 impl RustLocalFs {
     #[new]
     #[pyo3(signature = (auto_mkdir = false))]
-    fn py_new(auto_mkdir: bool) -> Self {
-        RustLocalFs {
-            inner: LocalFs::with_auto_mkdir(auto_mkdir),
-        }
+    fn py_new(auto_mkdir: bool) -> PyResult<Self> {
+        Ok(RustLocalFs {
+            inner: backend::local(auto_mkdir).map_err(fs_error_to_pyerr)?,
+            auto_mkdir,
+        })
     }
 
     /// Return the protocol names.
@@ -475,6 +479,6 @@ impl RustLocalFs {
     }
 
     fn __repr__(&self) -> String {
-        format!("RustLocalFs(auto_mkdir={})", self.inner.auto_mkdir)
+        format!("RustLocalFs(auto_mkdir={})", self.auto_mkdir)
     }
 }

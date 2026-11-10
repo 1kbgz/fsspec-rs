@@ -3,6 +3,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+mod backend;
 mod local;
 mod s3;
 mod types;
@@ -34,5 +35,21 @@ fn fsspec_rs(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     errors.set_item("IsADirectory", "IsADirectory")?;
     m.add("error_codes", errors)?;
 
+    m.add_function(wrap_pyfunction!(protocols, m)?)?;
+    m.add_function(wrap_pyfunction!(linked_to_libfsspec, m)?)?;
+
     Ok(())
+}
+
+/// The protocols in the registry this extension uses, sorted.
+#[pyfunction]
+fn protocols() -> PyResult<Vec<String>> {
+    backend::protocols().map_err(types::fs_error_to_pyerr)
+}
+
+/// Whether the extension reaches the backends through the shared libfsspec
+/// rather than its own copy.
+#[pyfunction]
+fn linked_to_libfsspec() -> bool {
+    backend::LINKED_TO_LIBFSSPEC
 }

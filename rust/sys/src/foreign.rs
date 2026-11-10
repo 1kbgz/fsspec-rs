@@ -6,13 +6,16 @@ use std::mem::MaybeUninit;
 use std::ptr;
 use std::sync::{Mutex, PoisonError};
 
-use fsspec_rs::{FileInfo, FileSystem, FsError, FsFile, FsResult, OpenMode, OpenOptions};
+use fsspec_rs::{
+    CacheType, FileInfo, FileSystem, FsError, FsFile, FsOptions, FsResult, OpenMode, OpenOptions,
+};
 
 use crate::ffi;
 use crate::types::*;
 use crate::util::{
     arg, check, empty_bytes, empty_info_list, empty_string_list, io_error, null_string,
 };
+use crate::Options;
 
 /// Reads and frees a string returned by libfsspec.
 pub(crate) unsafe fn take_string(string: fsspec_string) -> String {
@@ -57,6 +60,24 @@ fn intern(protocol: &str) -> &'static str {
     let leaked: &'static str = Box::leak(protocol.to_owned().into_boxed_str());
     set.insert(leaked);
     leaked
+}
+
+/// The string map `fsspec_fs_open_ex` reads for an `OpenOptions`.
+pub fn open_options_map(opts: &OpenOptions) -> FsOptions {
+    let mut options = FsOptions::new();
+    options.insert("block_size".to_string(), opts.block_size.to_string());
+    options.insert("max_blocks".to_string(), opts.max_blocks.to_string());
+    options.insert("autocommit".to_string(), opts.autocommit.to_string());
+    if let Some(cache_type) = &opts.cache_type {
+        let name = match cache_type {
+            CacheType::None => "none",
+            CacheType::ReadAhead => "readahead",
+            CacheType::Block => "block",
+            CacheType::All => "all",
+        };
+        options.insert("cache_type".to_string(), name.to_string());
+    }
+    options
 }
 
 /// A filesystem owned by `libfsspec`, reached through its C ABI. Dropping it
@@ -170,13 +191,27 @@ impl FileSystem for ForeignFileSystem {
         &self,
         path: &str,
         mode: OpenMode,
-        _opts: Option<OpenOptions>,
+        opts: Option<OpenOptions>,
     ) -> FsResult<Box<dyn FsFile>> {
         let (path_ptr, path_len) = arg(path);
         let (mode_ptr, mode_len) = arg(mode.as_str());
         let mut out = ptr::null_mut();
-        check(
-            unsafe {
+        let status = match opts {
+            Some(opts) => {
+                let options = Options::new(&open_options_map(&opts))?;
+                unsafe {
+                    ffi::fsspec_fs_open_ex(
+                        self.handle,
+                        path_ptr,
+                        path_len,
+                        mode_ptr,
+                        mode_len,
+                        options.0,
+                        &mut out,
+                    )
+                }
+            }
+            None => unsafe {
                 ffi::fsspec_fs_open(
                     self.handle,
                     path_ptr,
@@ -186,8 +221,8 @@ impl FileSystem for ForeignFileSystem {
                     &mut out,
                 )
             },
-            "fsspec_fs_open",
-        )?;
+        };
+        check(status, "fsspec_fs_open")?;
         if out.is_null() {
             return Err(FsError::Other("libfsspec returned a null file".to_string()));
         }

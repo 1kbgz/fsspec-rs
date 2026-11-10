@@ -2,7 +2,13 @@
 
 __version__ = "0.1.8"
 
+import os as _os
 from pathlib import Path as _Path
+
+_PREFIX = _Path(__file__).resolve().parent
+if _os.name == "nt" and (_PREFIX / "lib").is_dir():
+    # The extension links libfsspec from here; Windows does not search the extension's own directory.
+    _DLL_DIRECTORY = _os.add_dll_directory(str(_PREFIX / "lib"))
 
 # Re-export Rust types
 # Register with fsspec so protocols are usable immediately after import
@@ -29,7 +35,7 @@ del _register
 
 def get_prefix() -> str:
     """The installed package directory, usable as a CMake prefix for libfsspec."""
-    return str(_Path(__file__).resolve().parent)
+    return str(_PREFIX)
 
 
 def get_include() -> str:

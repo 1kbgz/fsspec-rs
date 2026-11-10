@@ -29,7 +29,7 @@ use std::sync::Arc;
 use fsspec_rs::{FilesystemFactory, FsOptions, FsResult, SharedFileSystem};
 
 pub use export::{export_file, export_filesystem};
-pub use foreign::{ForeignFile, ForeignFileSystem};
+pub use foreign::{open_options_map, ForeignFile, ForeignFileSystem};
 pub use types::*;
 pub use util::{check, error_from_status, io_error, status_code, take_last_error};
 
