@@ -4,8 +4,6 @@
 .PHONY: develop-py develop-rs develop
 develop-py:
 	uv pip install -e .[develop]
-	# until hatch-rs releases library-source support
-	uv pip install "hatch-rs @ git+https://github.com/python-project-templates/hatch-rs@split-library"
 
 develop-rs:
 	make -C rust develop

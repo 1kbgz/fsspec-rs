@@ -1,7 +1,7 @@
 [build-system]
 requires = [
     "hatchling",
-    "hatch-rs @ git+https://github.com/python-project-templates/hatch-rs@split-library",
+    "hatch-rs>=0.5.0",
 ]
 build-backend = "hatchling.build"
 
@@ -41,7 +41,7 @@ develop = [
     "check-dist",
     "cibuildwheel",
     "codespell",
-    "hatch-rs>=0.4.3",
+    "hatch-rs>=0.5.0",
     "hatchling",
     "laxate",
     "mdformat",
