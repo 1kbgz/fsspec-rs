@@ -150,6 +150,37 @@ embedded Tokio runtime to implement the synchronous `FileSystem` trait.
 Plain HTTP is allowed automatically when `endpoint_url` starts with
 `http://`, which is useful for MinIO and LocalStack.
 
+## Filesystem registry
+
+`FilesystemRegistry` maps URL protocols to `FilesystemFactory` implementations,
+the Rust counterpart of fsspec's `fsspec.specs` entry points. Rust has no runtime
+plugin discovery, so a backend crate exports a factory and the application
+registers it. Any `Fn(&str, &FsOptions) -> FsResult<SharedFileSystem>` closure is
+a factory.
+
+`url_to_fs(url, options)` returns a `SharedFileSystem` and the path to pass to it.
+A URL without `protocol://` is a local path. Options are a
+`FsOptions` (`BTreeMap<String, String>`). Chained URLs such as
+`simplecache::s3://...` are not supported.
+
+Filesystems are cached by protocol, options, and the factory's
+`instance_scope` for the path, so equal calls share one instance.
+`url_to_fs_uncached` always builds a new one. Registering a protocol again
+replaces its factory and drops its cached instances.
+
+`FilesystemRegistry::default()` registers:
+
+| Protocol        | Filesystem                      | Options                                                                                    |
+| --------------- | ------------------------------- | ------------------------------------------------------------------------------------------ |
+| `file`, `local` | `LocalFs`                       | `auto_mkdir`                                                                               |
+| `s3`            | `S3Fs`, one instance per bucket | `key`, `secret`, `token`, `endpoint_url`, `region`, `anon`, `virtual_hosted_style_request` |
+
+Unknown options are rejected. Boolean options accept `true`, `false`, `1`, and `0`.
+`FilesystemRegistry::empty()` starts with no protocols.
+
+`DEFAULT_FILESYSTEMS` is a process-wide registry. The `register_filesystem` and
+`url_to_fs` functions use it.
+
 ## Python fsspec bridge
 
 `fsspec_rs_bridge` exports `PyFsspecFs`, `url_to_fs`, and `StorageOptions`. It is an
