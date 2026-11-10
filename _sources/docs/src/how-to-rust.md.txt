@@ -37,6 +37,36 @@ let objects = fs.ls("", true)?;
 # Ok::<(), fsspec_rs::FsError>(())
 ```
 
+## Open a filesystem from a URL
+
+`url_to_fs` picks a filesystem by the URL's protocol and returns the path to use
+with it:
+
+```rust
+use fsspec_rs::{url_to_fs, FsOptions};
+
+let mut options = FsOptions::new();
+options.insert("region".to_string(), "us-east-1".to_string());
+let (fs, path) = url_to_fs("s3://my-bucket/data/a.parquet", &options)?;
+let bytes = fs.cat_file(&path, None, None)?;
+# Ok::<(), fsspec_rs::FsError>(())
+```
+
+Register a factory to add a protocol. Backend crates export one, and the
+application registers it once at startup:
+
+```rust
+use std::sync::Arc;
+use fsspec_rs::{register_filesystem, FsOptions, LocalFs, SharedFileSystem};
+
+register_filesystem("scratch", |_path: &str, _options: &FsOptions| {
+    Ok(Arc::new(LocalFs::with_auto_mkdir(true)) as SharedFileSystem)
+});
+```
+
+To keep registrations out of the process-wide registry, build a
+`FilesystemRegistry` and call `register` and `url_to_fs` on it.
+
 ## Call a Python fsspec backend from Rust
 
 Use the bridge crate in a Python extension or embedded-Python application. It
