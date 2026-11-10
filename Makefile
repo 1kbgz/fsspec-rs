@@ -42,6 +42,7 @@ lint-py:  ## run python linter with ruff
 
 lint-rs:  ## run rust linter
 	make -C rust lint
+	git diff --exit-code -- rust/capi/include/fsspec.h
 
 lint-docs:  ## lint docs with mdformat and codespell
 	python -m mdformat --check README.md docs/src/

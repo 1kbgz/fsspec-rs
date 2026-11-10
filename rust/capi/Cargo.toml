@@ -1,0 +1,24 @@
+[package]
+name = "fsspec_capi"
+version = "0.1.8"
+authors = ["the fsspec-rs authors <dev@1kbgz.com>"]
+edition = "2021"
+license = "Apache-2.0"
+readme = "../../README.md"
+repository = "https://github.com/1kbgz/fsspec-rs"
+description = "C ABI for the fsspec-rs filesystem registry and backends"
+build = "build.rs"
+
+[lib]
+name = "fsspec"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+fsspec_rs = { path = "..", version = "0.1.8" }
+
+[build-dependencies]
+cbindgen = { version = "0.29", default-features = false }
+
+[dev-dependencies]
+tempfile = "3"
