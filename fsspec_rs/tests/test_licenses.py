@@ -3,7 +3,7 @@ from json import loads
 
 
 def test_cargo_license_bundle_contains_dependency_texts():
-    resource = files("fsspec_rs").joinpath("licenses/cargo.json")
+    resource = files("fsspec_rs").joinpath("licenses/fsspec_rs.json")
     assert resource.is_file(), "Cargo dependency license bundle is missing from the package"
     bundle = loads(resource.read_text(encoding="utf-8"))
     assert bundle["root_name"] == "fsspec_rs_py"

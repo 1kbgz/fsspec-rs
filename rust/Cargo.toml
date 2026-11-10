@@ -27,4 +27,5 @@ tempfile = "3"
 members = [
     ".",
     "bridge",
+    "capi",
 ]

@@ -4,6 +4,8 @@
 .PHONY: develop-py develop-rs develop
 develop-py:
 	uv pip install -e .[develop]
+	# until hatch-rs releases library-source support
+	uv pip install "hatch-rs @ git+https://github.com/python-project-templates/hatch-rs@split-library"
 
 develop-rs:
 	make -C rust develop
@@ -42,6 +44,7 @@ lint-py:  ## run python linter with ruff
 
 lint-rs:  ## run rust linter
 	make -C rust lint
+	git diff --exit-code -- rust/capi/include/fsspec.h
 
 lint-docs:  ## lint docs with mdformat and codespell
 	python -m mdformat --check README.md docs/src/
