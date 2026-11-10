@@ -1,0 +1,22 @@
+[package]
+name = "fsspec_sys"
+version = "0.1.8"
+authors = ["the fsspec-rs authors <dev@1kbgz.com>"]
+edition = "2021"
+license = "Apache-2.0"
+readme = "../../README.md"
+repository = "https://github.com/1kbgz/fsspec-rs"
+description = "C ABI types and bindings for libfsspec, the shared fsspec-rs registry"
+
+[lib]
+name = "fsspec_sys"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+fsspec_rs = { path = "..", version = "0.1.8" }
+
+[dev-dependencies]
+# Path-only, so packaging strips it: capi depends on this crate and is published after it.
+fsspec_capi = { path = "../capi" }
+tempfile = "3"

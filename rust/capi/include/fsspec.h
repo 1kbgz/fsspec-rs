@@ -75,7 +75,7 @@ typedef struct fsspec_file fsspec_file;
 typedef struct fsspec_fs fsspec_fs;
 
 /**
- * Storage options for a filesystem, the string map of `FsOptions`.
+ * Storage options for a filesystem: an opaque string map.
  */
 typedef struct fsspec_options fsspec_options;
 
@@ -158,7 +158,7 @@ typedef struct fsspec_fs_factory {
  * A foreign filesystem. `protocol` is a NUL-terminated, comma-separated list
  * such as `"file,local"`; `root_marker` and `sep` may be null. The
  * operations mirror the `FileSystem` primitives; everything else is derived
- * from them. Output values are allocated with libfsspec's own functions and
+ * from them. Output values are allocated with the platform allocator and
  * freed by libfsspec.
  */
 typedef struct fsspec_fs_vtable {
@@ -303,6 +303,16 @@ void fsspec_fs_release(struct fsspec_fs *fs);
 fsspec_status fsspec_fs_protocols(const struct fsspec_fs *fs, struct fsspec_string_list *out);
 
 /**
+ * The filesystem's root marker, such as `/` for local paths.
+ */
+fsspec_status fsspec_fs_root_marker(const struct fsspec_fs *fs, struct fsspec_string *out);
+
+/**
+ * The filesystem's path separator.
+ */
+fsspec_status fsspec_fs_sep(const struct fsspec_fs *fs, struct fsspec_string *out);
+
+/**
  * Lists a directory. With `detail` false, backends may fill only names.
  */
 fsspec_status fsspec_fs_ls(const struct fsspec_fs *fs,
@@ -423,6 +433,13 @@ fsspec_status fsspec_options_set(struct fsspec_options *options,
                                  size_t key_len,
                                  const char *value,
                                  size_t value_len);
+
+/**
+ * The options as alternating key and value strings, sorted by key. Free
+ * with `fsspec_string_list_free`.
+ */
+fsspec_status fsspec_options_items(const struct fsspec_options *options,
+                                   struct fsspec_string_list *out);
 
 /**
  * Frees an option set. Null is ignored.

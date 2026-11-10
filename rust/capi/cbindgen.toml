@@ -11,4 +11,5 @@ usize_is_size_t = true
 prefix_with_name = false
 
 [parse]
-parse_deps = false
+parse_deps = true
+include = ["fsspec_sys"]

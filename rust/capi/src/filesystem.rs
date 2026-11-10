@@ -3,29 +3,33 @@ use std::ptr;
 use std::slice;
 
 use fsspec_rs::{FsError, FsResult, OpenMode, SharedFileSystem};
-
-use crate::file::fsspec_file;
-use crate::memory::{
-    fsspec_bytes, fsspec_file_info, fsspec_file_info_list, fsspec_string, fsspec_string_list,
+use fsspec_sys::types::{
+    fsspec_bytes, fsspec_file, fsspec_file_info, fsspec_file_info_list, fsspec_fs, fsspec_options,
+    fsspec_status, fsspec_string, fsspec_string_list,
 };
-use crate::options::{fsspec_options, options_arg};
-use crate::status::{fsspec_status, guard, handle_arg, invalid, str_arg, write_out};
 
-/// A filesystem resolved through the registry. Handles are reference counted:
-/// `fsspec_fs_retain` returns another handle to the same filesystem and
-/// `fsspec_fs_release` frees one.
-pub struct fsspec_fs {
+use crate::file::FileData;
+use crate::options::options_arg;
+use crate::status::{guard, handle_arg, invalid, str_arg, write_out};
+
+/// The data behind an `fsspec_fs` handle.
+pub(crate) struct FsData {
     pub(crate) inner: SharedFileSystem,
 }
 
-impl fsspec_fs {
-    pub(crate) fn into_raw(inner: SharedFileSystem) -> *mut Self {
-        Box::into_raw(Box::new(Self { inner }))
+impl FsData {
+    pub(crate) fn into_raw(inner: SharedFileSystem) -> *mut fsspec_fs {
+        Box::into_raw(Box::new(Self { inner })) as *mut fsspec_fs
+    }
+
+    pub(crate) unsafe fn from_raw(handle: *mut fsspec_fs) -> Box<Self> {
+        Box::from_raw(handle as *mut Self)
     }
 }
 
 pub(crate) unsafe fn fs_arg<'a>(fs: *const fsspec_fs) -> FsResult<&'a SharedFileSystem> {
-    Ok(&handle_arg(fs, "filesystem")?.inner)
+    let data: &FsData = handle_arg(fs, "filesystem")?;
+    Ok(&data.inner)
 }
 
 /// Resolves `url` through the process-wide registry. On success `out_fs`
@@ -47,7 +51,7 @@ pub unsafe extern "C" fn fsspec_url_to_fs(
         if !out_path.is_null() {
             out_path.write(fsspec_string::from_string(path));
         }
-        out_fs.write(fsspec_fs::into_raw(fs));
+        out_fs.write(FsData::into_raw(fs));
         Ok(())
     })
 }
@@ -55,8 +59,8 @@ pub unsafe extern "C" fn fsspec_url_to_fs(
 /// Returns another handle to the same filesystem, or null for null.
 #[no_mangle]
 pub unsafe extern "C" fn fsspec_fs_retain(fs: *const fsspec_fs) -> *mut fsspec_fs {
-    match fs.as_ref() {
-        Some(fs) => fsspec_fs::into_raw(fs.inner.clone()),
+    match (fs as *const FsData).as_ref() {
+        Some(fs) => FsData::into_raw(fs.inner.clone()),
         None => ptr::null_mut(),
     }
 }
@@ -66,7 +70,7 @@ pub unsafe extern "C" fn fsspec_fs_retain(fs: *const fsspec_fs) -> *mut fsspec_f
 #[no_mangle]
 pub unsafe extern "C" fn fsspec_fs_release(fs: *mut fsspec_fs) {
     if !fs.is_null() {
-        drop(Box::from_raw(fs));
+        drop(FsData::from_raw(fs));
     }
 }
 
@@ -84,6 +88,33 @@ pub unsafe extern "C" fn fsspec_fs_protocols(
             .map(|protocol| protocol.to_string())
             .collect();
         write_out(out, fsspec_string_list::from_strings(protocols))
+    })
+}
+
+/// The filesystem's root marker, such as `/` for local paths.
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_fs_root_marker(
+    fs: *const fsspec_fs,
+    out: *mut fsspec_string,
+) -> fsspec_status {
+    guard(|| {
+        let fs = fs_arg(fs)?;
+        write_out(
+            out,
+            fsspec_string::from_string(fs.root_marker().to_string()),
+        )
+    })
+}
+
+/// The filesystem's path separator.
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_fs_sep(
+    fs: *const fsspec_fs,
+    out: *mut fsspec_string,
+) -> fsspec_status {
+    guard(|| {
+        let fs = fs_arg(fs)?;
+        write_out(out, fsspec_string::from_string(fs.sep().to_string()))
     })
 }
 
@@ -240,6 +271,6 @@ pub unsafe extern "C" fn fsspec_fs_open(
         let mode = OpenMode::from_str_mode(mode)
             .ok_or_else(|| FsError::InvalidArgument(format!("unsupported open mode: {mode}")))?;
         let file = fs.open(path, mode, None)?;
-        write_out(out, fsspec_file::into_raw(file))
+        write_out(out, FileData::into_raw(file))
     })
 }
