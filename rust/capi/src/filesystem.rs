@@ -2,7 +2,7 @@ use std::ffi::c_char;
 use std::ptr;
 use std::slice;
 
-use fsspec_rs::{FsError, FsResult, OpenMode, SharedFileSystem};
+use fsspec_rs::{CacheType, FsError, FsOptions, FsResult, OpenMode, OpenOptions, SharedFileSystem};
 use fsspec_sys::types::{
     fsspec_bytes, fsspec_file, fsspec_file_info, fsspec_file_info_list, fsspec_fs, fsspec_options,
     fsspec_status, fsspec_string, fsspec_string_list,
@@ -271,6 +271,61 @@ pub unsafe extern "C" fn fsspec_fs_open(
         let mode = OpenMode::from_str_mode(mode)
             .ok_or_else(|| FsError::InvalidArgument(format!("unsupported open mode: {mode}")))?;
         let file = fs.open(path, mode, None)?;
+        write_out(out, FileData::into_raw(file))
+    })
+}
+
+fn parse_open_options(options: &FsOptions) -> FsResult<OpenOptions> {
+    let mut opts = OpenOptions::default();
+    for (key, value) in options {
+        let invalid_value = || {
+            FsError::InvalidArgument(format!(
+                "{key} must be a valid open option value, got {value:?}"
+            ))
+        };
+        match key.as_str() {
+            "block_size" => opts.block_size = value.parse().map_err(|_| invalid_value())?,
+            "max_blocks" => opts.max_blocks = value.parse().map_err(|_| invalid_value())?,
+            "autocommit" => opts.autocommit = value.parse().map_err(|_| invalid_value())?,
+            "cache_type" => {
+                opts.cache_type = Some(
+                    value
+                        .parse::<CacheType>()
+                        .map_err(|error| FsError::InvalidArgument(error.to_string()))?,
+                )
+            }
+            _ => {
+                return Err(FsError::InvalidArgument(format!(
+                    "unknown open option: {key}"
+                )))
+            }
+        }
+    }
+    Ok(opts)
+}
+
+/// Opens a file like `fsspec_fs_open`, with open options from a string map:
+/// `block_size`, `max_blocks`, `autocommit`, and `cache_type` (`none`,
+/// `readahead`, `block`, `all`). Backends registered through a vtable
+/// receive no options.
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_fs_open_ex(
+    fs: *const fsspec_fs,
+    path: *const c_char,
+    path_len: usize,
+    mode: *const c_char,
+    mode_len: usize,
+    options: *const fsspec_options,
+    out: *mut *mut fsspec_file,
+) -> fsspec_status {
+    guard(|| {
+        let fs = fs_arg(fs)?;
+        let path = str_arg(path, path_len)?;
+        let mode = str_arg(mode, mode_len)?;
+        let mode = OpenMode::from_str_mode(mode)
+            .ok_or_else(|| FsError::InvalidArgument(format!("unsupported open mode: {mode}")))?;
+        let opts = parse_open_options(&options_arg(options))?;
+        let file = fs.open(path, mode, Some(opts))?;
         write_out(out, FileData::into_raw(file))
     })
 }

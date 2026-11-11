@@ -396,6 +396,20 @@ fsspec_status fsspec_fs_open(const struct fsspec_fs *fs,
                              struct fsspec_file **out);
 
 /**
+ * Opens a file like `fsspec_fs_open`, with open options from a string map:
+ * `block_size`, `max_blocks`, `autocommit`, and `cache_type` (`none`,
+ * `readahead`, `block`, `all`). Backends registered through a vtable
+ * receive no options.
+ */
+fsspec_status fsspec_fs_open_ex(const struct fsspec_fs *fs,
+                                const char *path,
+                                size_t path_len,
+                                const char *mode,
+                                size_t mode_len,
+                                const struct fsspec_options *options,
+                                struct fsspec_file **out);
+
+/**
  * Frees bytes returned by libfsspec.
  */
 void fsspec_bytes_free(struct fsspec_bytes bytes);

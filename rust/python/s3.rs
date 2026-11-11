@@ -4,7 +4,9 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::Mutex;
 
 use fsspec_rs::types::{OpenMode, OpenOptions};
-use fsspec_rs::{CacheType, FileSystem, S3Config, S3Fs};
+use fsspec_rs::{CacheType, FileSystem, S3Config, SharedFileSystem};
+
+use crate::backend;
 
 use crate::types::{fs_error_to_pyerr, PyFileInfo};
 
@@ -164,7 +166,8 @@ impl RustS3File {
 /// Python class.
 #[pyclass(name = "RustS3Fs")]
 pub struct RustS3Fs {
-    inner: S3Fs,
+    inner: SharedFileSystem,
+    bucket: String,
 }
 
 #[pymethods]
@@ -225,8 +228,9 @@ impl RustS3Fs {
             virtual_hosted_style_request: false,
         };
 
-        let inner = S3Fs::new(cfg).map_err(fs_error_to_pyerr)?;
-        Ok(RustS3Fs { inner })
+        let bucket = cfg.bucket.clone();
+        let inner = backend::s3(cfg).map_err(fs_error_to_pyerr)?;
+        Ok(RustS3Fs { inner, bucket })
     }
 
     /// Return the protocol names.
@@ -503,10 +507,10 @@ impl RustS3Fs {
     /// Return the bucket name.
     #[getter]
     fn bucket(&self) -> &str {
-        &self.inner.bucket
+        &self.bucket
     }
 
     fn __repr__(&self) -> String {
-        format!("RustS3Fs(bucket='{}')", self.inner.bucket)
+        format!("RustS3Fs(bucket='{}')", self.bucket)
     }
 }

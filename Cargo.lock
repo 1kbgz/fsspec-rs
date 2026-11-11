@@ -301,7 +301,15 @@ name = "fsspec_rs_py"
 version = "0.1.8"
 dependencies = [
  "fsspec_rs",
+ "fsspec_sys",
  "pyo3",
+]
+
+[[package]]
+name = "fsspec_sys"
+version = "0.1.8"
+dependencies = [
+ "fsspec_rs",
 ]
 
 [[package]]

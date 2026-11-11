@@ -112,6 +112,16 @@ extern "C" {
         out: *mut *mut fsspec_file,
     ) -> fsspec_status;
 
+    pub fn fsspec_fs_open_ex(
+        fs: *const fsspec_fs,
+        path: *const c_char,
+        path_len: usize,
+        mode: *const c_char,
+        mode_len: usize,
+        options: *const fsspec_options,
+        out: *mut *mut fsspec_file,
+    ) -> fsspec_status;
+
     pub fn fsspec_file_read(
         file: *mut fsspec_file,
         buf: *mut u8,

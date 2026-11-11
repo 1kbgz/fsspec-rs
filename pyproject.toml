@@ -132,16 +132,21 @@ cargo install cargo-bundle-licenses --version 4.2.0 --locked
 before-build = "cargo clean --manifest-path {package}/Cargo.toml && rm -f {package}/fsspec_rs/*.so"
 environment = {PATH="$HOME/.cargo/bin:$PATH", CARGO_TERM_COLOR="always"}
 skip = "*i686* *musllinux*"
+# Keep the bundled libfsspec where the extension's rpath expects it.
+repair-wheel-command = "auditwheel repair --exclude 'libfsspec.so*' -w {dest_dir} {wheel}"
 
 [tool.cibuildwheel.macos]
 before-all = "cargo install cargo-bundle-licenses --version 4.2.0 --locked"
 environment = {PATH="$HOME/.cargo/bin:$PATH", CARGO_TERM_COLOR="always", MACOS_DEPLOYMENT_TARGET=11.0}
 archs = "arm64"
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} --exclude libfsspec -w {dest_dir} -v {wheel}"
 
 [tool.cibuildwheel.windows]
 before-all = "cargo install cargo-bundle-licenses --version 4.2.0 --locked"
 environment = {PATH="$UserProfile\\.cargo\bin;$PATH", CARGO_TERM_COLOR="always"}
 skip = "*win32 *arm64"
+# libfsspec ships inside the wheel; delvewheel must not look for it on PATH.
+repair-wheel-command = "delvewheel repair --exclude fsspec.dll -w {dest_dir} {wheel}"
 
 
 [tool.coverage.run]
@@ -188,11 +193,18 @@ source = "rust/capi/include/fsspec.h"
 destination = "fsspec_rs/include/fsspec/fsspec.h"
 install-scheme = "package"
 
-# The PyO3 extension.
+# The PyO3 extension, linked against libfsspec (library-source = bundled by default).
 [[tool.hatch.build.hooks.hatch-rs.artifacts]]
 name = "fsspec_rs"
 manifest = "Cargo.toml"
 destination = "fsspec_rs/{python_extension_name}"
+links = ["fsspec"]
+
+[tool.hatch.build.hooks.hatch-rs.artifacts.library-source-features]
+bundled = ["capi"]
+external = ["capi"]
+static = ["direct"]
+direct = ["direct"]
 
 [tool.hatch.build.targets.sdist]
 packages = [

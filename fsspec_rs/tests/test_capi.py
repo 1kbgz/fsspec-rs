@@ -1,6 +1,6 @@
 """Smoke test of libfsspec through ctypes, the way a non-Python consumer sees it."""
 
-from ctypes import CDLL, POINTER, Structure, byref, c_bool, c_char_p, c_int32, c_int64, c_size_t, c_uint32, c_uint64, c_void_p, string_at
+from ctypes import CDLL, POINTER, Structure, byref, c_bool, c_char_p, c_int32, c_int64, c_size_t, c_uint32, c_uint64, c_void_p, sizeof, string_at
 from pathlib import Path
 from sys import platform
 
@@ -141,3 +141,25 @@ def test_registry_lists_builtin_protocols(lib):
     names = {protocols.items[index].value() for index in range(protocols.len)}
     lib.fsspec_string_list_free(protocols)
     assert {"file", "local", "s3"} <= names
+
+
+class Factory(Structure):
+    _fields_ = [
+        ("struct_size", c_size_t),
+        ("abi_version", c_uint32),
+        ("data", c_void_p),
+        ("create", c_void_p),
+        ("instance_scope", c_void_p),
+        ("release", c_void_p),
+    ]
+
+
+def test_extension_shares_the_registry_with_libfsspec(lib):
+    from fsspec_rs.fsspec_rs import linked_to_libfsspec, protocols
+
+    if not linked_to_libfsspec():
+        pytest.skip("the extension compiled the registry in")
+    lib.fsspec_register_filesystem.argtypes = [c_char_p, c_size_t, POINTER(Factory)]
+    factory = Factory(sizeof(Factory), 1, None, None, None, None)
+    assert lib.fsspec_register_filesystem(b"probe", 5, byref(factory)) == 0, lib.fsspec_last_error_message()
+    assert "probe" in protocols()
