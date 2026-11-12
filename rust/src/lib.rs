@@ -18,6 +18,7 @@ mod async_fs;
 mod fs;
 mod local;
 mod memory;
+#[cfg(feature = "s3")]
 mod s3;
 
 #[cfg(test)]
@@ -28,7 +29,7 @@ mod local_tests;
 mod memory_tests;
 #[cfg(test)]
 mod registry_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "s3"))]
 mod s3_tests;
 #[cfg(test)]
 mod tests;
@@ -49,5 +50,6 @@ pub use registry::{
     url_to_fs, FilesystemFactory, FilesystemRegistry, FsOptions, RegistryHooks, SharedFileSystem,
     DEFAULT_FILESYSTEMS,
 };
+#[cfg(feature = "s3")]
 pub use s3::{S3Config, S3File, S3Fs};
 pub use types::{DuResult, FileInfo, FileType, OpenMode, OpenOptions, WalkEntry};

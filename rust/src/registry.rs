@@ -9,6 +9,7 @@ use crate::error::{FsError, FsResult};
 use crate::fs::FileSystem;
 use crate::local::LocalFs;
 use crate::memory::MemoryFs;
+#[cfg(feature = "s3")]
 use crate::s3::{S3Config, S3Fs};
 
 /// A filesystem shared between callers.
@@ -59,13 +60,14 @@ pub struct FilesystemRegistry {
 }
 
 impl Default for FilesystemRegistry {
-    /// A registry with `file` and `local` ([`LocalFs`]), `memory` ([`MemoryFs`]), and `s3`
-    /// ([`S3Fs`]).
+    /// A registry with `file` and `local` ([`LocalFs`]), `memory` ([`MemoryFs`]), and, with
+    /// the `s3` feature, `s3` (`S3Fs`).
     fn default() -> Self {
         let mut registry = Self::empty();
         registry.register("file", local_filesystem);
         registry.register("local", local_filesystem);
         registry.register("memory", memory_filesystem);
+        #[cfg(feature = "s3")]
         registry.register("s3", S3Factory);
         registry
     }
@@ -285,8 +287,10 @@ fn memory_filesystem(_path: &str, options: &FsOptions) -> FsResult<SharedFileSys
 /// Builds one [`S3Fs`] per bucket from the same option names as the Python `S3Fs`:
 /// `key`, `secret`, `token`, `endpoint_url`, `region`, and `anon`, plus
 /// `virtual_hosted_style_request`.
+#[cfg(feature = "s3")]
 struct S3Factory;
 
+#[cfg(feature = "s3")]
 impl FilesystemFactory for S3Factory {
     fn create(&self, path: &str, options: &FsOptions) -> FsResult<SharedFileSystem> {
         let bucket = self.instance_scope(path);

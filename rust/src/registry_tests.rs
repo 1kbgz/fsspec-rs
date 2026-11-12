@@ -82,6 +82,7 @@ fn default_registry_resolves_local_paths() {
     assert!(nested.exists());
 }
 
+#[cfg(feature = "s3")]
 #[test]
 fn default_registry_builds_one_s3_filesystem_per_bucket() {
     let registry = FilesystemRegistry::default();
@@ -109,14 +110,17 @@ fn rejects_unknown_protocols_options_and_chained_urls() {
         message(registry.url_to_fs("gs://bucket/a", &FsOptions::new())),
         "not supported: no filesystem registered for protocol: gs"
     );
-    assert_eq!(
-        message(registry.url_to_fs("s3://", &FsOptions::new())),
-        "invalid argument: S3 URL must include a bucket"
-    );
-    assert_eq!(
-        message(registry.url_to_fs("s3://b/a", &options(&[("secrets", "x")]))),
-        "invalid argument: unknown s3 option: secrets"
-    );
+    #[cfg(feature = "s3")]
+    {
+        assert_eq!(
+            message(registry.url_to_fs("s3://", &FsOptions::new())),
+            "invalid argument: S3 URL must include a bucket"
+        );
+        assert_eq!(
+            message(registry.url_to_fs("s3://b/a", &options(&[("secrets", "x")]))),
+            "invalid argument: unknown s3 option: secrets"
+        );
+    }
     assert_eq!(
         message(registry.url_to_fs("/tmp/a", &options(&[("auto_mkdir", "yes")]))),
         "invalid argument: auto_mkdir must be true or false, got \"yes\""
