@@ -418,6 +418,9 @@ they return through vtable callbacks the same way, and <code class="docutils lit
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_protocols(out)</span></code></p></td>
 <td><p>Registered protocols, sorted.</p></td>
 </tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_register_fallback(factory)</span></code></p></td>
+<td><p>Installs the factory used for protocols nothing registered; null clears it. It is given the whole URL.</p></td>
+</tr>
 </tbody>
 </table>
 <p>URL resolution, caching, and the built-in protocols (<code class="docutils literal notranslate"><span class="pre">file</span></code>, <code class="docutils literal notranslate"><span class="pre">local</span></code>, <code class="docutils literal notranslate"><span class="pre">s3</span></code>) and their
@@ -473,6 +476,12 @@ options are the same as the Rust registry; see
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_fs_root_marker(fs,</span> <span class="pre">out)</span></code>, <code class="docutils literal notranslate"><span class="pre">fsspec_fs_sep(fs,</span> <span class="pre">out)</span></code></p></td>
 <td><p>Root marker and path separator.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_fs_strip_protocol(fs,</span> <span class="pre">path,</span> <span class="pre">path_len,</span> <span class="pre">out)</span></code></p></td>
+<td><p>The path without its protocol prefix, as the backend normalises it; an empty result is the root marker.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_fs_unstrip_protocol(fs,</span> <span class="pre">path,</span> <span class="pre">path_len,</span> <span class="pre">out)</span></code></p></td>
+<td><p>The path with the backend’s protocol prefix.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_fs_ls(fs,</span> <span class="pre">path,</span> <span class="pre">path_len,</span> <span class="pre">detail,</span> <span class="pre">out)</span></code></p></td>
 <td><p>Lists a directory. With <code class="docutils literal notranslate"><span class="pre">detail</span></code> false, entries may contain only names.</p></td>
@@ -579,6 +588,9 @@ null with the error message set on failure.</p>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">release</span></code></p></td>
 <td><p>Called with <code class="docutils literal notranslate"><span class="pre">data</span></code> when the last handle is released.</p></td>
 </tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">strip_protocol</span></code>, <code class="docutils literal notranslate"><span class="pre">unstrip_protocol</span></code>, <code class="docutils literal notranslate"><span class="pre">cat_file</span></code>, <code class="docutils literal notranslate"><span class="pre">pipe_file</span></code></p></td>
+<td><p>Optional, after <code class="docutils literal notranslate"><span class="pre">release</span></code>. A backend that overrides these in Rust keeps its own behaviour across the ABI; null uses the derived defaults.</p></td>
+</tr>
 </tbody>
 </table>
 <p><code class="docutils literal notranslate"><span class="pre">fsspec_file_vtable</span></code> has <code class="docutils literal notranslate"><span class="pre">read</span></code>, <code class="docutils literal notranslate"><span class="pre">write</span></code>, <code class="docutils literal notranslate"><span class="pre">seek</span></code>, <code class="docutils literal notranslate"><span class="pre">flush</span></code>, <code class="docutils literal notranslate"><span class="pre">size</span></code>, <code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">commit</span></code>,
@@ -603,6 +615,12 @@ registry state.</p>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">register_filesystem(protocol,</span> <span class="pre">factory)</span></code></p></td>
 <td><p>Registers a <code class="docutils literal notranslate"><span class="pre">FilesystemFactory</span></code> in <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">register_fallback(factory)</span></code></p></td>
+<td><p>Installs or clears the factory for protocols nothing registered.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">use_shared_registry()</span></code></p></td>
+<td><p>Routes <code class="docutils literal notranslate"><span class="pre">fsspec_rs::url_to_fs</span></code> and <code class="docutils literal notranslate"><span class="pre">register_filesystem</span></code> through <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">protocols()</span></code></p></td>
 <td><p>Registered protocols, sorted.</p></td>

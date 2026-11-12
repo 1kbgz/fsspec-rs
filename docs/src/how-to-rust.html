@@ -218,6 +218,11 @@ application registers it once at startup:</p>
 </div>
 <p>To keep registrations out of the process-wide registry, build a
 <code class="docutils literal notranslate"><span class="pre">FilesystemRegistry</span></code> and call <code class="docutils literal notranslate"><span class="pre">register</span></code> and <code class="docutils literal notranslate"><span class="pre">url_to_fs</span></code> on it.</p>
+<p>In a process that loads the shared <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> (every wheel built from this
+repository, and any extension linked against it), <code class="docutils literal notranslate"><span class="pre">fsspec_sys::use_shared_registry()</span></code>
+routes <code class="docutils literal notranslate"><span class="pre">register_filesystem</span></code> and <code class="docutils literal notranslate"><span class="pre">url_to_fs</span></code> through that library, so a protocol
+registered by one extension is visible to every other crate in the process.
+Call it once before registering anything.</p>
 </section>
 <section id="call-a-python-fsspec-backend-from-rust">
 <h2>Call a Python fsspec backend from Rust<a class="headerlink" href="#call-a-python-fsspec-backend-from-rust" title="Link to this heading">¶</a></h2>
