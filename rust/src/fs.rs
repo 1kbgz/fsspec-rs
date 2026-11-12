@@ -390,13 +390,17 @@ pub trait FileSystem {
                 self.rm_file(&full)?;
             }
         }
-        // Remove directories bottom-up (walk with topdown=false gives us this order)
+        // Remove directories bottom-up (walk with topdown=false gives us this order).
+        // A directory implied only by the files below it, as in an object store, went
+        // with its last file.
         for entry in &walk {
-            if entry.dirpath != path {
+            if entry.dirpath != path && self.exists(&entry.dirpath)? {
                 self.rmdir(&entry.dirpath)?;
             }
         }
-        self.rmdir(path)?;
+        if self.exists(path)? {
+            self.rmdir(path)?;
+        }
         Ok(())
     }
 
