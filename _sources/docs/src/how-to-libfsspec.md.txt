@@ -402,8 +402,18 @@ your package its own copy of `libfsspec` and its own registry. Exclude it:
 
 ```bash
 auditwheel repair --exclude 'libfsspec.so*' dist/*.whl
-delocate-wheel --exclude libfsspec dist/*.whl
 delvewheel repair --exclude fsspec.dll dist/*.whl
+```
+
+On macOS, delocate resolves every dependency before it applies `--exclude`, and your
+extension's `@rpath` only finds `libfsspec` inside an environment where `fsspec_rs` is
+installed. Put the library from an fsspec-rs wheel on `DYLD_LIBRARY_PATH` while
+repairing:
+
+```bash
+python -m pip download --no-deps --only-binary=:all: --dest fsspec-rs-wheel 'fsspec-rs>=0.2.1,<0.3'
+python -m zipfile -e fsspec-rs-wheel/fsspec_rs-*.whl fsspec-rs-wheel
+DYLD_LIBRARY_PATH=fsspec-rs-wheel/fsspec_rs/lib delocate-wheel --exclude libfsspec dist/*.whl
 ```
 
 Require `fsspec-rs` at run time, at least the version you built against:

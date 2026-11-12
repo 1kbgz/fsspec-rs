@@ -519,8 +519,16 @@ It is visible to fsspec but not to <code class="docutils literal notranslate"><s
 <p>Wheel repair tools copy external libraries into the wheel by default, which would give
 your package its own copy of <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> and its own registry. Exclude it:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>auditwheel<span class="w"> </span>repair<span class="w"> </span>--exclude<span class="w"> </span><span class="s1">'libfsspec.so*'</span><span class="w"> </span>dist/*.whl
-delocate-wheel<span class="w"> </span>--exclude<span class="w"> </span>libfsspec<span class="w"> </span>dist/*.whl
 delvewheel<span class="w"> </span>repair<span class="w"> </span>--exclude<span class="w"> </span>fsspec.dll<span class="w"> </span>dist/*.whl
+</pre></div>
+</div>
+<p>On macOS, delocate resolves every dependency before it applies <code class="docutils literal notranslate"><span class="pre">--exclude</span></code>, and your
+extension’s <code class="docutils literal notranslate"><span class="pre">&#64;rpath</span></code> only finds <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> inside an environment where <code class="docutils literal notranslate"><span class="pre">fsspec_rs</span></code> is
+installed. Put the library from an fsspec-rs wheel on <code class="docutils literal notranslate"><span class="pre">DYLD_LIBRARY_PATH</span></code> while
+repairing:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>download<span class="w"> </span>--no-deps<span class="w"> </span>--only-binary<span class="o">=</span>:all:<span class="w"> </span>--dest<span class="w"> </span>fsspec-rs-wheel<span class="w"> </span><span class="s1">'fsspec-rs&gt;=0.2.1,&lt;0.3'</span>
+python<span class="w"> </span>-m<span class="w"> </span>zipfile<span class="w"> </span>-e<span class="w"> </span>fsspec-rs-wheel/fsspec_rs-*.whl<span class="w"> </span>fsspec-rs-wheel
+<span class="nv">DYLD_LIBRARY_PATH</span><span class="o">=</span>fsspec-rs-wheel/fsspec_rs/lib<span class="w"> </span>delocate-wheel<span class="w"> </span>--exclude<span class="w"> </span>libfsspec<span class="w"> </span>dist/*.whl
 </pre></div>
 </div>
 <p>Require <code class="docutils literal notranslate"><span class="pre">fsspec-rs</span></code> at run time, at least the version you built against:</p>
