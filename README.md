@@ -23,7 +23,3 @@ Look up [filesystem behavior](docs/src/filesystems.md),
 [Rust traits and types](docs/src/rust.md), or the [Python API](docs/src/api.md).
 [Why fsspec-rs uses explicit protocols and shared traits](docs/src/explanation.md)
 explains the design decisions.
-
-For source installations, follow [How to build from source](docs/src/how-to-build.md).
-[License bundle reference](docs/src/licenses.md) describes which dependency licenses
-are included in wheels.

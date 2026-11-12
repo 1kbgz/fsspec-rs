@@ -276,7 +276,6 @@ section-order = [
 title = "fsspec-rs"
 root = "README.md"
 pages = [
-    "docs/src/how-to-build.md",
     "docs/src/tutorial.md",
     "docs/src/how-to.md",
     "docs/src/how-to-rust.md",
@@ -286,7 +285,5 @@ pages = [
     "docs/src/c-api.md",
     "docs/src/api.md",
     "docs/src/explanation.md",
-    "docs/src/licenses.md",
-    "rust/LICENSES.md",
 ]
 use-autoapi = false
