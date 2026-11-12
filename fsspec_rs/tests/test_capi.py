@@ -223,12 +223,40 @@ def test_header_compiles_and_links(lib, tmp_path, compiler, suffix):
 def test_python_backends_are_reachable_through_the_c_api(lib):
     """In a Python process the registry falls back to fsspec's own backends."""
     import fsspec
+    from fsspec.implementations.memory import MemoryFileSystem
 
-    fs, path = _url_to_fs(lib, "memory://shared/hello.txt")
+    # The native registry has its own memory://, so use a protocol only Python knows.
+    class PythonMemory(MemoryFileSystem):
+        protocol = ("python-memory",)
+
+        @classmethod
+        def _strip_protocol(cls, path):
+            return super()._strip_protocol(path.replace("python-memory://", "memory://", 1))
+
+    fsspec.register_implementation("python-memory", PythonMemory, clobber=True)
+    fs, path = _url_to_fs(lib, "python-memory://shared/hello.txt")
     try:
         assert path == "/shared/hello.txt"
         encoded = path.encode()
         assert lib.fsspec_fs_pipe_file(fs, encoded, len(encoded), b"from c", 6) == 0, lib.fsspec_last_error_message()
     finally:
         lib.fsspec_fs_release(fs)
-    assert fsspec.filesystem("memory").cat("/shared/hello.txt") == b"from c"
+    assert fsspec.filesystem("python-memory").cat("/shared/hello.txt") == b"from c"
+
+
+def test_native_memory_is_the_memory_rs_store(lib):
+    """memory:// in the native registry and memory-rs:// in Python share one store."""
+    import uuid
+
+    from fsspec_rs import MemoryFileSystem
+
+    url = f"memory://{uuid.uuid4().hex}/hello.txt"
+    fs, path = _url_to_fs(lib, url)
+    try:
+        encoded = path.encode()
+        assert lib.fsspec_fs_pipe_file(fs, encoded, len(encoded), b"from c", 6) == 0, lib.fsspec_last_error_message()
+    finally:
+        lib.fsspec_fs_release(fs)
+    memory = MemoryFileSystem()
+    assert memory.cat_file(path) == b"from c"
+    memory.rm_file(path)

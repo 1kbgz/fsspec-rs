@@ -19,16 +19,20 @@ from fsspec_rs.fsspec_rs import (
     FileType,
     RustLocalFile,
     RustLocalFs,
+    RustMemoryFile,
+    RustMemoryFs,
     RustS3File,
     RustS3Fs,
 )
 
 # Re-export Python wrappers
 from fsspec_rs.local import LocalFile, LocalFileSystem
+from fsspec_rs.memory import MemoryFile, MemoryFileSystem
 from fsspec_rs.s3 import S3File, S3FileSystem
 
 _register("file-rs", LocalFileSystem)
 _register("local-rs", LocalFileSystem)
+_register("memory-rs", MemoryFileSystem)
 _register("s3-rs", S3FileSystem)
 del _register
 

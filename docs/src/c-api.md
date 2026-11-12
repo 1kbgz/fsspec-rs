@@ -108,7 +108,7 @@ A null `fsspec_options *` argument means no options.
 | `fsspec_protocols(out)`                                       | Registered protocols, sorted.                                                                                  |
 | `fsspec_register_fallback(factory)`                           | Installs the factory used for protocols nothing registered; null clears it. It is given the whole URL.         |
 
-URL resolution, caching, and the built-in protocols (`file`, `local`, `s3`) and their
+URL resolution, caching, and the built-in protocols (`file`, `local`, `memory`, `s3`) and their
 options are the same as the Rust registry; see
 "Filesystem registry" in the [Rust reference](rust.md).
 

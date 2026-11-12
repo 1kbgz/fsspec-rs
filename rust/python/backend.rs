@@ -24,6 +24,10 @@ mod route {
         Ok(fsspec_sys::url_to_fs("file://", &options)?.0)
     }
 
+    pub fn memory() -> FsResult<SharedFileSystem> {
+        Ok(fsspec_sys::url_to_fs("memory://", &FsOptions::new())?.0)
+    }
+
     pub fn s3(config: S3Config) -> FsResult<SharedFileSystem> {
         let mut options = FsOptions::new();
         let strings = [
@@ -61,6 +65,10 @@ mod route {
         Ok(Arc::new(LocalFs::with_auto_mkdir(auto_mkdir)))
     }
 
+    pub fn memory() -> FsResult<SharedFileSystem> {
+        Ok(fsspec_rs::url_to_fs("memory://", &fsspec_rs::FsOptions::new())?.0)
+    }
+
     pub fn s3(config: S3Config) -> FsResult<SharedFileSystem> {
         Ok(Arc::new(S3Fs::new(config)?))
     }
@@ -75,6 +83,11 @@ mod route {
 
 pub fn local(auto_mkdir: bool) -> FsResult<SharedFileSystem> {
     route::local(auto_mkdir)
+}
+
+/// The process's one in-memory filesystem, the registry's `memory` instance.
+pub fn memory() -> FsResult<SharedFileSystem> {
+    route::memory()
 }
 
 pub fn s3(config: S3Config) -> FsResult<SharedFileSystem> {

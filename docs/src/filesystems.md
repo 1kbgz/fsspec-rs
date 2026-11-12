@@ -3,12 +3,13 @@
 `fsspec-rs` provides Rust-backed filesystems through fsspec classes.
 Importing `fsspec_rs` registers the protocols with fsspec:
 
-| Filesystem       | Protocols             | Class                       |
-| ---------------- | --------------------- | --------------------------- |
-| Local filesystem | `file-rs`, `local-rs` | `fsspec_rs.LocalFileSystem` |
-| Amazon S3        | `s3-rs`               | `fsspec_rs.S3FileSystem`    |
+| Filesystem       | Protocols             | Class                        |
+| ---------------- | --------------------- | ---------------------------- |
+| Local filesystem | `file-rs`, `local-rs` | `fsspec_rs.LocalFileSystem`  |
+| In memory        | `memory-rs`           | `fsspec_rs.MemoryFileSystem` |
+| Amazon S3        | `s3-rs`               | `fsspec_rs.S3FileSystem`     |
 
-The standard `file`, `local`, and `s3` registrations remain unchanged.
+The standard `file`, `local`, `memory`, and `s3` registrations remain unchanged.
 
 ```python
 import fsspec
@@ -95,6 +96,31 @@ Local filesystem methods delegated to Rust include:
 The `cache_type`, `block_size`, and `max_blocks` options are accepted by
 `open()` for API compatibility but do not change local read behavior. Local
 reads use direct filesystem operations.
+
+## In memory
+
+`MemoryFileSystem` wraps the Rust `MemoryFs` backend, which keeps files in
+process memory. Every instance shares one store, so a file written through one
+`MemoryFileSystem` is visible through all of them until the process exits.
+
+```python
+import fsspec
+from fsspec_rs import MemoryFileSystem
+
+fs = MemoryFileSystem()
+fs.pipe_file("/data/example.txt", b"hello")
+
+with fsspec.open("memory-rs://data/example.txt", "rb") as f:
+    print(f.read())
+```
+
+Paths are rooted at `/`. Writing a file needs no `mkdir`: directories exist while
+a file below them does, as in fsspec's `MemoryFileSystem`. `mkdir` creates an
+empty directory that persists until `rmdir` or `rm`. Written files become visible
+when they are closed, so readers never see partial contents.
+
+The store is separate from fsspec's Python `memory://`. In Rust, and to C, C++,
+and other extensions through `libfsspec`, the same store is `memory://`.
 
 ## S3
 
