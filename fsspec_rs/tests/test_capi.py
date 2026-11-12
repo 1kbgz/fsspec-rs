@@ -2,6 +2,8 @@
 
 from ctypes import CDLL, POINTER, Structure, byref, c_bool, c_char_p, c_int32, c_int64, c_size_t, c_uint32, c_uint64, c_void_p, sizeof, string_at
 from pathlib import Path
+from shutil import which
+from subprocess import run
 from sys import platform
 
 import pytest
@@ -163,3 +165,56 @@ def test_extension_shares_the_registry_with_libfsspec(lib):
     factory = Factory(sizeof(Factory), 1, None, None, None, None)
     assert lib.fsspec_register_filesystem(b"probe", 5, byref(factory)) == 0, lib.fsspec_last_error_message()
     assert "probe" in protocols()
+
+
+PROGRAM = """
+#include <stdio.h>
+#include <string.h>
+#include <fsspec/fsspec.h>
+
+int main(int argc, char **argv) {
+    if (argc != 2 || fsspec_abi_version() != FSSPEC_ABI_VERSION) return 2;
+    fsspec_fs *fs = NULL;
+    fsspec_string path = {0};
+    if (fsspec_url_to_fs(argv[1], strlen(argv[1]), NULL, &fs, &path) != FSSPEC_OK) return 3;
+    fsspec_file *file = NULL;
+    fsspec_file_info info;
+    if (fsspec_fs_open(fs, path.data, path.len, "rb", 2, &file) != FSSPEC_OK) return 4;
+    if (fsspec_file_get_info(file, &info) != FSSPEC_OK) return 5;
+    printf("%llu", (unsigned long long)info.size);
+    fsspec_file_info_free(info);
+    fsspec_file_close(file);
+    fsspec_string_free(path);
+    fsspec_fs_release(fs);
+    return 0;
+}
+"""
+
+
+@pytest.mark.parametrize("compiler,suffix", [("cc", ".c"), ("c++", ".cpp")])
+def test_header_compiles_and_links(lib, tmp_path, compiler, suffix):
+    if platform == "win32" or which(compiler) is None:
+        pytest.skip(f"no {compiler} compiler")
+    source = tmp_path / f"program{suffix}"
+    source.write_text(PROGRAM)
+    program = tmp_path / "program"
+    library_dir = fsspec_rs.get_library_dirs()[0]
+    command = [
+        compiler,
+        "-Wall",
+        "-Werror",
+        str(source),
+        "-I",
+        fsspec_rs.get_include(),
+        "-L",
+        library_dir,
+        "-lfsspec",
+        f"-Wl,-rpath,{library_dir}",
+        "-o",
+        str(program),
+    ]
+    run(command, check=True)
+    target = tmp_path / "hello.txt"
+    target.write_bytes(b"hello")
+    result = run([str(program), f"file://{target}"], check=False, capture_output=True, text=True)
+    assert (result.returncode, result.stdout) == (0, "5")

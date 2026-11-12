@@ -139,7 +139,7 @@ pub unsafe extern "C" fn fsspec_file_size(
 
 /// Metadata for the open file.
 #[no_mangle]
-pub unsafe extern "C" fn fsspec_file_info(
+pub unsafe extern "C" fn fsspec_file_get_info(
     file: *mut fsspec_file,
     out: *mut fsspec_file_info,
 ) -> fsspec_status {

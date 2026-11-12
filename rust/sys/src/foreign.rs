@@ -367,7 +367,7 @@ impl FsFile for ForeignFile {
     fn info(&self) -> FsResult<FileInfo> {
         let mut out = MaybeUninit::<fsspec_file_info>::zeroed();
         check(
-            unsafe { ffi::fsspec_file_info(self.handle, out.as_mut_ptr()) },
+            unsafe { ffi::fsspec_file_get_info(self.handle, out.as_mut_ptr()) },
             "fsspec_file_info",
         )?;
         Ok(unsafe { take_info(out.assume_init()) })

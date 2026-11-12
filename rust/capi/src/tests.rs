@@ -255,7 +255,7 @@ fn file_handle_round_trip() {
     assert_eq!(size, 6);
     let mut info = MaybeUninit::<fsspec_file_info>::zeroed();
     assert_eq!(
-        unsafe { fsspec_file_info(file, info.as_mut_ptr()) },
+        unsafe { fsspec_file_get_info(file, info.as_mut_ptr()) },
         FSSPEC_OK
     );
     unsafe { fsspec_file_info_free(info.assume_init()) };
@@ -701,7 +701,7 @@ fn foreign_file_round_trip() {
     assert_eq!(size, 6);
     let mut info = MaybeUninit::<fsspec_file_info>::zeroed();
     assert_eq!(
-        unsafe { fsspec_file_info(file, info.as_mut_ptr()) },
+        unsafe { fsspec_file_get_info(file, info.as_mut_ptr()) },
         FSSPEC_NOT_SUPPORTED
     );
     assert_eq!(unsafe { fsspec_file_commit(file) }, FSSPEC_OK);
