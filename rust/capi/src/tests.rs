@@ -419,6 +419,8 @@ fn local_vtable() -> fsspec_fs_vtable {
         release: Some(vt_release),
         strip_protocol: None,
         unstrip_protocol: None,
+        cat_file: None,
+        pipe_file: None,
     }
 }
 

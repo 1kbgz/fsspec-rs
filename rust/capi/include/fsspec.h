@@ -196,6 +196,17 @@ typedef struct fsspec_fs_vtable {
                                     const char *path,
                                     size_t path_len,
                                     struct fsspec_string *out);
+  fsspec_status (*cat_file)(void *data,
+                            const char *path,
+                            size_t path_len,
+                            const int64_t *start,
+                            const int64_t *end,
+                            struct fsspec_bytes *out);
+  fsspec_status (*pipe_file)(void *data,
+                             const char *path,
+                             size_t path_len,
+                             const uint8_t *bytes,
+                             size_t bytes_len);
 } fsspec_fs_vtable;
 
 /**
@@ -492,6 +503,13 @@ void fsspec_options_free(struct fsspec_options *options);
 fsspec_status fsspec_register_filesystem(const char *protocol,
                                          size_t protocol_len,
                                          const struct fsspec_fs_factory *factory);
+
+/**
+ * Installs the factory used for protocols nothing registered, replacing an
+ * earlier one; null clears it. The factory is given the whole URL. The
+ * factory struct is copied.
+ */
+fsspec_status fsspec_register_fallback(const struct fsspec_fs_factory *factory);
 
 /**
  * The registered protocols in sorted order.

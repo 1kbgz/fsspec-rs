@@ -9,13 +9,13 @@ use std::ptr;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use fsspec_rs::{
-    strip_protocol_default, unstrip_protocol_default, FileInfo, FileSystem, FilesystemFactory,
-    FsError, FsFile, FsOptions, FsResult, OpenMode, OpenOptions, SharedFileSystem,
-    DEFAULT_FILESYSTEMS,
+    cat_file_default, pipe_file_default, strip_protocol_default, unstrip_protocol_default,
+    FileInfo, FileSystem, FilesystemFactory, FsError, FsFile, FsOptions, FsResult, OpenMode,
+    OpenOptions, SharedFileSystem, DEFAULT_FILESYSTEMS,
 };
 use fsspec_sys::types::{
-    fsspec_file, fsspec_file_info, fsspec_file_info_list, fsspec_file_vtable, fsspec_fs,
-    fsspec_fs_factory, fsspec_fs_vtable, fsspec_options, fsspec_status, fsspec_string,
+    fsspec_bytes, fsspec_file, fsspec_file_info, fsspec_file_info_list, fsspec_file_vtable,
+    fsspec_fs, fsspec_fs_factory, fsspec_fs_vtable, fsspec_options, fsspec_status, fsspec_string,
     fsspec_string_list,
 };
 
@@ -213,6 +213,52 @@ impl FileSystem for ForeignFileSystem {
                 .unwrap_or_else(|_| unstrip_protocol_default(&self.protocols, path)),
             None => unstrip_protocol_default(&self.protocols, path),
         }
+    }
+
+    fn cat_file(&self, path: &str, start: Option<i64>, end: Option<i64>) -> FsResult<Vec<u8>> {
+        let Some(cat_file) = self.vtable.cat_file else {
+            return cat_file_default(self, path, start, end);
+        };
+        let mut out = fsspec_bytes {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+        check(
+            unsafe {
+                cat_file(
+                    self.data,
+                    path.as_ptr() as *const c_char,
+                    path.len(),
+                    start
+                        .as_ref()
+                        .map_or(ptr::null(), |start| start as *const i64),
+                    end.as_ref().map_or(ptr::null(), |end| end as *const i64),
+                    &mut out,
+                )
+            },
+            "cat_file",
+        )?;
+        let bytes = unsafe { out.as_slice().to_vec() };
+        unsafe { out.free() };
+        Ok(bytes)
+    }
+
+    fn pipe_file(&self, path: &str, data: &[u8]) -> FsResult<()> {
+        let Some(pipe_file) = self.vtable.pipe_file else {
+            return pipe_file_default(self, path, data);
+        };
+        check(
+            unsafe {
+                pipe_file(
+                    self.data,
+                    path.as_ptr() as *const c_char,
+                    path.len(),
+                    data.as_ptr(),
+                    data.len(),
+                )
+            },
+            "pipe_file",
+        )
     }
 
     fn ls(&self, path: &str, detail: bool) -> FsResult<Vec<FileInfo>> {
@@ -483,6 +529,29 @@ pub unsafe extern "C" fn fsspec_register_filesystem(
             .write()
             .unwrap_or_else(PoisonError::into_inner)
             .register(protocol, ForeignFactory { factory });
+        Ok(())
+    })
+}
+
+/// Installs the factory used for protocols nothing registered, replacing an
+/// earlier one; null clears it. The factory is given the whole URL. The
+/// factory struct is copied.
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_register_fallback(
+    factory: *const fsspec_fs_factory,
+) -> fsspec_status {
+    guard(|| {
+        let factory = if factory.is_null() {
+            None
+        } else {
+            Some(ForeignFactory {
+                factory: copy_versioned(factory, "factory")?,
+            })
+        };
+        DEFAULT_FILESYSTEMS
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .set_fallback(factory);
         Ok(())
     })
 }

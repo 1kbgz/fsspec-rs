@@ -218,3 +218,17 @@ def test_header_compiles_and_links(lib, tmp_path, compiler, suffix):
     target.write_bytes(b"hello")
     result = run([str(program), f"file://{target}"], check=False, capture_output=True, text=True)
     assert (result.returncode, result.stdout) == (0, "5")
+
+
+def test_python_backends_are_reachable_through_the_c_api(lib):
+    """In a Python process the registry falls back to fsspec's own backends."""
+    import fsspec
+
+    fs, path = _url_to_fs(lib, "memory://shared/hello.txt")
+    try:
+        assert path == "/shared/hello.txt"
+        encoded = path.encode()
+        assert lib.fsspec_fs_pipe_file(fs, encoded, len(encoded), b"from c", 6) == 0, lib.fsspec_last_error_message()
+    finally:
+        lib.fsspec_fs_release(fs)
+    assert fsspec.filesystem("memory").cat("/shared/hello.txt") == b"from c"

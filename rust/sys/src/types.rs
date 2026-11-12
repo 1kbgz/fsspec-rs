@@ -233,6 +233,25 @@ pub struct fsspec_fs_vtable {
             out: *mut fsspec_string,
         ) -> fsspec_status,
     >,
+    pub cat_file: Option<
+        unsafe extern "C" fn(
+            data: *mut c_void,
+            path: *const c_char,
+            path_len: usize,
+            start: *const i64,
+            end: *const i64,
+            out: *mut fsspec_bytes,
+        ) -> fsspec_status,
+    >,
+    pub pipe_file: Option<
+        unsafe extern "C" fn(
+            data: *mut c_void,
+            path: *const c_char,
+            path_len: usize,
+            bytes: *const u8,
+            bytes_len: usize,
+        ) -> fsspec_status,
+    >,
 }
 
 /// A foreign open file. `read` and `write` move at most `len` bytes and

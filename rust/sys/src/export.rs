@@ -5,6 +5,7 @@
 use std::ffi::{c_char, c_void, CString};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::mem::size_of;
+use std::ptr;
 
 use fsspec_rs::{FilesystemFactory, FsError, FsFile, FsResult, OpenMode, SharedFileSystem};
 
@@ -67,6 +68,39 @@ unsafe extern "C" fn fs_unstrip_protocol(
     guard(|| {
         let unstripped = fs_data(data).unstrip_protocol(str_arg(path, len)?);
         write_out(out, fsspec_string::from_string(unstripped))
+    })
+}
+
+unsafe extern "C" fn fs_cat_file(
+    data: *mut c_void,
+    path: *const c_char,
+    len: usize,
+    start: *const i64,
+    end: *const i64,
+    out: *mut fsspec_bytes,
+) -> fsspec_status {
+    guard(|| {
+        let start = if start.is_null() { None } else { Some(*start) };
+        let end = if end.is_null() { None } else { Some(*end) };
+        let bytes = fs_data(data).cat_file(str_arg(path, len)?, start, end)?;
+        write_out(out, fsspec_bytes::from_vec(bytes))
+    })
+}
+
+unsafe extern "C" fn fs_pipe_file(
+    data: *mut c_void,
+    path: *const c_char,
+    len: usize,
+    bytes: *const u8,
+    bytes_len: usize,
+) -> fsspec_status {
+    guard(|| {
+        let bytes = if bytes.is_null() {
+            &[][..]
+        } else {
+            std::slice::from_raw_parts(bytes, bytes_len)
+        };
+        fs_data(data).pipe_file(str_arg(path, len)?, bytes)
     })
 }
 
@@ -146,6 +180,8 @@ pub fn export_filesystem(fs: SharedFileSystem) -> FsResult<*mut fsspec_fs> {
         release: Some(fs_release),
         strip_protocol: Some(fs_strip_protocol),
         unstrip_protocol: Some(fs_unstrip_protocol),
+        cat_file: Some(fs_cat_file),
+        pipe_file: Some(fs_pipe_file),
     };
     let data = Box::into_raw(Box::new(FsData { fs })) as *mut c_void;
     let handle = unsafe { ffi::fsspec_fs_from_vtable(&vtable, data) };
@@ -308,16 +344,35 @@ unsafe extern "C" fn factory_release(data: *mut c_void) {
     drop(Box::from_raw(data as *mut BoxedFactory));
 }
 
-pub(crate) fn register_factory(protocol: &str, factory: BoxedFactory) -> FsResult<()> {
-    let data = Box::into_raw(Box::new(factory)) as *mut c_void;
-    let descriptor = fsspec_fs_factory {
+fn factory_descriptor(factory: BoxedFactory) -> fsspec_fs_factory {
+    fsspec_fs_factory {
         struct_size: size_of::<fsspec_fs_factory>(),
         abi_version: FSSPEC_ABI_VERSION,
-        data,
+        data: Box::into_raw(Box::new(factory)) as *mut c_void,
         create: Some(factory_create),
         instance_scope: Some(factory_scope),
         release: Some(factory_release),
-    };
+    }
+}
+
+/// Installs `factory` as the shared registry's fallback, or clears it.
+pub(crate) fn register_fallback(factory: Option<BoxedFactory>) -> FsResult<()> {
+    let descriptor = factory.map(factory_descriptor);
+    let pointer = descriptor.as_ref().map_or(ptr::null(), |descriptor| {
+        descriptor as *const fsspec_fs_factory
+    });
+    let status = unsafe { ffi::fsspec_register_fallback(pointer) };
+    if status != FSSPEC_OK {
+        if let Some(descriptor) = descriptor {
+            unsafe { factory_release(descriptor.data) };
+        }
+    }
+    check(status, "fsspec_register_fallback")
+}
+
+pub(crate) fn register_factory(protocol: &str, factory: BoxedFactory) -> FsResult<()> {
+    let descriptor = factory_descriptor(factory);
+    let data = descriptor.data;
     let (protocol_ptr, protocol_len) = arg(protocol);
     let status =
         unsafe { ffi::fsspec_register_filesystem(protocol_ptr, protocol_len, &descriptor) };

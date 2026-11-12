@@ -124,6 +124,14 @@ pub fn register_filesystem<F: FilesystemFactory + 'static>(
     export::register_factory(protocol, Box::new(factory))
 }
 
+/// Installs `factory` as the shared registry's fallback for protocols nothing
+/// registered, or clears it with `None`. The fallback is given the whole URL.
+pub fn register_fallback<F: FilesystemFactory + 'static>(factory: Option<F>) -> FsResult<()> {
+    export::register_fallback(
+        factory.map(|factory| Box::new(factory) as Box<dyn FilesystemFactory>),
+    )
+}
+
 /// Routes `fsspec_rs::url_to_fs` and `fsspec_rs::register_filesystem` through
 /// `libfsspec` for the rest of the process, so crates that only know fsspec_rs
 /// share its registry instead of the one compiled into this binary. Call it
@@ -132,6 +140,7 @@ pub fn register_filesystem<F: FilesystemFactory + 'static>(
 pub fn use_shared_registry() {
     let _ = fsspec_rs::set_registry_hooks(RegistryHooks {
         register: export::register_factory,
+        set_fallback: export::register_fallback,
         url_to_fs,
     });
 }
