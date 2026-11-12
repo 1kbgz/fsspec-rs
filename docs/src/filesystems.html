@@ -156,6 +156,9 @@
     <a href="#local-operations">Local operations</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
+    <a href="#in-memory">In memory</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
     <a href="#s3">S3</a>
   </li>
   <li class="fd-toc-item" data-depth="2">
@@ -193,13 +196,17 @@ Importing <code class="docutils literal notranslate"><span class="pre">fsspec_rs
 <td><p><code class="docutils literal notranslate"><span class="pre">file-rs</span></code>, <code class="docutils literal notranslate"><span class="pre">local-rs</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">fsspec_rs.LocalFileSystem</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p>Amazon S3</p></td>
+<tr class="row-odd"><td><p>In memory</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">memory-rs</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fsspec_rs.MemoryFileSystem</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Amazon S3</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">s3-rs</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">fsspec_rs.S3FileSystem</span></code></p></td>
 </tr>
 </tbody>
 </table>
-<p>The standard <code class="docutils literal notranslate"><span class="pre">file</span></code>, <code class="docutils literal notranslate"><span class="pre">local</span></code>, and <code class="docutils literal notranslate"><span class="pre">s3</span></code> registrations remain unchanged.</p>
+<p>The standard <code class="docutils literal notranslate"><span class="pre">file</span></code>, <code class="docutils literal notranslate"><span class="pre">local</span></code>, <code class="docutils literal notranslate"><span class="pre">memory</span></code>, and <code class="docutils literal notranslate"><span class="pre">s3</span></code> registrations remain unchanged.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">fsspec</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">fsspec_rs</span>
 
@@ -276,6 +283,28 @@ or the complete new contents. <code class="docutils literal notranslate"><span c
 <code class="docutils literal notranslate"><span class="pre">open()</span></code> for API compatibility but do not change local read behavior. Local
 reads use direct filesystem operations.</p>
 </section>
+</section>
+<section id="in-memory">
+<h2>In memory<a class="headerlink" href="#in-memory" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">MemoryFileSystem</span></code> wraps the Rust <code class="docutils literal notranslate"><span class="pre">MemoryFs</span></code> backend, which keeps files in
+process memory. Every instance shares one store, so a file written through one
+<code class="docutils literal notranslate"><span class="pre">MemoryFileSystem</span></code> is visible through all of them until the process exits.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">fsspec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryFileSystem</span>
+
+<span class="n">fs</span> <span class="o">=</span> <span class="n">MemoryFileSystem</span><span class="p">()</span>
+<span class="n">fs</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="s2">"/data/example.txt"</span><span class="p">,</span> <span class="sa">b</span><span class="s2">"hello"</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">fsspec</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"memory-rs://data/example.txt"</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>Paths are rooted at <code class="docutils literal notranslate"><span class="pre">/</span></code>. Writing a file needs no <code class="docutils literal notranslate"><span class="pre">mkdir</span></code>: directories exist while
+a file below them does, as in fsspec’s <code class="docutils literal notranslate"><span class="pre">MemoryFileSystem</span></code>. <code class="docutils literal notranslate"><span class="pre">mkdir</span></code> creates an
+empty directory that persists until <code class="docutils literal notranslate"><span class="pre">rmdir</span></code> or <code class="docutils literal notranslate"><span class="pre">rm</span></code>. Written files become visible
+when they are closed, so readers never see partial contents.</p>
+<p>The store is separate from fsspec’s Python <code class="docutils literal notranslate"><span class="pre">memory://</span></code>. In Rust, and to C, C++,
+and other extensions through <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>, the same store is <code class="docutils literal notranslate"><span class="pre">memory://</span></code>.</p>
 </section>
 <section id="s3">
 <h2>S3<a class="headerlink" href="#s3" title="Link to this heading">¶</a></h2>
@@ -435,6 +464,9 @@ not support concurrent multipart uploads or signed URLs.</p>
   </li>
   <li class="fd-toc-item" data-depth="2">
     <a href="#local-operations">Local operations</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#in-memory">In memory</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#s3">S3</a>

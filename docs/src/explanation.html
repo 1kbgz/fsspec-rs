@@ -175,10 +175,11 @@ applications can use the native backends without Python. A separate bridge crate
 lets Rust callers use Python fsspec implementations through the same trait.</p>
 <section id="explicit-protocols-preserve-compatibility">
 <h2>Explicit protocols preserve compatibility<a class="headerlink" href="#explicit-protocols-preserve-compatibility" title="Link to this heading">¶</a></h2>
-<p>fsspec already assigns <code class="docutils literal notranslate"><span class="pre">file</span></code>, <code class="docutils literal notranslate"><span class="pre">local</span></code>, and <code class="docutils literal notranslate"><span class="pre">s3</span></code> to established Python implementations.
-Replacing those registrations globally would make importing <code class="docutils literal notranslate"><span class="pre">fsspec-rs</span></code> change unrelated
-application behavior. The <code class="docutils literal notranslate"><span class="pre">file-rs</span></code>, <code class="docutils literal notranslate"><span class="pre">local-rs</span></code>, and <code class="docutils literal notranslate"><span class="pre">s3-rs</span></code> names make backend selection
-explicit in configuration and allow both implementations to coexist.</p>
+<p>fsspec already assigns <code class="docutils literal notranslate"><span class="pre">file</span></code>, <code class="docutils literal notranslate"><span class="pre">local</span></code>, <code class="docutils literal notranslate"><span class="pre">memory</span></code>, and <code class="docutils literal notranslate"><span class="pre">s3</span></code> to established Python
+implementations. Replacing those registrations globally would make importing <code class="docutils literal notranslate"><span class="pre">fsspec-rs</span></code>
+change unrelated application behavior. The <code class="docutils literal notranslate"><span class="pre">file-rs</span></code>, <code class="docutils literal notranslate"><span class="pre">local-rs</span></code>, <code class="docutils literal notranslate"><span class="pre">memory-rs</span></code>, and <code class="docutils literal notranslate"><span class="pre">s3-rs</span></code>
+names make backend selection explicit in configuration and allow both implementations to
+coexist.</p>
 <p>The classes still inherit from <code class="docutils literal notranslate"><span class="pre">fsspec.spec.AbstractFileSystem</span></code>. Code written against
 fsspec operations can therefore select a Rust backend without switching to a different
 API.</p>

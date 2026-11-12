@@ -44,7 +44,7 @@ with fsspec.open(
     summary = file.read()
 ```
 
-Keep `file`, `local`, and `s3` URLs when you want the existing Python implementations.
+Keep `file`, `local`, `memory`, and `s3` URLs when you want the existing Python implementations.
 Use the `-rs` protocols to select the Rust-backed implementations explicitly.
 
 ## Configure an S3-compatible service

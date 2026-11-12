@@ -7,10 +7,11 @@ lets Rust callers use Python fsspec implementations through the same trait.
 
 ## Explicit protocols preserve compatibility
 
-fsspec already assigns `file`, `local`, and `s3` to established Python implementations.
-Replacing those registrations globally would make importing `fsspec-rs` change unrelated
-application behavior. The `file-rs`, `local-rs`, and `s3-rs` names make backend selection
-explicit in configuration and allow both implementations to coexist.
+fsspec already assigns `file`, `local`, `memory`, and `s3` to established Python
+implementations. Replacing those registrations globally would make importing `fsspec-rs`
+change unrelated application behavior. The `file-rs`, `local-rs`, `memory-rs`, and `s3-rs`
+names make backend selection explicit in configuration and allow both implementations to
+coexist.
 
 The classes still inherit from `fsspec.spec.AbstractFileSystem`. Code written against
 fsspec operations can therefore select a Rust backend without switching to a different
