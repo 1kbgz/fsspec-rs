@@ -173,6 +173,7 @@ replaces its factory and drops its cached instances.
 | Protocol        | Filesystem                      | Options                                                                                    |
 | --------------- | ------------------------------- | ------------------------------------------------------------------------------------------ |
 | `file`, `local` | `LocalFs`                       | `auto_mkdir`                                                                               |
+| `memory`        | `MemoryFs`, one per process     | none                                                                                       |
 | `s3`            | `S3Fs`, one instance per bucket | `key`, `secret`, `token`, `endpoint_url`, `region`, `anon`, `virtual_hosted_style_request` |
 
 Unknown options are rejected. Boolean options accept `true`, `false`, `1`, and `0`.

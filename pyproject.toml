@@ -62,6 +62,7 @@ develop = [
 [project.entry-points."fsspec.specs"]
 file-rs = "fsspec_rs.local:LocalFileSystem"
 local-rs = "fsspec_rs.local:LocalFileSystem"
+memory-rs = "fsspec_rs.memory:MemoryFileSystem"
 s3-rs = "fsspec_rs.s3:S3FileSystem"
 
 [project.scripts]

@@ -17,12 +17,15 @@ pub mod types;
 mod async_fs;
 mod fs;
 mod local;
+mod memory;
 mod s3;
 
 #[cfg(test)]
 mod cache_tests;
 #[cfg(test)]
 mod local_tests;
+#[cfg(test)]
+mod memory_tests;
 #[cfg(test)]
 mod registry_tests;
 #[cfg(test)]
@@ -40,6 +43,7 @@ pub use fs::{
     FileSystem,
 };
 pub use local::{LocalFile, LocalFs};
+pub use memory::{MemoryFile, MemoryFs};
 pub use registry::{
     register_filesystem, set_fallback_filesystem, set_registry_hooks, try_register_filesystem,
     url_to_fs, FilesystemFactory, FilesystemRegistry, FsOptions, RegistryHooks, SharedFileSystem,

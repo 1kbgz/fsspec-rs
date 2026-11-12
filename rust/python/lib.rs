@@ -5,10 +5,12 @@ use pyo3::types::PyDict;
 
 mod backend;
 mod local;
+mod memory;
 mod s3;
 mod types;
 
 pub use local::{RustLocalFile, RustLocalFs};
+pub use memory::{RustMemoryFile, RustMemoryFs};
 pub use s3::{RustS3File, RustS3Fs};
 pub use types::{PyFileInfo, PyFileType};
 
@@ -21,6 +23,10 @@ fn fsspec_rs(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     // Local filesystem
     m.add_class::<RustLocalFs>()?;
     m.add_class::<RustLocalFile>()?;
+
+    // In-memory filesystem
+    m.add_class::<RustMemoryFs>()?;
+    m.add_class::<RustMemoryFile>()?;
 
     // S3 filesystem
     m.add_class::<RustS3Fs>()?;
