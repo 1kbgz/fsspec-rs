@@ -258,7 +258,7 @@ fsspec_status fsspec_file_size(struct fsspec_file *file, int64_t *out_size);
 /**
  * Metadata for the open file.
  */
-fsspec_status fsspec_file_info(struct fsspec_file *file, struct fsspec_file_info *out);
+fsspec_status fsspec_file_get_info(struct fsspec_file *file, struct fsspec_file_info *out);
 
 /**
  * Commits a transactional write.

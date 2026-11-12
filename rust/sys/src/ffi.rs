@@ -143,7 +143,10 @@ extern "C" {
     pub fn fsspec_file_tell(file: *mut fsspec_file, out_position: *mut u64) -> fsspec_status;
     pub fn fsspec_file_flush(file: *mut fsspec_file) -> fsspec_status;
     pub fn fsspec_file_size(file: *mut fsspec_file, out_size: *mut i64) -> fsspec_status;
-    pub fn fsspec_file_info(file: *mut fsspec_file, out: *mut fsspec_file_info) -> fsspec_status;
+    pub fn fsspec_file_get_info(
+        file: *mut fsspec_file,
+        out: *mut fsspec_file_info,
+    ) -> fsspec_status;
     pub fn fsspec_file_commit(file: *mut fsspec_file) -> fsspec_status;
     pub fn fsspec_file_discard(file: *mut fsspec_file) -> fsspec_status;
     pub fn fsspec_file_close(file: *mut fsspec_file) -> fsspec_status;
