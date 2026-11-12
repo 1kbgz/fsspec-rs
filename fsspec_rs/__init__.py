@@ -1,6 +1,6 @@
 """fsspec-rs: fsspec-compatible backends with Rust acceleration."""
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 import os as _os
 from pathlib import Path as _Path
