@@ -49,8 +49,40 @@ The experimental `AsyncFileSystem` trait defines an async interface without chan
 synchronous one. Its status and methods are documented in the
 [Rust reference](rust.md).
 
+## One registry per process
+
+A Rust crate compiled into a Python extension is private to that extension. When
+`fsspec-rs`, `fsspec-db`, and `fsspec-kafka` each compile `fsspec_rs` in, a process loads
+three copies of its code and three registries, so a backend registered by one extension
+is invisible to the others. Rust has no stable ABI, so a `dyn FileSystem` cannot be passed
+from one extension to another either.
+
+`libfsspec` fixes both with a C ABI. The registry, its instance cache, and the
+built-in backends are compiled into that one shared library, and every extension links
+it dynamically. A filesystem is passed between extensions as an opaque handle with a table
+of C function pointers, which every compiler and language supports.
+
+The work is split across three crates so that only one of them has shared state:
+
+- `fsspec_rs` has the traits and backends. Compiling the traits into several extensions
+  is harmless; its own registry stays private to the binary that compiles it in.
+- `fsspec_capi` builds `libfsspec` and is the only crate with the shared registry.
+- `fsspec_sys` declares the C functions without implementing them. Extensions depend on
+  it to reach `libfsspec`; it must never depend on `fsspec_capi`, or every extension
+  would export its own copy of the C functions.
+
+The C ABI costs a function-pointer call per operation and copies of returned strings and
+buffers. Single-binary Rust programs avoid both by using `fsspec_rs` and its registry
+directly. Pyodide builds do the same, because Emscripten wheels cannot share libraries
+yet.
+
+The same library serves C and C++ programs. They link `libfsspec` and see the backends
+that Python extensions register.
+
 ## See also
 
 - Follow the [local filesystem tutorial](tutorial.md).
 - Use the [filesystem how-to guide](how-to.md) for S3 and caching.
 - Look up [filesystem behavior](filesystems.md) and the [Python API](api.md).
+- Share filesystems across extensions and languages with the
+  [libfsspec how-to](how-to-libfsspec.md) and the [C API reference](c-api.md).
