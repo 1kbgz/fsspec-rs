@@ -1,7 +1,10 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use crate::registry::{FilesystemRegistry, FsOptions, SharedFileSystem};
+use crate::registry::{
+    set_registry_hooks, try_register_filesystem, url_to_fs, FilesystemRegistry, FsOptions,
+    RegistryHooks, SharedFileSystem, DEFAULT_FILESYSTEMS,
+};
 use crate::{FsError, LocalFs};
 
 fn options(pairs: &[(&str, &str)]) -> FsOptions {
@@ -122,4 +125,40 @@ fn rejects_unknown_protocols_options_and_chained_urls() {
         registry.url_to_fs("simplecache::s3://b/a", &FsOptions::new()),
         Err(FsError::NotSupported(_))
     ));
+}
+
+#[test]
+fn hooks_route_the_process_wide_functions() {
+    // The hooks are process-wide, so these forward to the default registry and only count.
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+    let hooks = RegistryHooks {
+        register: |protocol, factory| {
+            CALLS.fetch_add(1, Ordering::SeqCst);
+            DEFAULT_FILESYSTEMS
+                .write()
+                .unwrap()
+                .register(protocol, factory);
+            Ok(())
+        },
+        url_to_fs: |url, options| {
+            CALLS.fetch_add(1, Ordering::SeqCst);
+            DEFAULT_FILESYSTEMS.read().unwrap().url_to_fs(url, options)
+        },
+    };
+    assert!(set_registry_hooks(hooks).is_ok());
+    assert!(set_registry_hooks(RegistryHooks {
+        register: |_, _| Err(FsError::Other("second".into())),
+        url_to_fs: |_, _| Err(FsError::Other("second".into())),
+    })
+    .is_err());
+
+    let before = CALLS.load(Ordering::SeqCst);
+    try_register_filesystem("hooked", |_: &str, _: &FsOptions| {
+        Ok(Arc::new(LocalFs::new()) as SharedFileSystem)
+    })
+    .unwrap();
+    let (fs, path) = url_to_fs("hooked://x/y", &FsOptions::new()).unwrap();
+    assert_eq!(path, "x/y");
+    assert!(fs.exists("/").unwrap());
+    assert_eq!(CALLS.load(Ordering::SeqCst), before + 2);
 }

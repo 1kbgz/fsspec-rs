@@ -67,6 +67,12 @@ register_filesystem("scratch", |_path: &str, _options: &FsOptions| {
 To keep registrations out of the process-wide registry, build a
 `FilesystemRegistry` and call `register` and `url_to_fs` on it.
 
+In a process that loads the shared `libfsspec` (every wheel built from this
+repository, and any extension linked against it), `fsspec_sys::use_shared_registry()`
+routes `register_filesystem` and `url_to_fs` through that library, so a protocol
+registered by one extension is visible to every other crate in the process.
+Call it once before registering anything.
+
 ## Call a Python fsspec backend from Rust
 
 Use the bridge crate in a Python extension or embedded-Python application. It

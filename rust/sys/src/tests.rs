@@ -190,3 +190,25 @@ fn exported_filesystem_handle_is_reference_counted() {
     second.pipe_file(&path, b"still open").unwrap();
     assert_eq!(second.cat_file(&path, None, None).unwrap(), b"still open");
 }
+
+#[test]
+fn shared_registry_hooks_route_fsspec_rs_functions_through_libfsspec() {
+    use_shared_registry();
+    use_shared_registry();
+    let dir = tempfile::tempdir().unwrap();
+
+    fsspec_rs::register_filesystem("hooked", |_: &str, _: &FsOptions| {
+        Ok(Arc::new(LocalFs::new()) as SharedFileSystem)
+    });
+    assert!(protocols().unwrap().contains(&"hooked".to_string()));
+
+    // "hooked" exists only in libfsspec's registry, so resolving it proves the route.
+    let (fs, path) = fsspec_rs::url_to_fs(
+        &format!("hooked://{}", dir.path().display()),
+        &FsOptions::new(),
+    )
+    .unwrap();
+    fs.pipe_file(&join(Path::new(&path), "via-hook.txt"), b"shared")
+        .unwrap();
+    assert!(dir.path().join("via-hook.txt").exists());
+}

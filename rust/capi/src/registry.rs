@@ -436,7 +436,10 @@ pub unsafe extern "C" fn fsspec_register_filesystem(
             return Err(invalid("protocol is empty"));
         }
         let factory = copy_versioned(factory, "factory")?;
-        fsspec_rs::register_filesystem(protocol, ForeignFactory { factory });
+        DEFAULT_FILESYSTEMS
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .register(protocol, ForeignFactory { factory });
         Ok(())
     })
 }

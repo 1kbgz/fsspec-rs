@@ -26,7 +26,7 @@ mod tests;
 use std::ptr;
 use std::sync::Arc;
 
-use fsspec_rs::{FilesystemFactory, FsOptions, FsResult, SharedFileSystem};
+use fsspec_rs::{FilesystemFactory, FsOptions, FsResult, RegistryHooks, SharedFileSystem};
 
 pub use export::{export_file, export_filesystem};
 pub use foreign::{open_options_map, ForeignFile, ForeignFileSystem};
@@ -122,4 +122,16 @@ pub fn register_filesystem<F: FilesystemFactory + 'static>(
     factory: F,
 ) -> FsResult<()> {
     export::register_factory(protocol, Box::new(factory))
+}
+
+/// Routes `fsspec_rs::url_to_fs` and `fsspec_rs::register_filesystem` through
+/// `libfsspec` for the rest of the process, so crates that only know fsspec_rs
+/// share its registry instead of the one compiled into this binary. Call it
+/// once at startup, before anything registers a protocol; later calls do
+/// nothing.
+pub fn use_shared_registry() {
+    let _ = fsspec_rs::set_registry_hooks(RegistryHooks {
+        register: export::register_factory,
+        url_to_fs,
+    });
 }

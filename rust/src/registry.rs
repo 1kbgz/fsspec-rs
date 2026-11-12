@@ -3,7 +3,7 @@
 //! backend crates export a factory and applications register it.
 
 use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock, PoisonError, RwLock};
 
 use crate::error::{FsError, FsResult};
 use crate::fs::FileSystem;
@@ -35,6 +35,16 @@ where
 {
     fn create(&self, path: &str, options: &FsOptions) -> FsResult<SharedFileSystem> {
         self(path, options)
+    }
+}
+
+impl FilesystemFactory for Box<dyn FilesystemFactory> {
+    fn create(&self, path: &str, options: &FsOptions) -> FsResult<SharedFileSystem> {
+        (**self).create(path, options)
+    }
+
+    fn instance_scope(&self, path: &str) -> String {
+        (**self).instance_scope(path)
     }
 }
 
@@ -141,16 +151,55 @@ impl FilesystemRegistry {
 pub static DEFAULT_FILESYSTEMS: LazyLock<RwLock<FilesystemRegistry>> =
     LazyLock::new(|| RwLock::new(FilesystemRegistry::default()));
 
-/// Registers `factory` for `protocol` in [`DEFAULT_FILESYSTEMS`].
-pub fn register_filesystem<F: FilesystemFactory + 'static>(protocol: &str, factory: F) {
-    DEFAULT_FILESYSTEMS
-        .write()
-        .unwrap_or_else(PoisonError::into_inner)
-        .register(protocol, factory);
+/// Routes [`register_filesystem`] and [`url_to_fs`] to another registry, such as the
+/// one inside a shared `libfsspec`, so every crate in the process that only knows
+/// fsspec_rs still sees one set of protocols.
+pub struct RegistryHooks {
+    pub register: fn(&str, Box<dyn FilesystemFactory>) -> FsResult<()>,
+    pub url_to_fs: fn(&str, &FsOptions) -> FsResult<(SharedFileSystem, String)>,
 }
 
-/// Resolves `url` through [`DEFAULT_FILESYSTEMS`]; see [`FilesystemRegistry::url_to_fs`].
+static HOOKS: OnceLock<RegistryHooks> = OnceLock::new();
+
+/// Installs `hooks` for the rest of the process. Only the first call takes effect;
+/// a later call gets its hooks back.
+pub fn set_registry_hooks(hooks: RegistryHooks) -> Result<(), RegistryHooks> {
+    HOOKS.set(hooks)
+}
+
+/// Registers `factory` for `protocol` in [`DEFAULT_FILESYSTEMS`], or through the
+/// installed [`RegistryHooks`].
+pub fn try_register_filesystem<F: FilesystemFactory + 'static>(
+    protocol: &str,
+    factory: F,
+) -> FsResult<()> {
+    match HOOKS.get() {
+        Some(hooks) => (hooks.register)(protocol, Box::new(factory)),
+        None => {
+            DEFAULT_FILESYSTEMS
+                .write()
+                .unwrap_or_else(PoisonError::into_inner)
+                .register(protocol, factory);
+            Ok(())
+        }
+    }
+}
+
+/// Registers `factory` for `protocol`; see [`try_register_filesystem`].
+///
+/// # Panics
+///
+/// When installed [`RegistryHooks`] reject the registration.
+pub fn register_filesystem<F: FilesystemFactory + 'static>(protocol: &str, factory: F) {
+    try_register_filesystem(protocol, factory).expect("registering a filesystem factory");
+}
+
+/// Resolves `url` through [`DEFAULT_FILESYSTEMS`] or the installed [`RegistryHooks`];
+/// see [`FilesystemRegistry::url_to_fs`].
 pub fn url_to_fs(url: &str, options: &FsOptions) -> FsResult<(SharedFileSystem, String)> {
+    if let Some(hooks) = HOOKS.get() {
+        return (hooks.url_to_fs)(url, options);
+    }
     DEFAULT_FILESYSTEMS
         .read()
         .unwrap_or_else(PoisonError::into_inner)
