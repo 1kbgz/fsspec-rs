@@ -332,6 +332,13 @@ write, append, exclusive-create, and copy operations.</p>
 <h2>S3Fs<a class="headerlink" href="#s3fs" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> wraps <code class="docutils literal notranslate"><span class="pre">object_store::aws::AmazonS3</span></code> and runs its async calls through an
 embedded Tokio runtime to implement the synchronous <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> trait.</p>
+<p><code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> and the registry’s <code class="docutils literal notranslate"><span class="pre">s3</span></code> protocol come from the <code class="docutils literal notranslate"><span class="pre">s3</span></code> feature, which is on by
+default. With <code class="docutils literal notranslate"><span class="pre">default-features</span> <span class="pre">=</span> <span class="pre">false</span></code> the crate does not depend on <code class="docutils literal notranslate"><span class="pre">object_store</span></code> or
+Tokio and builds for <code class="docutils literal notranslate"><span class="pre">wasm32-unknown-unknown</span></code>:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[dependencies]</span>
+<span class="n">fsspec_rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"0.2"</span><span class="p">,</span><span class="w"> </span><span class="n">default-features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">false</span><span class="w"> </span><span class="p">}</span>
+</pre></div>
+</div>
 <p><code class="docutils literal notranslate"><span class="pre">S3Config</span></code> supports:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">bucket</span></code></p></li>
