@@ -136,6 +136,15 @@ write, append, exclusive-create, and copy operations.
 `S3Fs` wraps `object_store::aws::AmazonS3` and runs its async calls through an
 embedded Tokio runtime to implement the synchronous `FileSystem` trait.
 
+`S3Fs` and the registry's `s3` protocol come from the `s3` feature, which is on by
+default. With `default-features = false` the crate does not depend on `object_store` or
+Tokio and builds for `wasm32-unknown-unknown`:
+
+```toml
+[dependencies]
+fsspec_rs = { version = "0.2", default-features = false }
+```
+
 `S3Config` supports:
 
 - `bucket`

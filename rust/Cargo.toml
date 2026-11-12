@@ -14,11 +14,16 @@ path = "src/lib.rs"
 crate-type = ["rlib"]
 
 [dependencies]
-object_store = { version = "0.14", features = ["aws"] }
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
+object_store = { version = "0.14", features = ["aws"], optional = true }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"], optional = true }
 bytes = "1"
 url = "2"
 percent-encoding = "2"
+
+[features]
+default = ["s3"]
+# S3Fs and the `s3` registry protocol. Without it the crate builds for wasm32-unknown-unknown.
+s3 = ["dep:object_store", "dep:tokio"]
 
 [dev-dependencies]
 tempfile = "3"
