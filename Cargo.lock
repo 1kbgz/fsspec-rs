@@ -287,7 +287,7 @@ checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
 
 [[package]]
 name = "fsspec_rs"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "bytes",
  "object_store",
@@ -298,7 +298,7 @@ dependencies = [
 
 [[package]]
 name = "fsspec_rs_py"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "fsspec_rs",
  "fsspec_sys",
@@ -307,7 +307,7 @@ dependencies = [
 
 [[package]]
 name = "fsspec_sys"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "fsspec_rs",
 ]
