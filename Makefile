@@ -35,7 +35,7 @@ install:  ## install python library
 #########
 # LINTS #
 #########
-.PHONY: lint-py lint-rs lint-docs lint lints
+.PHONY: lint-py lint-rs lint-header lint-docs lint lints
 lint-py:  ## run python linter with ruff
 	python -m ruff check fsspec_rs
 	python -m ruff format --check fsspec_rs
@@ -43,6 +43,15 @@ lint-py:  ## run python linter with ruff
 lint-rs:  ## run rust linter
 	make -C rust lint
 	git diff --exit-code -- rust/capi/include/fsspec.h
+	$(MAKE) lint-header
+
+CC ?= cc
+CXX ?= c++
+lint-header:  ## compile fsspec.h as C and C++
+	@if command -v $(CC) >/dev/null && command -v $(CXX) >/dev/null; then \
+		$(CC) -std=c99 -Wall -Wextra -Werror -pedantic -fsyntax-only -x c rust/capi/include/fsspec.h && \
+		$(CXX) -std=c++11 -Wall -Wextra -Werror -pedantic -fsyntax-only -x c++ rust/capi/include/fsspec.h; \
+	else echo "skipping lint-header: no C or C++ compiler"; fi
 
 lint-docs:  ## lint docs with mdformat and codespell
 	python -m mdformat --check README.md docs/src/
