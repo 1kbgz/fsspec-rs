@@ -3,7 +3,7 @@
 //! backend crates export a factory and applications register it.
 
 use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock, PoisonError, RwLock};
 
 use crate::error::{FsError, FsResult};
 use crate::fs::FileSystem;
@@ -38,11 +38,22 @@ where
     }
 }
 
+impl FilesystemFactory for Box<dyn FilesystemFactory> {
+    fn create(&self, path: &str, options: &FsOptions) -> FsResult<SharedFileSystem> {
+        (**self).create(path, options)
+    }
+
+    fn instance_scope(&self, path: &str) -> String {
+        (**self).instance_scope(path)
+    }
+}
+
 type InstanceKey = (String, String, FsOptions);
 
 /// Factories keyed by protocol, with a cache of the filesystems they built.
 pub struct FilesystemRegistry {
     factories: HashMap<String, Arc<dyn FilesystemFactory>>,
+    fallback: Option<Arc<dyn FilesystemFactory>>,
     instances: Mutex<HashMap<InstanceKey, SharedFileSystem>>,
 }
 
@@ -62,6 +73,7 @@ impl FilesystemRegistry {
     pub fn empty() -> Self {
         Self {
             factories: HashMap::new(),
+            fallback: None,
             instances: Mutex::new(HashMap::new()),
         }
     }
@@ -93,7 +105,7 @@ impl FilesystemRegistry {
         options: &FsOptions,
     ) -> FsResult<(SharedFileSystem, String)> {
         let (protocol, path) = split_protocol(url)?;
-        let factory = self.factory(protocol)?;
+        let (factory, path) = self.factory(protocol, url, path)?;
         let key = (
             protocol.to_string(),
             factory.instance_scope(path),
@@ -125,15 +137,40 @@ impl FilesystemRegistry {
         options: &FsOptions,
     ) -> FsResult<(SharedFileSystem, String)> {
         let (protocol, path) = split_protocol(url)?;
-        let fs = self.factory(protocol)?.create(path, options)?;
+        let (factory, path) = self.factory(protocol, url, path)?;
+        let fs = factory.create(path, options)?;
         let path = fs.strip_protocol(path);
         Ok((fs, path))
     }
 
-    fn factory(&self, protocol: &str) -> FsResult<Arc<dyn FilesystemFactory>> {
-        self.factories.get(protocol).cloned().ok_or_else(|| {
-            FsError::NotSupported(format!("no filesystem registered for protocol: {protocol}"))
-        })
+    /// Installs the factory used for protocols nothing registered, such as one that
+    /// opens any Python fsspec backend. It is given the whole URL rather than the
+    /// path, since it has to pick a backend from the protocol.
+    pub fn set_fallback<F: FilesystemFactory + 'static>(&mut self, factory: Option<F>) {
+        self.fallback = factory.map(|factory| Arc::new(factory) as Arc<dyn FilesystemFactory>);
+        self.instances
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .retain(|(protocol, _, _), _| self.factories.contains_key(protocol));
+    }
+
+    /// The factory for `protocol` and the argument it takes: the path, or the whole
+    /// URL for the fallback.
+    fn factory<'a>(
+        &self,
+        protocol: &str,
+        url: &'a str,
+        path: &'a str,
+    ) -> FsResult<(Arc<dyn FilesystemFactory>, &'a str)> {
+        if let Some(factory) = self.factories.get(protocol) {
+            return Ok((factory.clone(), path));
+        }
+        match &self.fallback {
+            Some(fallback) => Ok((fallback.clone(), url)),
+            None => Err(FsError::NotSupported(format!(
+                "no filesystem registered for protocol: {protocol}"
+            ))),
+        }
     }
 }
 
@@ -141,16 +178,73 @@ impl FilesystemRegistry {
 pub static DEFAULT_FILESYSTEMS: LazyLock<RwLock<FilesystemRegistry>> =
     LazyLock::new(|| RwLock::new(FilesystemRegistry::default()));
 
-/// Registers `factory` for `protocol` in [`DEFAULT_FILESYSTEMS`].
-pub fn register_filesystem<F: FilesystemFactory + 'static>(protocol: &str, factory: F) {
-    DEFAULT_FILESYSTEMS
-        .write()
-        .unwrap_or_else(PoisonError::into_inner)
-        .register(protocol, factory);
+/// Routes [`register_filesystem`] and [`url_to_fs`] to another registry, such as the
+/// one inside a shared `libfsspec`, so every crate in the process that only knows
+/// fsspec_rs still sees one set of protocols.
+pub struct RegistryHooks {
+    pub register: fn(&str, Box<dyn FilesystemFactory>) -> FsResult<()>,
+    pub set_fallback: fn(Option<Box<dyn FilesystemFactory>>) -> FsResult<()>,
+    pub url_to_fs: fn(&str, &FsOptions) -> FsResult<(SharedFileSystem, String)>,
 }
 
-/// Resolves `url` through [`DEFAULT_FILESYSTEMS`]; see [`FilesystemRegistry::url_to_fs`].
+static HOOKS: OnceLock<RegistryHooks> = OnceLock::new();
+
+/// Installs `hooks` for the rest of the process. Only the first call takes effect;
+/// a later call gets its hooks back.
+pub fn set_registry_hooks(hooks: RegistryHooks) -> Result<(), RegistryHooks> {
+    HOOKS.set(hooks)
+}
+
+/// Registers `factory` for `protocol` in [`DEFAULT_FILESYSTEMS`], or through the
+/// installed [`RegistryHooks`].
+pub fn try_register_filesystem<F: FilesystemFactory + 'static>(
+    protocol: &str,
+    factory: F,
+) -> FsResult<()> {
+    match HOOKS.get() {
+        Some(hooks) => (hooks.register)(protocol, Box::new(factory)),
+        None => {
+            DEFAULT_FILESYSTEMS
+                .write()
+                .unwrap_or_else(PoisonError::into_inner)
+                .register(protocol, factory);
+            Ok(())
+        }
+    }
+}
+
+/// Registers `factory` for `protocol`; see [`try_register_filesystem`].
+///
+/// # Panics
+///
+/// When installed [`RegistryHooks`] reject the registration.
+pub fn register_filesystem<F: FilesystemFactory + 'static>(protocol: &str, factory: F) {
+    try_register_filesystem(protocol, factory).expect("registering a filesystem factory");
+}
+
+/// Installs the fallback factory of [`DEFAULT_FILESYSTEMS`], or of the registry the
+/// installed [`RegistryHooks`] point at; see [`FilesystemRegistry::set_fallback`].
+pub fn set_fallback_filesystem<F: FilesystemFactory + 'static>(factory: Option<F>) -> FsResult<()> {
+    match HOOKS.get() {
+        Some(hooks) => (hooks.set_fallback)(
+            factory.map(|factory| Box::new(factory) as Box<dyn FilesystemFactory>),
+        ),
+        None => {
+            DEFAULT_FILESYSTEMS
+                .write()
+                .unwrap_or_else(PoisonError::into_inner)
+                .set_fallback(factory);
+            Ok(())
+        }
+    }
+}
+
+/// Resolves `url` through [`DEFAULT_FILESYSTEMS`] or the installed [`RegistryHooks`];
+/// see [`FilesystemRegistry::url_to_fs`].
 pub fn url_to_fs(url: &str, options: &FsOptions) -> FsResult<(SharedFileSystem, String)> {
+    if let Some(hooks) = HOOKS.get() {
+        return (hooks.url_to_fs)(url, options);
+    }
     DEFAULT_FILESYSTEMS
         .read()
         .unwrap_or_else(PoisonError::into_inner)

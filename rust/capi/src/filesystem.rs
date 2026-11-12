@@ -2,7 +2,12 @@ use std::ffi::c_char;
 use std::ptr;
 use std::slice;
 
-use fsspec_rs::{CacheType, FsError, FsOptions, FsResult, OpenMode, OpenOptions, SharedFileSystem};
+use std::sync::PoisonError;
+
+use fsspec_rs::{
+    CacheType, FsError, FsOptions, FsResult, OpenMode, OpenOptions, SharedFileSystem,
+    DEFAULT_FILESYSTEMS,
+};
 use fsspec_sys::types::{
     fsspec_bytes, fsspec_file, fsspec_file_info, fsspec_file_info_list, fsspec_fs, fsspec_options,
     fsspec_status, fsspec_string, fsspec_string_list,
@@ -47,7 +52,11 @@ pub unsafe extern "C" fn fsspec_url_to_fs(
         if out_fs.is_null() {
             return Err(invalid("output filesystem pointer is null"));
         }
-        let (fs, path) = fsspec_rs::url_to_fs(url, &options_arg(options))?;
+        // The library's own registry is the shared one; never route through hooks here.
+        let (fs, path) = DEFAULT_FILESYSTEMS
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .url_to_fs(url, &options_arg(options))?;
         if !out_path.is_null() {
             out_path.write(fsspec_string::from_string(path));
         }
@@ -88,6 +97,37 @@ pub unsafe extern "C" fn fsspec_fs_protocols(
             .map(|protocol| protocol.to_string())
             .collect();
         write_out(out, fsspec_string_list::from_strings(protocols))
+    })
+}
+
+/// Removes the protocol prefix from `path` the way the backend does, and maps
+/// an empty path to the root marker.
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_fs_strip_protocol(
+    fs: *const fsspec_fs,
+    path: *const c_char,
+    path_len: usize,
+    out: *mut fsspec_string,
+) -> fsspec_status {
+    guard(|| {
+        let fs = fs_arg(fs)?;
+        let stripped = fs.strip_protocol(str_arg(path, path_len)?);
+        write_out(out, fsspec_string::from_string(stripped))
+    })
+}
+
+/// Adds the backend's protocol prefix to `path`.
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_fs_unstrip_protocol(
+    fs: *const fsspec_fs,
+    path: *const c_char,
+    path_len: usize,
+    out: *mut fsspec_string,
+) -> fsspec_status {
+    guard(|| {
+        let fs = fs_arg(fs)?;
+        let unstripped = fs.unstrip_protocol(str_arg(path, path_len)?);
+        write_out(out, fsspec_string::from_string(unstripped))
     })
 }
 

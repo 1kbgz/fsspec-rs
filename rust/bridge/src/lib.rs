@@ -246,6 +246,27 @@ impl FileSystem for PyFsspecFs {
         })
     }
 
+    fn strip_protocol(&self, path: &str) -> String {
+        // The Python class knows its own protocols and root; the bridge's protocol is "python".
+        Python::attach(|py| {
+            self.fs
+                .bind(py)
+                .call_method1("_strip_protocol", (path,))
+                .and_then(|value| value.extract::<String>())
+                .unwrap_or_else(|_| path.to_string())
+        })
+    }
+
+    fn unstrip_protocol(&self, path: &str) -> String {
+        Python::attach(|py| {
+            self.fs
+                .bind(py)
+                .call_method1("unstrip_protocol", (path,))
+                .and_then(|value| value.extract::<String>())
+                .unwrap_or_else(|_| format!("{}://{path}", self.source_protocol))
+        })
+    }
+
     fn info(&self, path: &str) -> FsResult<FileInfo> {
         Python::attach(|py| {
             let value = self

@@ -18,6 +18,78 @@ pub(crate) fn byte_range(size: u64, start: Option<i64>, end: Option<i64>) -> (u6
     (start as u64, end as u64)
 }
 
+/// Removes the first matching `"protocol://"` prefix; an empty result becomes
+/// `root_marker`. The default [`FileSystem::strip_protocol`].
+pub fn strip_protocol_default(protocols: &[&str], root_marker: &str, path: &str) -> String {
+    let mut p = path.to_string();
+    for proto in protocols {
+        let prefix = format!("{proto}://");
+        if let Some(stripped) = p.strip_prefix(&prefix) {
+            p = stripped.to_string();
+            break;
+        }
+    }
+    if p.is_empty() {
+        return root_marker.to_string();
+    }
+    p
+}
+
+/// Prefixes `path` with the first protocol. The default [`FileSystem::unstrip_protocol`].
+pub fn unstrip_protocol_default(protocols: &[&str], path: &str) -> String {
+    let proto = protocols.first().unwrap_or(&"abstract");
+    format!("{proto}://{path}")
+}
+
+/// Reads a file, or the byte range `[start, end)`, through [`FileSystem::open`].
+/// The default [`FileSystem::cat_file`].
+pub fn cat_file_default<F: FileSystem + ?Sized>(
+    fs: &F,
+    path: &str,
+    start: Option<i64>,
+    end: Option<i64>,
+) -> FsResult<Vec<u8>> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = fs.open(path, OpenMode::Read, None)?;
+    let Some(file_size) = f.size()? else {
+        // Without a known size, read everything and take the range afterwards.
+        let mut data = Vec::new();
+        f.read_to_end(&mut data)?;
+        let (start, end) = byte_range(data.len() as u64, start, end);
+        data.truncate(end as usize);
+        data.drain(..start as usize);
+        return Ok(data);
+    };
+    let (actual_start, actual_end) = byte_range(file_size, start, end);
+
+    if actual_start > 0 {
+        f.seek(SeekFrom::Start(actual_start))?;
+    }
+
+    let to_read = (actual_end - actual_start) as usize;
+    let mut buf = vec![0u8; to_read];
+    let mut total = 0;
+    while total < to_read {
+        match f.read(&mut buf[total..]) {
+            Ok(0) => break,
+            Ok(n) => total += n,
+            Err(e) => return Err(e.into()),
+        }
+    }
+    buf.truncate(total);
+    Ok(buf)
+}
+
+/// Writes `data` through [`FileSystem::open`] and commits, so write errors are
+/// returned rather than lost in `Drop`. The default [`FileSystem::pipe_file`].
+pub fn pipe_file_default<F: FileSystem + ?Sized>(fs: &F, path: &str, data: &[u8]) -> FsResult<()> {
+    use std::io::Write;
+    let mut f = fs.open(path, OpenMode::Write, None)?;
+    f.write_all(data)?;
+    f.flush()?;
+    f.commit()
+}
+
 pub trait FileSystem {
     /// Protocol name(s) this filesystem handles (e.g., `["file", "local"]`).
     fn protocol(&self) -> &[&str];
@@ -72,26 +144,14 @@ pub trait FileSystem {
     // ---------------------------------------------------------------
 
     /// Strip the protocol prefix from a path.
-    /// Default: removes `"protocol://"` prefix for each protocol.
+    /// Default: [`strip_protocol_default`].
     fn strip_protocol(&self, path: &str) -> String {
-        let mut p = path.to_string();
-        for proto in self.protocol() {
-            let prefix = format!("{proto}://");
-            if let Some(stripped) = p.strip_prefix(&prefix) {
-                p = stripped.to_string();
-                break;
-            }
-        }
-        if p.is_empty() {
-            return self.root_marker().to_string();
-        }
-        p
+        strip_protocol_default(self.protocol(), self.root_marker(), path)
     }
 
-    /// Re-add the protocol prefix.
+    /// Re-add the protocol prefix. Default: [`unstrip_protocol_default`].
     fn unstrip_protocol(&self, path: &str) -> String {
-        let proto = self.protocol().first().unwrap_or(&"abstract");
-        format!("{proto}://{path}")
+        unstrip_protocol_default(self.protocol(), path)
     }
 
     /// Return the parent directory of a path.
@@ -151,48 +211,14 @@ pub trait FileSystem {
         paths.iter().map(|p| self.size(p)).collect()
     }
 
-    /// Read the entire contents of a file.
+    /// Read the entire contents of a file. Default: [`cat_file_default`].
     fn cat_file(&self, path: &str, start: Option<i64>, end: Option<i64>) -> FsResult<Vec<u8>> {
-        use std::io::{Read, Seek, SeekFrom};
-        let mut f = self.open(path, OpenMode::Read, None)?;
-        let Some(file_size) = f.size()? else {
-            // Without a known size, read everything and take the range afterwards.
-            let mut data = Vec::new();
-            f.read_to_end(&mut data)?;
-            let (start, end) = byte_range(data.len() as u64, start, end);
-            data.truncate(end as usize);
-            data.drain(..start as usize);
-            return Ok(data);
-        };
-        let (actual_start, actual_end) = byte_range(file_size, start, end);
-
-        if actual_start > 0 {
-            f.seek(SeekFrom::Start(actual_start))?;
-        }
-
-        let to_read = (actual_end - actual_start) as usize;
-        let mut buf = vec![0u8; to_read];
-        let mut total = 0;
-        while total < to_read {
-            match f.read(&mut buf[total..]) {
-                Ok(0) => break,
-                Ok(n) => total += n,
-                Err(e) => return Err(e.into()),
-            }
-        }
-        buf.truncate(total);
-        Ok(buf)
+        cat_file_default(self, path, start, end)
     }
 
-    /// Write bytes directly to a file.
-    ///
-    /// Commits explicitly so write errors are returned; `Drop` cannot report them.
+    /// Write bytes directly to a file. Default: [`pipe_file_default`].
     fn pipe_file(&self, path: &str, data: &[u8]) -> FsResult<()> {
-        use std::io::Write;
-        let mut f = self.open(path, OpenMode::Write, None)?;
-        f.write_all(data)?;
-        f.flush()?;
-        f.commit()
+        pipe_file_default(self, path, data)
     }
 
     /// Read the first `size` bytes of a file.

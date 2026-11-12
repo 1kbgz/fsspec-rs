@@ -38,6 +38,9 @@ fn fsspec_rs(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(protocols, m)?)?;
     m.add_function(wrap_pyfunction!(linked_to_libfsspec, m)?)?;
 
+    // In a Python process every fsspec backend is reachable from the registry.
+    backend::install_python_fallback().map_err(types::fs_error_to_pyerr)?;
+
     Ok(())
 }
 

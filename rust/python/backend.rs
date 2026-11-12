@@ -5,7 +5,10 @@
 //! process and are shared with other extensions. With `direct` (Pyodide and
 //! debugging) the crate is compiled in.
 
-use fsspec_rs::{FsResult, S3Config, SharedFileSystem};
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use fsspec_rs::{FilesystemFactory, FsOptions, FsResult, S3Config, SharedFileSystem};
 
 /// Whether this extension talks to a shared `libfsspec` rather than its own
 /// copy of the backends.
@@ -80,4 +83,25 @@ pub fn s3(config: S3Config) -> FsResult<SharedFileSystem> {
 
 pub fn protocols() -> FsResult<Vec<String>> {
     route::protocols()
+}
+
+/// Opens protocols the registry does not know through Python's own fsspec
+/// registry, so a Rust consumer in this process sees every Python backend.
+struct PythonFallback;
+
+impl FilesystemFactory for PythonFallback {
+    fn create(&self, url: &str, options: &FsOptions) -> FsResult<SharedFileSystem> {
+        let options: HashMap<String, String> = options.clone().into_iter().collect();
+        let (fs, _) = fsspec_rs_bridge::url_to_fs(url, &options)?;
+        Ok(Arc::new(fs))
+    }
+}
+
+/// Installs [`PythonFallback`] in the registry this extension uses: the shared
+/// `libfsspec` with the `capi` feature, so other extensions and C consumers get
+/// it too, or the registry compiled in otherwise.
+pub fn install_python_fallback() -> FsResult<()> {
+    #[cfg(feature = "capi")]
+    fsspec_sys::use_shared_registry();
+    fsspec_rs::set_fallback_filesystem(Some(PythonFallback))
 }

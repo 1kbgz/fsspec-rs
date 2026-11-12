@@ -106,6 +106,7 @@ A null `fsspec_options *` argument means no options.
 | `fsspec_url_to_fs(url, url_len, options, out_fs, out_path)`   | Resolves a URL through the registry. `out_path`, when not null, receives the path to use with the filesystem.  |
 | `fsspec_register_filesystem(protocol, protocol_len, factory)` | Registers a factory, replacing an earlier one and dropping its cached instances. The factory struct is copied. |
 | `fsspec_protocols(out)`                                       | Registered protocols, sorted.                                                                                  |
+| `fsspec_register_fallback(factory)`                           | Installs the factory used for protocols nothing registered; null clears it. It is given the whole URL.         |
 
 URL resolution, caching, and the built-in protocols (`file`, `local`, `s3`) and their
 options are the same as the Rust registry; see
@@ -132,6 +133,8 @@ options are the same as the Rust registry; see
 | `fsspec_fs_release(fs)`                                               | Frees a handle; the filesystem is dropped with its last handle.                                                                                                              |
 | `fsspec_fs_protocols(fs, out)`                                        | Protocol names of the filesystem.                                                                                                                                            |
 | `fsspec_fs_root_marker(fs, out)`, `fsspec_fs_sep(fs, out)`            | Root marker and path separator.                                                                                                                                              |
+| `fsspec_fs_strip_protocol(fs, path, path_len, out)`                   | The path without its protocol prefix, as the backend normalises it; an empty result is the root marker.                                                                      |
+| `fsspec_fs_unstrip_protocol(fs, path, path_len, out)`                 | The path with the backend's protocol prefix.                                                                                                                                 |
 | `fsspec_fs_ls(fs, path, path_len, detail, out)`                       | Lists a directory. With `detail` false, entries may contain only names.                                                                                                      |
 | `fsspec_fs_info(fs, path, path_len, out)`                             | Metadata for one path.                                                                                                                                                       |
 | `fsspec_fs_exists(fs, path, path_len, out)`                           | Whether a path exists.                                                                                                                                                       |
@@ -169,13 +172,14 @@ null with the error message set on failure.
 
 `fsspec_fs_vtable`:
 
-| Field                                                        | Description                                                                                                                                                                |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `struct_size`, `abi_version`                                 | As for factories.                                                                                                                                                          |
-| `protocol`                                                   | NUL-terminated, comma-separated protocol names, such as `"file,local"`.                                                                                                    |
-| `root_marker`, `sep`                                         | NUL-terminated strings; null uses the defaults.                                                                                                                            |
-| `ls`, `info`, `rm_file`, `cp_file`, `mkdir`, `rmdir`, `open` | The `FileSystem` primitives. A null callback makes its operation return `FSSPEC_NOT_SUPPORTED`. Other operations, such as `cat_file` and `exists`, are derived from these. |
-| `release`                                                    | Called with `data` when the last handle is released.                                                                                                                       |
+| Field                                                         | Description                                                                                                                                                                |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `struct_size`, `abi_version`                                  | As for factories.                                                                                                                                                          |
+| `protocol`                                                    | NUL-terminated, comma-separated protocol names, such as `"file,local"`.                                                                                                    |
+| `root_marker`, `sep`                                          | NUL-terminated strings; null uses the defaults.                                                                                                                            |
+| `ls`, `info`, `rm_file`, `cp_file`, `mkdir`, `rmdir`, `open`  | The `FileSystem` primitives. A null callback makes its operation return `FSSPEC_NOT_SUPPORTED`. Other operations, such as `cat_file` and `exists`, are derived from these. |
+| `release`                                                     | Called with `data` when the last handle is released.                                                                                                                       |
+| `strip_protocol`, `unstrip_protocol`, `cat_file`, `pipe_file` | Optional, after `release`. A backend that overrides these in Rust keeps its own behaviour across the ABI; null uses the derived defaults.                                  |
 
 `fsspec_file_vtable` has `read`, `write`, `seek`, `flush`, `size`, `info`, `commit`,
 `discard`, and `release`. A null `read`, `write`, `seek`, or `info` returns
@@ -192,6 +196,8 @@ registry state.
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `url_to_fs(url, &FsOptions)`                                   | Resolves a URL through `libfsspec`; returns a `SharedFileSystem` and the path. |
 | `register_filesystem(protocol, factory)`                       | Registers a `FilesystemFactory` in `libfsspec`.                                |
+| `register_fallback(factory)`                                   | Installs or clears the factory for protocols nothing registered.               |
+| `use_shared_registry()`                                        | Routes `fsspec_rs::url_to_fs` and `register_filesystem` through `libfsspec`.   |
 | `protocols()`                                                  | Registered protocols, sorted.                                                  |
 | `abi_version()`                                                | ABI version of the loaded library.                                             |
 | `ForeignFileSystem`, `ForeignFile`                             | `FileSystem` and `FsFile` implementations over `libfsspec` handles.            |

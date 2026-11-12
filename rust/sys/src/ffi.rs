@@ -44,7 +44,20 @@ extern "C" {
     pub fn fsspec_fs_release(fs: *mut fsspec_fs);
     pub fn fsspec_fs_protocols(fs: *const fsspec_fs, out: *mut fsspec_string_list)
         -> fsspec_status;
+    pub fn fsspec_register_fallback(factory: *const fsspec_fs_factory) -> fsspec_status;
     pub fn fsspec_fs_root_marker(fs: *const fsspec_fs, out: *mut fsspec_string) -> fsspec_status;
+    pub fn fsspec_fs_strip_protocol(
+        fs: *const fsspec_fs,
+        path: *const c_char,
+        path_len: usize,
+        out: *mut fsspec_string,
+    ) -> fsspec_status;
+    pub fn fsspec_fs_unstrip_protocol(
+        fs: *const fsspec_fs,
+        path: *const c_char,
+        path_len: usize,
+        out: *mut fsspec_string,
+    ) -> fsspec_status;
     pub fn fsspec_fs_sep(fs: *const fsspec_fs, out: *mut fsspec_string) -> fsspec_status;
     pub fn fsspec_fs_ls(
         fs: *const fsspec_fs,

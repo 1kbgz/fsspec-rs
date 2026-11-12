@@ -6,7 +6,8 @@ use std::path::{Path, MAIN_SEPARATOR};
 use std::sync::Arc;
 
 use fsspec_rs::{
-    FileSystem, FileType, FsError, FsFile, FsOptions, LocalFs, OpenMode, SharedFileSystem,
+    FileInfo, FileSystem, FileType, FsError, FsFile, FsOptions, LocalFs, OpenMode, OpenOptions,
+    SharedFileSystem,
 };
 
 use crate::*;
@@ -189,4 +190,190 @@ fn exported_filesystem_handle_is_reference_counted() {
     let path = join(dir.path(), "counted.txt");
     second.pipe_file(&path, b"still open").unwrap();
     assert_eq!(second.cat_file(&path, None, None).unwrap(), b"still open");
+}
+
+#[test]
+fn shared_registry_hooks_route_fsspec_rs_functions_through_libfsspec() {
+    use_shared_registry();
+    use_shared_registry();
+    let dir = tempfile::tempdir().unwrap();
+
+    fsspec_rs::register_filesystem("hooked", |_: &str, _: &FsOptions| {
+        Ok(Arc::new(LocalFs::new()) as SharedFileSystem)
+    });
+    assert!(protocols().unwrap().contains(&"hooked".to_string()));
+
+    // "hooked" exists only in libfsspec's registry, so resolving it proves the route.
+    let (fs, path) = fsspec_rs::url_to_fs(
+        &format!("hooked://{}", dir.path().display()),
+        &FsOptions::new(),
+    )
+    .unwrap();
+    fs.pipe_file(&join(Path::new(&path), "via-hook.txt"), b"shared")
+        .unwrap();
+    assert!(dir.path().join("via-hook.txt").exists());
+}
+
+/// A filesystem that overrides the methods real backends override, each counting
+/// its calls, so a method the vtable does not carry shows up as a zero count.
+struct Prefixed(LocalFs);
+
+static OVERRIDE_CALLS: [std::sync::atomic::AtomicUsize; 4] = [
+    std::sync::atomic::AtomicUsize::new(0),
+    std::sync::atomic::AtomicUsize::new(0),
+    std::sync::atomic::AtomicUsize::new(0),
+    std::sync::atomic::AtomicUsize::new(0),
+];
+const STRIP: usize = 0;
+const UNSTRIP: usize = 1;
+const CAT: usize = 2;
+const PIPE: usize = 3;
+
+fn count(which: usize) {
+    OVERRIDE_CALLS[which].fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+}
+
+fn counted(which: usize) -> usize {
+    OVERRIDE_CALLS[which].load(std::sync::atomic::Ordering::SeqCst)
+}
+
+impl FileSystem for Prefixed {
+    fn protocol(&self) -> &[&str] {
+        &["prefixed"]
+    }
+
+    fn strip_protocol(&self, path: &str) -> String {
+        count(STRIP);
+        path.trim_start_matches("prefixed://")
+            .trim_start_matches("mount/")
+            .to_string()
+    }
+
+    fn unstrip_protocol(&self, path: &str) -> String {
+        count(UNSTRIP);
+        format!("prefixed://mount/{path}")
+    }
+
+    fn cat_file(&self, path: &str, start: Option<i64>, end: Option<i64>) -> FsResult<Vec<u8>> {
+        count(CAT);
+        self.0.cat_file(path, start, end)
+    }
+
+    fn pipe_file(&self, path: &str, data: &[u8]) -> FsResult<()> {
+        count(PIPE);
+        self.0.pipe_file(path, data)
+    }
+
+    fn ls(&self, path: &str, detail: bool) -> FsResult<Vec<FileInfo>> {
+        self.0.ls(path, detail)
+    }
+
+    fn info(&self, path: &str) -> FsResult<FileInfo> {
+        self.0.info(path)
+    }
+
+    fn rm_file(&self, path: &str) -> FsResult<()> {
+        self.0.rm_file(path)
+    }
+
+    fn cp_file(&self, src: &str, dst: &str) -> FsResult<()> {
+        self.0.cp_file(src, dst)
+    }
+
+    fn mkdir(&self, path: &str, create_parents: bool) -> FsResult<()> {
+        self.0.mkdir(path, create_parents)
+    }
+
+    fn rmdir(&self, path: &str) -> FsResult<()> {
+        self.0.rmdir(path)
+    }
+
+    fn open(
+        &self,
+        path: &str,
+        mode: OpenMode,
+        options: Option<OpenOptions>,
+    ) -> FsResult<Box<dyn FsFile>> {
+        self.0.open(path, mode, options)
+    }
+}
+
+#[test]
+fn path_normalisation_crosses_the_abi() {
+    let handle = export_filesystem(Arc::new(Prefixed(LocalFs::new()))).unwrap();
+    let foreign = unsafe { ForeignFileSystem::from_raw(handle) }.unwrap();
+    assert_eq!(foreign.strip_protocol("prefixed://mount/a/b"), "a/b");
+    assert_eq!(foreign.unstrip_protocol("a/b"), "prefixed://mount/a/b");
+
+    // The registry strips through the same route, so url_to_fs gives the backend's path.
+    register_filesystem("prefixed", |_: &str, _: &FsOptions| {
+        Ok(Arc::new(Prefixed(LocalFs::new())) as SharedFileSystem)
+    })
+    .unwrap();
+    let (_, path) = url_to_fs("prefixed://mount/a/b", &FsOptions::new()).unwrap();
+    assert_eq!(path, "a/b");
+}
+
+#[test]
+fn fallback_crosses_the_abi_with_the_whole_url() {
+    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let recorded = seen.clone();
+    // Other tests expect unknown protocols to fail, so this fallback only takes its own.
+    register_fallback(Some(move |url: &str, _: &FsOptions| {
+        if !url.starts_with("nobody-registered-this://") {
+            return Err(FsError::NotSupported(format!(
+                "no filesystem registered for: {url}"
+            )));
+        }
+        recorded.lock().unwrap().push(url.to_string());
+        Ok(Arc::new(LocalFs::new()) as SharedFileSystem)
+    }))
+    .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let url = format!("nobody-registered-this://{}", dir.path().display());
+    let (fs, path) = url_to_fs(&url, &FsOptions::new()).unwrap();
+    assert_eq!(*seen.lock().unwrap(), std::slice::from_ref(&url));
+    assert_eq!(path, url);
+    assert!(fs.exists(&join(dir.path(), "")).unwrap_or(true));
+
+    assert!(url_to_fs("nope://bucket/key", &FsOptions::new()).is_err());
+}
+
+#[test]
+fn overridden_methods_reach_the_backend_through_the_abi() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = export_filesystem(Arc::new(Prefixed(LocalFs::new()))).unwrap();
+    let foreign = unsafe { ForeignFileSystem::from_raw(handle) }.unwrap();
+    let path = join(dir.path(), "counted.txt");
+
+    let before = [
+        counted(STRIP),
+        counted(UNSTRIP),
+        counted(CAT),
+        counted(PIPE),
+    ];
+    foreign.strip_protocol("prefixed://mount/x");
+    foreign.unstrip_protocol("x");
+    foreign.pipe_file(&path, b"0123456789").unwrap();
+    assert_eq!(foreign.cat_file(&path, Some(2), Some(5)).unwrap(), b"234");
+    let after = [
+        counted(STRIP),
+        counted(UNSTRIP),
+        counted(CAT),
+        counted(PIPE),
+    ];
+    for (name, (before, after)) in [
+        "strip_protocol",
+        "unstrip_protocol",
+        "cat_file",
+        "pipe_file",
+    ]
+    .iter()
+    .zip(before.iter().zip(after.iter()))
+    {
+        assert!(
+            after > before,
+            "{name} did not reach the backend through the ABI"
+        );
+    }
 }
