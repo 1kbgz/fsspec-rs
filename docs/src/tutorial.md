@@ -5,7 +5,7 @@ fsspec URL and inspect its metadata.
 
 ## Before you start
 
-Install `fsspec-rs` in a Python 3.10 or newer environment:
+Install `fsspec-rs` in a Python 3.11 or newer environment:
 
 ```console
 python -m pip install fsspec-rs
