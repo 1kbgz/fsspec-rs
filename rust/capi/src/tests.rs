@@ -417,6 +417,8 @@ fn local_vtable() -> fsspec_fs_vtable {
         rmdir: Some(vt_rmdir),
         open: Some(vt_open),
         release: Some(vt_release),
+        strip_protocol: None,
+        unstrip_protocol: None,
     }
 }
 

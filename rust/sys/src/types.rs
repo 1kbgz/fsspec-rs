@@ -217,6 +217,22 @@ pub struct fsspec_fs_vtable {
         ) -> fsspec_status,
     >,
     pub release: Option<unsafe extern "C" fn(data: *mut c_void)>,
+    pub strip_protocol: Option<
+        unsafe extern "C" fn(
+            data: *mut c_void,
+            path: *const c_char,
+            path_len: usize,
+            out: *mut fsspec_string,
+        ) -> fsspec_status,
+    >,
+    pub unstrip_protocol: Option<
+        unsafe extern "C" fn(
+            data: *mut c_void,
+            path: *const c_char,
+            path_len: usize,
+            out: *mut fsspec_string,
+        ) -> fsspec_status,
+    >,
 }
 
 /// A foreign open file. `read` and `write` move at most `len` bytes and

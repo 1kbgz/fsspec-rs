@@ -160,6 +160,28 @@ impl FileSystem for ForeignFileSystem {
         &self.sep
     }
 
+    fn strip_protocol(&self, path: &str) -> String {
+        let (path_ptr, path_len) = arg(path);
+        let mut out = null_string();
+        let status =
+            unsafe { ffi::fsspec_fs_strip_protocol(self.handle, path_ptr, path_len, &mut out) };
+        match check(status, "fsspec_fs_strip_protocol") {
+            Ok(()) => unsafe { take_string(out) },
+            Err(_) => fsspec_rs::strip_protocol_default(self.protocol(), self.root_marker(), path),
+        }
+    }
+
+    fn unstrip_protocol(&self, path: &str) -> String {
+        let (path_ptr, path_len) = arg(path);
+        let mut out = null_string();
+        let status =
+            unsafe { ffi::fsspec_fs_unstrip_protocol(self.handle, path_ptr, path_len, &mut out) };
+        match check(status, "fsspec_fs_unstrip_protocol") {
+            Ok(()) => unsafe { take_string(out) },
+            Err(_) => fsspec_rs::unstrip_protocol_default(self.protocol(), path),
+        }
+    }
+
     fn ls(&self, path: &str, detail: bool) -> FsResult<Vec<FileInfo>> {
         let (path_ptr, path_len) = arg(path);
         let mut out = empty_info_list();

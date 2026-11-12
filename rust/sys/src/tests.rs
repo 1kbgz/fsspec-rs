@@ -6,7 +6,8 @@ use std::path::{Path, MAIN_SEPARATOR};
 use std::sync::Arc;
 
 use fsspec_rs::{
-    FileSystem, FileType, FsError, FsFile, FsOptions, LocalFs, OpenMode, SharedFileSystem,
+    FileInfo, FileSystem, FileType, FsError, FsFile, FsOptions, LocalFs, OpenMode, OpenOptions,
+    SharedFileSystem,
 };
 
 use crate::*;
@@ -211,4 +212,72 @@ fn shared_registry_hooks_route_fsspec_rs_functions_through_libfsspec() {
     fs.pipe_file(&join(Path::new(&path), "via-hook.txt"), b"shared")
         .unwrap();
     assert!(dir.path().join("via-hook.txt").exists());
+}
+
+/// A filesystem whose paths live under a prefix the default stripping would not remove.
+struct Prefixed(LocalFs);
+
+impl FileSystem for Prefixed {
+    fn protocol(&self) -> &[&str] {
+        &["prefixed"]
+    }
+
+    fn strip_protocol(&self, path: &str) -> String {
+        path.trim_start_matches("prefixed://")
+            .trim_start_matches("mount/")
+            .to_string()
+    }
+
+    fn unstrip_protocol(&self, path: &str) -> String {
+        format!("prefixed://mount/{path}")
+    }
+
+    fn ls(&self, path: &str, detail: bool) -> FsResult<Vec<FileInfo>> {
+        self.0.ls(path, detail)
+    }
+
+    fn info(&self, path: &str) -> FsResult<FileInfo> {
+        self.0.info(path)
+    }
+
+    fn rm_file(&self, path: &str) -> FsResult<()> {
+        self.0.rm_file(path)
+    }
+
+    fn cp_file(&self, src: &str, dst: &str) -> FsResult<()> {
+        self.0.cp_file(src, dst)
+    }
+
+    fn mkdir(&self, path: &str, create_parents: bool) -> FsResult<()> {
+        self.0.mkdir(path, create_parents)
+    }
+
+    fn rmdir(&self, path: &str) -> FsResult<()> {
+        self.0.rmdir(path)
+    }
+
+    fn open(
+        &self,
+        path: &str,
+        mode: OpenMode,
+        options: Option<OpenOptions>,
+    ) -> FsResult<Box<dyn FsFile>> {
+        self.0.open(path, mode, options)
+    }
+}
+
+#[test]
+fn path_normalisation_crosses_the_abi() {
+    let handle = export_filesystem(Arc::new(Prefixed(LocalFs::new()))).unwrap();
+    let foreign = unsafe { ForeignFileSystem::from_raw(handle) }.unwrap();
+    assert_eq!(foreign.strip_protocol("prefixed://mount/a/b"), "a/b");
+    assert_eq!(foreign.unstrip_protocol("a/b"), "prefixed://mount/a/b");
+
+    // The registry strips through the same route, so url_to_fs gives the backend's path.
+    register_filesystem("prefixed", |_: &str, _: &FsOptions| {
+        Ok(Arc::new(Prefixed(LocalFs::new())) as SharedFileSystem)
+    })
+    .unwrap();
+    let (_, path) = url_to_fs("prefixed://mount/a/b", &FsOptions::new()).unwrap();
+    assert_eq!(path, "a/b");
 }

@@ -46,6 +46,30 @@ unsafe extern "C" fn fs_info(
     })
 }
 
+unsafe extern "C" fn fs_strip_protocol(
+    data: *mut c_void,
+    path: *const c_char,
+    len: usize,
+    out: *mut fsspec_string,
+) -> fsspec_status {
+    guard(|| {
+        let stripped = fs_data(data).strip_protocol(str_arg(path, len)?);
+        write_out(out, fsspec_string::from_string(stripped))
+    })
+}
+
+unsafe extern "C" fn fs_unstrip_protocol(
+    data: *mut c_void,
+    path: *const c_char,
+    len: usize,
+    out: *mut fsspec_string,
+) -> fsspec_status {
+    guard(|| {
+        let unstripped = fs_data(data).unstrip_protocol(str_arg(path, len)?);
+        write_out(out, fsspec_string::from_string(unstripped))
+    })
+}
+
 unsafe extern "C" fn fs_rm_file(
     data: *mut c_void,
     path: *const c_char,
@@ -120,6 +144,8 @@ pub fn export_filesystem(fs: SharedFileSystem) -> FsResult<*mut fsspec_fs> {
         rmdir: Some(fs_rmdir),
         open: Some(fs_open),
         release: Some(fs_release),
+        strip_protocol: Some(fs_strip_protocol),
+        unstrip_protocol: Some(fs_unstrip_protocol),
     };
     let data = Box::into_raw(Box::new(FsData { fs })) as *mut c_void;
     let handle = unsafe { ffi::fsspec_fs_from_vtable(&vtable, data) };

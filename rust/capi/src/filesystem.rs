@@ -100,6 +100,37 @@ pub unsafe extern "C" fn fsspec_fs_protocols(
     })
 }
 
+/// Removes the protocol prefix from `path` the way the backend does, and maps
+/// an empty path to the root marker.
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_fs_strip_protocol(
+    fs: *const fsspec_fs,
+    path: *const c_char,
+    path_len: usize,
+    out: *mut fsspec_string,
+) -> fsspec_status {
+    guard(|| {
+        let fs = fs_arg(fs)?;
+        let stripped = fs.strip_protocol(str_arg(path, path_len)?);
+        write_out(out, fsspec_string::from_string(stripped))
+    })
+}
+
+/// Adds the backend's protocol prefix to `path`.
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_fs_unstrip_protocol(
+    fs: *const fsspec_fs,
+    path: *const c_char,
+    path_len: usize,
+    out: *mut fsspec_string,
+) -> fsspec_status {
+    guard(|| {
+        let fs = fs_arg(fs)?;
+        let unstripped = fs.unstrip_protocol(str_arg(path, path_len)?);
+        write_out(out, fsspec_string::from_string(unstripped))
+    })
+}
+
 /// The filesystem's root marker, such as `/` for local paths.
 #[no_mangle]
 pub unsafe extern "C" fn fsspec_fs_root_marker(

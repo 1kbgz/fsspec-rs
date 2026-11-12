@@ -9,8 +9,9 @@ use std::ptr;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use fsspec_rs::{
-    FileInfo, FileSystem, FilesystemFactory, FsError, FsFile, FsOptions, FsResult, OpenMode,
-    OpenOptions, SharedFileSystem, DEFAULT_FILESYSTEMS,
+    strip_protocol_default, unstrip_protocol_default, FileInfo, FileSystem, FilesystemFactory,
+    FsError, FsFile, FsOptions, FsResult, OpenMode, OpenOptions, SharedFileSystem,
+    DEFAULT_FILESYSTEMS,
 };
 use fsspec_sys::types::{
     fsspec_file, fsspec_file_info, fsspec_file_info_list, fsspec_file_vtable, fsspec_fs,
@@ -150,7 +151,29 @@ struct ForeignFileSystem {
 unsafe impl Send for ForeignFileSystem {}
 unsafe impl Sync for ForeignFileSystem {}
 
+type PathCall =
+    unsafe extern "C" fn(*mut c_void, *const c_char, usize, *mut fsspec_string) -> fsspec_status;
+
 impl ForeignFileSystem {
+    /// Calls a vtable member that maps a path to a string.
+    fn path_call(&self, call: PathCall, path: &str, operation: &str) -> FsResult<String> {
+        let mut out = fsspec_string::null();
+        check(
+            unsafe {
+                call(
+                    self.data,
+                    path.as_ptr() as *const c_char,
+                    path.len(),
+                    &mut out,
+                )
+            },
+            operation,
+        )?;
+        let text = unsafe { out.as_str().into_owned() };
+        unsafe { out.free() };
+        Ok(text)
+    }
+
     fn missing(&self, operation: &str) -> FsError {
         FsError::NotSupported(format!(
             "{} backend does not implement {operation}",
@@ -170,6 +193,26 @@ impl FileSystem for ForeignFileSystem {
 
     fn sep(&self) -> &str {
         &self.sep
+    }
+
+    fn strip_protocol(&self, path: &str) -> String {
+        match self.vtable.strip_protocol {
+            Some(strip) => self
+                .path_call(strip, path, "strip_protocol")
+                .unwrap_or_else(|_| {
+                    strip_protocol_default(&self.protocols, &self.root_marker, path)
+                }),
+            None => strip_protocol_default(&self.protocols, &self.root_marker, path),
+        }
+    }
+
+    fn unstrip_protocol(&self, path: &str) -> String {
+        match self.vtable.unstrip_protocol {
+            Some(unstrip) => self
+                .path_call(unstrip, path, "unstrip_protocol")
+                .unwrap_or_else(|_| unstrip_protocol_default(&self.protocols, path)),
+            None => unstrip_protocol_default(&self.protocols, path),
+        }
     }
 
     fn ls(&self, path: &str, detail: bool) -> FsResult<Vec<FileInfo>> {

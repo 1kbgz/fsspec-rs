@@ -35,7 +35,7 @@ pub use buffered::BufferedFile;
 pub use caching::CacheType;
 pub use error::{FsError, FsResult};
 pub use file::FsFile;
-pub use fs::FileSystem;
+pub use fs::{strip_protocol_default, unstrip_protocol_default, FileSystem};
 pub use local::{LocalFile, LocalFs};
 pub use registry::{
     register_filesystem, set_registry_hooks, try_register_filesystem, url_to_fs, FilesystemFactory,

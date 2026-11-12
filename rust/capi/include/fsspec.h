@@ -188,6 +188,14 @@ typedef struct fsspec_fs_vtable {
                         size_t mode_len,
                         struct fsspec_file **out);
   void (*release)(void *data);
+  fsspec_status (*strip_protocol)(void *data,
+                                  const char *path,
+                                  size_t path_len,
+                                  struct fsspec_string *out);
+  fsspec_status (*unstrip_protocol)(void *data,
+                                    const char *path,
+                                    size_t path_len,
+                                    struct fsspec_string *out);
 } fsspec_fs_vtable;
 
 /**
@@ -301,6 +309,23 @@ void fsspec_fs_release(struct fsspec_fs *fs);
  * The protocols the filesystem answers to.
  */
 fsspec_status fsspec_fs_protocols(const struct fsspec_fs *fs, struct fsspec_string_list *out);
+
+/**
+ * Removes the protocol prefix from `path` the way the backend does, and maps
+ * an empty path to the root marker.
+ */
+fsspec_status fsspec_fs_strip_protocol(const struct fsspec_fs *fs,
+                                       const char *path,
+                                       size_t path_len,
+                                       struct fsspec_string *out);
+
+/**
+ * Adds the backend's protocol prefix to `path`.
+ */
+fsspec_status fsspec_fs_unstrip_protocol(const struct fsspec_fs *fs,
+                                         const char *path,
+                                         size_t path_len,
+                                         struct fsspec_string *out);
 
 /**
  * The filesystem's root marker, such as `/` for local paths.
