@@ -98,6 +98,11 @@
     </a>
   </li>
   <li class="fd-tree-item">
+    <a class="fd-link" href="how-to-libfsspec.html">
+      <span class="fd-link-text">How to share filesystems through libfsspec</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
     <a class="fd-link" href="filesystems.html">
       <span class="fd-link-text">fsspec-rs filesystems</span>
     </a>
@@ -105,6 +110,11 @@
   <li class="fd-tree-item">
     <a class="fd-link" href="rust.html">
       <span class="fd-link-text">Rust traits and types</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="c-api.html">
+      <span class="fd-link-text">C API reference</span>
     </a>
   </li>
   <li class="fd-tree-item">
@@ -159,6 +169,9 @@
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#backends-share-a-synchronous-interface">Backends share a synchronous interface</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#one-registry-per-process">One registry per process</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#see-also">See also</a>
@@ -216,12 +229,41 @@ that matches Python file objects and fsspec, but cannot control async scheduling
 synchronous one. Its status and methods are documented in the
 <a class="reference internal" href="rust.html"><span class="std std-doc">Rust reference</span></a>.</p>
 </section>
+<section id="one-registry-per-process">
+<h2>One registry per process<a class="headerlink" href="#one-registry-per-process" title="Link to this heading">¶</a></h2>
+<p>A Rust crate compiled into a Python extension is private to that extension. When
+<code class="docutils literal notranslate"><span class="pre">fsspec-rs</span></code>, <code class="docutils literal notranslate"><span class="pre">fsspec-db</span></code>, and <code class="docutils literal notranslate"><span class="pre">fsspec-kafka</span></code> each compile <code class="docutils literal notranslate"><span class="pre">fsspec_rs</span></code> in, a process loads
+three copies of its code and three registries, so a backend registered by one extension
+is invisible to the others. Rust has no stable ABI, so a <code class="docutils literal notranslate"><span class="pre">dyn</span> <span class="pre">FileSystem</span></code> cannot be passed
+from one extension to another either.</p>
+<p><code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> fixes both with a C ABI. The registry, its instance cache, and the
+built-in backends are compiled into that one shared library, and every extension links
+it dynamically. A filesystem is passed between extensions as an opaque handle with a table
+of C function pointers, which every compiler and language supports.</p>
+<p>The work is split across three crates so that only one of them has shared state:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">fsspec_rs</span></code> has the traits and backends. Compiling the traits into several extensions
+is harmless; its own registry stays private to the binary that compiles it in.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fsspec_capi</span></code> builds <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> and is the only crate with the shared registry.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fsspec_sys</span></code> declares the C functions without implementing them. Extensions depend on
+it to reach <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>; it must never depend on <code class="docutils literal notranslate"><span class="pre">fsspec_capi</span></code>, or every extension
+would export its own copy of the C functions.</p></li>
+</ul>
+<p>The C ABI costs a function-pointer call per operation and copies of returned strings and
+buffers. Single-binary Rust programs avoid both by using <code class="docutils literal notranslate"><span class="pre">fsspec_rs</span></code> and its registry
+directly. Pyodide builds do the same, because Emscripten wheels cannot share libraries
+yet.</p>
+<p>The same library serves C and C++ programs. They link <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> and see the backends
+that Python extensions register.</p>
+</section>
 <section id="see-also">
 <h2>See also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
 <ul class="simple">
 <li><p>Follow the <a class="reference internal" href="tutorial.html"><span class="std std-doc">local filesystem tutorial</span></a>.</p></li>
 <li><p>Use the <a class="reference internal" href="how-to.html"><span class="std std-doc">filesystem how-to guide</span></a> for S3 and caching.</p></li>
 <li><p>Look up <a class="reference internal" href="filesystems.html"><span class="std std-doc">filesystem behavior</span></a> and the <a class="reference internal" href="api.html"><span class="std std-doc">Python API</span></a>.</p></li>
+<li><p>Share filesystems across extensions and languages with the
+<a class="reference internal" href="how-to-libfsspec.html"><span class="std std-doc">libfsspec how-to</span></a> and the <a class="reference internal" href="c-api.html"><span class="std std-doc">C API reference</span></a>.</p></li>
 </ul>
 </section>
 </section>
@@ -270,6 +312,9 @@ synchronous one. Its status and methods are documented in the
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#backends-share-a-synchronous-interface">Backends share a synchronous interface</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#one-registry-per-process">One registry per process</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#see-also">See also</a>

@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>How to share filesystems through libfsspec &#8212; fsspec-rs v0.2.0</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/fuma.css?v=ca04d621" />
+    <link rel="stylesheet" type="text/css" href="../../_static/fuma-code.css?v=a950e949" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=6a604523" />
+    <link rel="stylesheet" type="text/css" href="../../_static/fonts/fuma-fonts.css?v=c2892c73" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/custom.css?v=88c24c6a" />
+    <script src="../../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../../_static/design-tabs.js?v=fcb327ea"></script>
+    <script data-searchlite-index="searchlite-index.json" defer="defer" src="../../_static/searchlite.js?v=a5320898"></script>
+    <script defer="defer" src="../../_static/fuma.js?v=9c325f6c"></script>
+    <script src="../../_static/js/custom.js?v=956e5d78"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="fsspec-rs filesystems" href="filesystems.html" />
+    <link rel="prev" title="How to use the Rust crates" href="how-to-rust.html" />
+    <script>
+      (function () {
+        var root = document.documentElement;
+        try {
+          var stored = localStorage.getItem("fuma-theme");
+          if (stored) {
+            root.classList.add(stored === "dark" ? "dark" : "light");
+            root.style.colorScheme = stored === "dark" ? "dark" : "light";
+          }
+          if (localStorage.getItem("fuma-sidebar") === "collapsed") root.dataset.sidebarCollapsed = "true";
+          if (localStorage.getItem("fuma-toc") === "collapsed") root.dataset.tocCollapsed = "true";
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+<body class="fd-body" data-layout="docs" data-toc-style="normal" data-open-level="0">
+<div id="fd-layout"><header id="fd-subnav">
+  <div class="fd-subnav-inner">
+    <button type="button" class="fd-icon-button fd-sidebar-toggle" aria-controls="fd-sidebar" aria-expanded="false" aria-label="Toggle navigation" title="Toggle navigation">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.2.0</span>
+</a>
+
+    <div class="fd-nav-actions">
+      <button type="button" class="fd-icon-button" data-fd-search-open aria-label="Search" title="Search"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
+      <a class="fd-icon-button" href="https://github.com/1kbgz/fsspec-rs" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg></a>
+      <button type="button" class="fd-icon-button fd-theme-toggle" aria-label="Toggle theme" title="Toggle theme">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon fd-icon-light"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon fd-icon-dark"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<aside id="fd-sidebar" aria-label="Documentation">
+  <div class="fd-sidebar-header">
+    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.2.0</span>
+</a>
+      <button type="button" class="fd-icon-button fd-sidebar-collapse" aria-label="Collapse sidebar" title="Collapse sidebar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
+    </div>
+    <button type="button" class="fd-search-trigger" data-fd-search-open title="Search">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span>Search</span><kbd class="fd-kbd">/</kbd>
+    </button>
+  </div>
+
+  <nav class="fd-sidebar-nav">
+    <div class="fd-sidebar-group">
+      
+<ul class="fd-tree">
+  <li class="fd-tree-item">
+    <a class="fd-link" href="how-to-build.html">
+      <span class="fd-link-text">How to build from source</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="tutorial.html">
+      <span class="fd-link-text">Read and write a local file with fsspec-rs</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="how-to.html">
+      <span class="fd-link-text">How to use Rust-backed filesystems</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="how-to-rust.html">
+      <span class="fd-link-text">How to use the Rust crates</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link fd-current" href="#">
+      <span class="fd-link-text">How to share filesystems through libfsspec</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="filesystems.html">
+      <span class="fd-link-text">fsspec-rs filesystems</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="rust.html">
+      <span class="fd-link-text">Rust traits and types</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="c-api.html">
+      <span class="fd-link-text">C API reference</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="api.html">
+      <span class="fd-link-text">API reference</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="explanation.html">
+      <span class="fd-link-text">Why fsspec-rs uses explicit protocols and shared traits</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="licenses.html">
+      <span class="fd-link-text">License bundle reference</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="../../rust/LICENSES.html">
+      <span class="fd-link-text">Cargo license overrides</span>
+    </a>
+  </li>
+</ul>
+    </div>
+  </nav>
+
+  <div class="fd-sidebar-footer">
+    <div class="fd-toolbar">
+      <a class="fd-toolbar-item" href="https://github.com/1kbgz/fsspec-rs" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg></a>
+      <div class="fd-theme-switch" role="group" aria-label="Theme">
+        <button type="button" class="fd-theme-option" data-fd-theme="light" aria-label="Light theme" title="Light theme"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></button>
+        <button type="button" class="fd-theme-option" data-fd-theme="dark" aria-label="Dark theme" title="Dark theme"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/></svg></button>
+      </div>
+    </div>
+  </div>
+</aside>
+<button type="button" id="fd-sidebar-restore" class="fd-icon-button" aria-label="Expand sidebar" title="Expand sidebar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
+<div class="fd-sidebar-scrim" hidden></div>
+  <div id="fd-toc-popover">
+    <button type="button" class="fd-toc-trigger" aria-expanded="false" aria-controls="fd-toc-mobile" title="On this page">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg><span>On this page</span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div id="fd-toc-mobile" hidden><ul class="fd-toc-list">
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#build-against-libfsspec">Build against libfsspec</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#open-a-url">Open a URL</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#register-a-backend">Register a backend</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#ship-a-wheel-that-links-libfsspec">Ship a wheel that links libfsspec</a>
+  </li>
+</ul>
+</div>
+  </div>
+
+  <main id="fd-main">
+    <article class="fd-page">
+      <div class="fd-prose">
+  <section class="tex2jax_ignore mathjax_ignore" id="how-to-share-filesystems-through-libfsspec">
+<h1>How to share filesystems through libfsspec<a class="headerlink" href="#how-to-share-filesystems-through-libfsspec" title="Link to this heading">¶</a></h1>
+<p>This guide shows how to build against <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>, open a URL through its registry,
+and add a backend that every other consumer in the process can open. Each step has a
+tab for Rust, C, C++, and Python. For every function and type, see the
+<a class="reference internal" href="c-api.html"><span class="std std-doc">C API reference</span></a>.</p>
+<section id="build-against-libfsspec">
+<h2>Build against libfsspec<a class="headerlink" href="#build-against-libfsspec" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> and its header ship in the <code class="docutils literal notranslate"><span class="pre">fsspec-rs</span></code> wheel. Install it into the
+environment you build in:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>fsspec-rs
+</pre></div>
+</div>
+<div class="sd-tab-set docutils">
+<input checked="checked" id="sd-tab-item-0" name="sd-tab-set-0" type="radio">
+<label aria-controls="sd-tab-item-0-content" class="sd-tab-label" data-sync-group="lang" data-sync-id="rust" for="sd-tab-item-0">
+Rust</label><div class="sd-tab-content docutils" id="sd-tab-item-0-content">
+<p>A Python extension written in Rust depends on <code class="docutils literal notranslate"><span class="pre">fsspec_sys</span></code> for the C API and on
+<code class="docutils literal notranslate"><span class="pre">fsspec_rs</span></code> for the traits:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[dependencies]</span>
+<span class="n">fsspec_rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.2"</span>
+<span class="n">fsspec_sys</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.2"</span>
+</pre></div>
+</div>
+<p>Declare the wheel’s library in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> and link the extension to it. This needs a hatch-rs
+release with <code class="docutils literal notranslate"><span class="pre">python-package</span></code> support
+(<a class="reference external" href="https://github.com/python-project-templates/hatch-rs/pull/95">hatch-rs#95</a>), and
+<code class="docutils literal notranslate"><span class="pre">fsspec-rs</span></code> must be a build dependency:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[build-system]</span>
+<span class="n">requires</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"hatchling"</span><span class="p">,</span><span class="w"> </span><span class="s2">"hatch-rs"</span><span class="p">,</span><span class="w"> </span><span class="s2">"fsspec-rs"</span><span class="p">]</span>
+
+<span class="k">[[tool.hatch.build.hooks.hatch-rs.artifacts]]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"fsspec"</span>
+<span class="n">python-package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"fsspec_rs"</span>
+
+<span class="k">[[tool.hatch.build.hooks.hatch-rs.artifacts]]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_extension"</span>
+<span class="n">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_package/{python_extension_name}"</span>
+<span class="n">links</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"fsspec"</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>hatch-rs adds an rpath to <code class="docutils literal notranslate"><span class="pre">../fsspec_rs/lib</span></code>, so the extension finds the library when
+both wheels are installed in the same <code class="docutils literal notranslate"><span class="pre">site-packages</span></code>.</p>
+<p>A standalone Rust program that does not share a process with other extensions does not
+need <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>; it uses <code class="docutils literal notranslate"><span class="pre">fsspec_rs</span></code> and its registry directly.</p>
+</div>
+<input id="sd-tab-item-1" name="sd-tab-set-0" type="radio">
+<label aria-controls="sd-tab-item-1-content" class="sd-tab-label" data-sync-group="lang" data-sync-id="c" for="sd-tab-item-1">
+C</label><div class="sd-tab-content docutils" id="sd-tab-item-1-content">
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">PREFIX</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import fsspec_rs; print(fsspec_rs.get_prefix())"</span><span class="k">)</span>
+cc<span class="w"> </span>example.c<span class="w"> </span>-I<span class="s2">"</span><span class="nv">$PREFIX</span><span class="s2">/include"</span><span class="w"> </span>-L<span class="s2">"</span><span class="nv">$PREFIX</span><span class="s2">/lib"</span><span class="w"> </span>-lfsspec<span class="w"> </span>-Wl,-rpath,<span class="s2">"</span><span class="nv">$PREFIX</span><span class="s2">/lib"</span><span class="w"> </span>-o<span class="w"> </span>example
+</pre></div>
+</div>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;fsspec/fsspec.h&gt;</span>
+</pre></div>
+</div>
+</div>
+<input id="sd-tab-item-2" name="sd-tab-set-0" type="radio">
+<label aria-controls="sd-tab-item-2-content" class="sd-tab-label" data-sync-group="lang" data-sync-id="cpp" for="sd-tab-item-2">
+C++</label><div class="sd-tab-content docutils" id="sd-tab-item-2-content">
+<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nb">find_package</span><span class="p">(</span><span class="s">Python</span><span class="w"> </span><span class="s">COMPONENTS</span><span class="w"> </span><span class="s">Interpreter</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
+<span class="nb">execute_process</span><span class="p">(</span>
+<span class="w">  </span><span class="s">COMMAND</span><span class="w"> </span><span class="o">${</span><span class="nv">Python_EXECUTABLE</span><span class="o">}</span><span class="w"> </span><span class="s">-c</span><span class="w"> </span><span class="s2">"import fsspec_rs; print(fsspec_rs.get_prefix())"</span>
+<span class="w">  </span><span class="s">OUTPUT_VARIABLE</span><span class="w"> </span><span class="s">FSSPEC_PREFIX</span>
+<span class="w">  </span><span class="s">OUTPUT_STRIP_TRAILING_WHITESPACE</span><span class="p">)</span>
+<span class="nb">find_library</span><span class="p">(</span><span class="s">FSSPEC_LIBRARY</span><span class="w"> </span><span class="s">fsspec</span><span class="w"> </span><span class="s">PATHS</span><span class="w"> </span><span class="o">${</span><span class="nv">FSSPEC_PREFIX</span><span class="o">}</span><span class="s">/lib</span><span class="w"> </span><span class="s">NO_DEFAULT_PATH</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
+
+<span class="nb">add_executable</span><span class="p">(</span><span class="s">example</span><span class="w"> </span><span class="s">example.cpp</span><span class="p">)</span>
+<span class="nb">target_include_directories</span><span class="p">(</span><span class="s">example</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="o">${</span><span class="nv">FSSPEC_PREFIX</span><span class="o">}</span><span class="s">/include</span><span class="p">)</span>
+<span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">example</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="o">${</span><span class="nv">FSSPEC_LIBRARY</span><span class="o">}</span><span class="p">)</span>
+<span class="nb">set_target_properties</span><span class="p">(</span><span class="s">example</span><span class="w"> </span><span class="s">PROPERTIES</span><span class="w"> </span><span class="s">BUILD_RPATH</span><span class="w"> </span><span class="o">${</span><span class="nv">FSSPEC_PREFIX</span><span class="o">}</span><span class="s">/lib</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The header has <code class="docutils literal notranslate"><span class="pre">extern</span> <span class="pre">&quot;C&quot;</span></code> guards, so include it directly:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;fsspec/fsspec.h&gt;</span>
+</pre></div>
+</div>
+</div>
+<input id="sd-tab-item-3" name="sd-tab-set-0" type="radio">
+<label aria-controls="sd-tab-item-3-content" class="sd-tab-label" data-sync-group="lang" data-sync-id="python" for="sd-tab-item-3">
+Python</label><div class="sd-tab-content docutils" id="sd-tab-item-3-content">
+<p>The installed extension already uses <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>. Check it:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">fsspec_rs</span>
+
+<span class="k">assert</span> <span class="n">fsspec_rs</span><span class="o">.</span><span class="n">fsspec_rs</span><span class="o">.</span><span class="n">linked_to_libfsspec</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">linked_to_libfsspec()</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code> in Pyodide builds, which compile the registry into
+the extension.</p>
+</div>
+</div>
+</section>
+<section id="open-a-url">
+<h2>Open a URL<a class="headerlink" href="#open-a-url" title="Link to this heading">¶</a></h2>
+<div class="sd-tab-set docutils">
+<input checked="checked" id="sd-tab-item-4" name="sd-tab-set-1" type="radio">
+<label aria-controls="sd-tab-item-4-content" class="sd-tab-label" data-sync-group="lang" data-sync-id="rust" for="sd-tab-item-4">
+Rust</label><div class="sd-tab-content docutils" id="sd-tab-item-4-content">
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::{</span><span class="n">FileSystem</span><span class="p">,</span><span class="w"> </span><span class="n">FsOptions</span><span class="p">};</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="p">(</span><span class="n">fs</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fsspec_sys</span><span class="p">::</span><span class="n">url_to_fs</span><span class="p">(</span><span class="s">"file:///tmp/fsspec-example.txt"</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">FsOptions</span><span class="p">::</span><span class="n">new</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="n">fs</span><span class="p">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="o">&amp;</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="s">b"hello"</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="fm">assert_eq!</span><span class="p">(</span><span class="n">fs</span><span class="p">.</span><span class="n">cat_file</span><span class="p">(</span><span class="o">&amp;</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">)</span><span class="o">?</span><span class="p">,</span><span class="w"> </span><span class="s">b"hello"</span><span class="p">);</span>
+<span class="p">#</span><span class="w"> </span><span class="nb">Ok</span><span class="p">::</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::</span><span class="n">FsError</span><span class="o">&gt;</span><span class="p">(())</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">fs</span></code> is a <code class="docutils literal notranslate"><span class="pre">SharedFileSystem</span></code> over a <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> handle and supports every
+<code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> method.</p>
+</div>
+<input id="sd-tab-item-5" name="sd-tab-set-1" type="radio">
+<label aria-controls="sd-tab-item-5-content" class="sd-tab-label" data-sync-group="lang" data-sync-id="c" for="sd-tab-item-5">
+C</label><div class="sd-tab-content docutils" id="sd-tab-item-5-content">
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdio.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;fsspec/fsspec.h&gt;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"file:///tmp/fsspec-example.txt"</span><span class="p">;</span>
+<span class="w">    </span><span class="n">fsspec_fs</span><span class="w"> </span><span class="o">*</span><span class="n">fs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">    </span><span class="n">fsspec_string</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">fsspec_url_to_fs</span><span class="p">(</span><span class="n">url</span><span class="p">,</span><span class="w"> </span><span class="n">strlen</span><span class="p">(</span><span class="n">url</span><span class="p">),</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">fs</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">path</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">FSSPEC_OK</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="w"> </span><span class="s">"%s</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span><span class="w"> </span><span class="n">fsspec_last_error_message</span><span class="p">());</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"hello"</span><span class="p">;</span>
+<span class="w">    </span><span class="n">fsspec_bytes</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">fsspec_fs_pipe_file</span><span class="p">(</span><span class="n">fs</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">.</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">.</span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">text</span><span class="p">,</span><span class="w"> </span><span class="n">strlen</span><span class="p">(</span><span class="n">text</span><span class="p">))</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">FSSPEC_OK</span><span class="w"> </span><span class="o">||</span>
+<span class="w">        </span><span class="n">fsspec_fs_cat_file</span><span class="p">(</span><span class="n">fs</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">.</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">.</span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">data</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">FSSPEC_OK</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="w"> </span><span class="s">"%s</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span><span class="w"> </span><span class="n">fsspec_last_error_message</span><span class="p">());</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">"%.*s</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">data</span><span class="p">.</span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">data</span><span class="p">.</span><span class="n">data</span><span class="p">);</span>
+<span class="w">        </span><span class="n">fsspec_bytes_free</span><span class="p">(</span><span class="n">data</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">fsspec_string_free</span><span class="p">(</span><span class="n">path</span><span class="p">);</span>
+<span class="w">    </span><span class="n">fsspec_fs_release</span><span class="p">(</span><span class="n">fs</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input id="sd-tab-item-6" name="sd-tab-set-1" type="radio">
+<label aria-controls="sd-tab-item-6-content" class="sd-tab-label" data-sync-group="lang" data-sync-id="cpp" for="sd-tab-item-6">
+C++</label><div class="sd-tab-content docutils" id="sd-tab-item-6-content">
+<p>Wrap handles in <code class="docutils literal notranslate"><span class="pre">std::unique_ptr</span></code> and turn failing statuses into exceptions:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;fsspec/fsspec.h&gt;</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;memory&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdexcept&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string_view&gt;</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">FsRelease</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">operator</span><span class="p">()(</span><span class="n">fsspec_fs</span><span class="w"> </span><span class="o">*</span><span class="n">fs</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">fsspec_fs_release</span><span class="p">(</span><span class="n">fs</span><span class="p">);</span><span class="w"> </span><span class="p">}</span>
+<span class="p">};</span>
+<span class="k">using</span><span class="w"> </span><span class="n">Fs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">fsspec_fs</span><span class="p">,</span><span class="w"> </span><span class="n">FsRelease</span><span class="o">&gt;</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">check</span><span class="p">(</span><span class="n">fsspec_status</span><span class="w"> </span><span class="n">status</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">status</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">FSSPEC_OK</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fsspec_last_error_message</span><span class="p">();</span>
+<span class="w">        </span><span class="k">throw</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">runtime_error</span><span class="p">(</span><span class="n">message</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">message</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s">"fsspec error"</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string_view</span><span class="w"> </span><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"file:///tmp/fsspec-example.txt"</span><span class="p">;</span>
+<span class="w">    </span><span class="n">fsspec_fs</span><span class="w"> </span><span class="o">*</span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">nullptr</span><span class="p">;</span>
+<span class="w">    </span><span class="n">fsspec_string</span><span class="w"> </span><span class="n">resolved</span><span class="p">{};</span>
+<span class="w">    </span><span class="n">check</span><span class="p">(</span><span class="n">fsspec_url_to_fs</span><span class="p">(</span><span class="n">url</span><span class="p">.</span><span class="n">data</span><span class="p">(),</span><span class="w"> </span><span class="n">url</span><span class="p">.</span><span class="n">size</span><span class="p">(),</span><span class="w"> </span><span class="nb">nullptr</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">raw</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">resolved</span><span class="p">));</span>
+<span class="w">    </span><span class="n">Fs</span><span class="w"> </span><span class="n">fs</span><span class="p">(</span><span class="n">raw</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">path</span><span class="p">(</span><span class="n">resolved</span><span class="p">.</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">resolved</span><span class="p">.</span><span class="n">len</span><span class="p">);</span>
+<span class="w">    </span><span class="n">fsspec_string_free</span><span class="p">(</span><span class="n">resolved</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string_view</span><span class="w"> </span><span class="n">text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"hello"</span><span class="p">;</span>
+<span class="w">    </span><span class="n">check</span><span class="p">(</span><span class="n">fsspec_fs_pipe_file</span><span class="p">(</span><span class="n">fs</span><span class="p">.</span><span class="n">get</span><span class="p">(),</span><span class="w"> </span><span class="n">path</span><span class="p">.</span><span class="n">data</span><span class="p">(),</span><span class="w"> </span><span class="n">path</span><span class="p">.</span><span class="n">size</span><span class="p">(),</span>
+<span class="w">                              </span><span class="k">reinterpret_cast</span><span class="o">&lt;</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*&gt;</span><span class="p">(</span><span class="n">text</span><span class="p">.</span><span class="n">data</span><span class="p">()),</span><span class="w"> </span><span class="n">text</span><span class="p">.</span><span class="n">size</span><span class="p">()));</span>
+<span class="w">    </span><span class="n">fsspec_bytes</span><span class="w"> </span><span class="n">data</span><span class="p">{};</span>
+<span class="w">    </span><span class="n">check</span><span class="p">(</span><span class="n">fsspec_fs_cat_file</span><span class="p">(</span><span class="n">fs</span><span class="p">.</span><span class="n">get</span><span class="p">(),</span><span class="w"> </span><span class="n">path</span><span class="p">.</span><span class="n">data</span><span class="p">(),</span><span class="w"> </span><span class="n">path</span><span class="p">.</span><span class="n">size</span><span class="p">(),</span><span class="w"> </span><span class="nb">nullptr</span><span class="p">,</span><span class="w"> </span><span class="nb">nullptr</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">data</span><span class="p">));</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">(</span><span class="k">reinterpret_cast</span><span class="o">&lt;</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*&gt;</span><span class="p">(</span><span class="n">data</span><span class="p">.</span><span class="n">data</span><span class="p">),</span><span class="w"> </span><span class="n">data</span><span class="p">.</span><span class="n">len</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+<span class="w">    </span><span class="n">fsspec_bytes_free</span><span class="p">(</span><span class="n">data</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input id="sd-tab-item-7" name="sd-tab-set-1" type="radio">
+<label aria-controls="sd-tab-item-7-content" class="sd-tab-label" data-sync-group="lang" data-sync-id="python" for="sd-tab-item-7">
+Python</label><div class="sd-tab-content docutils" id="sd-tab-item-7-content">
+<p>Python code keeps using fsspec. The <code class="docutils literal notranslate"><span class="pre">-rs</span></code> protocols reach <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> through the
+extension:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">fsspec</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">fsspec_rs</span>
+
+<span class="n">fs</span><span class="p">,</span> <span class="n">path</span> <span class="o">=</span> <span class="n">fsspec</span><span class="o">.</span><span class="n">url_to_fs</span><span class="p">(</span><span class="s2">"file-rs:///tmp/fsspec-example.txt"</span><span class="p">)</span>
+<span class="n">fs</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="sa">b</span><span class="s2">"hello"</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">fs</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">"hello"</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>Options are strings on every side. Pass them as <code class="docutils literal notranslate"><span class="pre">FsOptions</span></code> in Rust, an
+<code class="docutils literal notranslate"><span class="pre">fsspec_options</span></code> map in C and C++, or keyword arguments in Python. The accepted keys
+for each built-in protocol are listed under
+“Filesystem registry” in the <a class="reference internal" href="rust.html"><span class="std std-doc">Rust reference</span></a>.</p>
+</section>
+<section id="register-a-backend">
+<h2>Register a backend<a class="headerlink" href="#register-a-backend" title="Link to this heading">¶</a></h2>
+<p>A backend registered in <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> can be opened by every consumer in the process,
+whatever language it is written in. Register it once, when your library loads.</p>
+<div class="sd-tab-set docutils">
+<input checked="checked" id="sd-tab-item-8" name="sd-tab-set-2" type="radio">
+<label aria-controls="sd-tab-item-8-content" class="sd-tab-label" data-sync-group="lang" data-sync-id="rust" for="sd-tab-item-8">
+Rust</label><div class="sd-tab-content docutils" id="sd-tab-item-8-content">
+<p>Register a factory from the extension’s module initializer. Any closure from a path
+and options to a <code class="docutils literal notranslate"><span class="pre">SharedFileSystem</span></code> is a factory:</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">sync</span><span class="p">::</span><span class="n">Arc</span><span class="p">;</span>
+
+<span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::{</span><span class="n">FsOptions</span><span class="p">,</span><span class="w"> </span><span class="n">FsResult</span><span class="p">,</span><span class="w"> </span><span class="n">SharedFileSystem</span><span class="p">};</span>
+<span class="k">use</span><span class="w"> </span><span class="n">pyo3</span><span class="p">::</span><span class="n">exceptions</span><span class="p">::</span><span class="n">PyRuntimeError</span><span class="p">;</span>
+<span class="k">use</span><span class="w"> </span><span class="n">pyo3</span><span class="p">::</span><span class="n">prelude</span><span class="p">::</span><span class="o">*</span><span class="p">;</span>
+
+<span class="cp">#[pymodule]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">my_extension</span><span class="p">(</span><span class="n">m</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="nc">Bound</span><span class="o">&lt;'</span><span class="nb">_</span><span class="p">,</span><span class="w"> </span><span class="n">PyModule</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">PyResult</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">fsspec_sys</span><span class="p">::</span><span class="n">register_filesystem</span><span class="p">(</span>
+<span class="w">        </span><span class="s">"example"</span><span class="p">,</span>
+<span class="w">        </span><span class="o">|</span><span class="n">_path</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="kt">str</span><span class="p">,</span><span class="w"> </span><span class="n">options</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="nc">FsOptions</span><span class="o">|</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">FsResult</span><span class="o">&lt;</span><span class="n">SharedFileSystem</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nb">Ok</span><span class="p">(</span><span class="n">Arc</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">ExampleFs</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">options</span><span class="p">)</span><span class="o">?</span><span class="p">))</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">    </span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="n">map_err</span><span class="p">(</span><span class="o">|</span><span class="n">error</span><span class="o">|</span><span class="w"> </span><span class="n">PyRuntimeError</span><span class="p">::</span><span class="n">new_err</span><span class="p">(</span><span class="n">error</span><span class="p">.</span><span class="n">to_string</span><span class="p">()))</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">fsspec_sys</span></code> exports <code class="docutils literal notranslate"><span class="pre">ExampleFs</span></code> through the vtables, so C and C++ callers see every
+<code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> method it implements.</p>
+</div>
+<input id="sd-tab-item-9" name="sd-tab-set-2" type="radio">
+<label aria-controls="sd-tab-item-9-content" class="sd-tab-label" data-sync-group="lang" data-sync-id="c" for="sd-tab-item-9">
+C</label><div class="sd-tab-content docutils" id="sd-tab-item-9-content">
+<p>Fill a vtable with the operations the backend supports; null entries return
+<code class="docutils literal notranslate"><span class="pre">FSSPEC_NOT_SUPPORTED</span></code>. Values returned through callbacks are freed by <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>, so
+allocate them with <code class="docutils literal notranslate"><span class="pre">malloc</span></code> (<code class="docutils literal notranslate"><span class="pre">HeapAlloc(GetProcessHeap(),</span> <span class="pre">...)</span></code> on Windows).</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdlib.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;fsspec/fsspec.h&gt;</span>
+
+<span class="k">static</span><span class="w"> </span><span class="n">fsspec_status</span><span class="w"> </span><span class="nf">example_info</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">path_len</span><span class="p">,</span>
+<span class="w">                                  </span><span class="n">fsspec_file_info</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">data</span><span class="p">;</span>
+<span class="w">    </span><span class="n">memset</span><span class="p">(</span><span class="n">out</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="p">);</span>
+<span class="w">    </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">malloc</span><span class="p">(</span><span class="n">path_len</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">memcpy</span><span class="p">(</span><span class="n">out</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">.</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">path_len</span><span class="p">);</span>
+<span class="w">    </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">.</span><span class="n">data</span><span class="p">[</span><span class="n">path_len</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sc">'\0'</span><span class="p">;</span>
+<span class="w">    </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">.</span><span class="n">len</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">path_len</span><span class="p">;</span>
+<span class="w">    </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">file_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">FSSPEC_FILE_TYPE_FILE</span><span class="p">;</span>
+<span class="w">    </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">created_ns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">    </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">modified_ns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">FSSPEC_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span><span class="w"> </span><span class="n">fsspec_status</span><span class="w"> </span><span class="nf">example_create</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">path_len</span><span class="p">,</span>
+<span class="w">                                    </span><span class="k">const</span><span class="w"> </span><span class="n">fsspec_options</span><span class="w"> </span><span class="o">*</span><span class="n">options</span><span class="p">,</span><span class="w"> </span><span class="n">fsspec_fs</span><span class="w"> </span><span class="o">**</span><span class="n">out</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">path_len</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">options</span><span class="p">;</span>
+<span class="w">    </span><span class="n">fsspec_fs_vtable</span><span class="w"> </span><span class="n">vtable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+<span class="w">    </span><span class="n">vtable</span><span class="p">.</span><span class="n">struct_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="n">vtable</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vtable</span><span class="p">.</span><span class="n">abi_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">FSSPEC_ABI_VERSION</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vtable</span><span class="p">.</span><span class="n">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"example"</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vtable</span><span class="p">.</span><span class="n">info</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">example_info</span><span class="p">;</span>
+<span class="w">    </span><span class="o">*</span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fsspec_fs_from_vtable</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vtable</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">FSSPEC_OK</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">FSSPEC_INVALID_ARGUMENT</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">fsspec_status</span><span class="w"> </span><span class="nf">register_example</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">fsspec_fs_factory</span><span class="w"> </span><span class="n">factory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+<span class="w">    </span><span class="n">factory</span><span class="p">.</span><span class="n">struct_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="n">factory</span><span class="p">;</span>
+<span class="w">    </span><span class="n">factory</span><span class="p">.</span><span class="n">abi_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">FSSPEC_ABI_VERSION</span><span class="p">;</span>
+<span class="w">    </span><span class="n">factory</span><span class="p">.</span><span class="n">create</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">example_create</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">fsspec_register_filesystem</span><span class="p">(</span><span class="s">"example"</span><span class="p">,</span><span class="w"> </span><span class="n">strlen</span><span class="p">(</span><span class="s">"example"</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">factory</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>To keep state, pass a pointer as <code class="docutils literal notranslate"><span class="pre">data</span></code> and free it in <code class="docutils literal notranslate"><span class="pre">release</span></code>.</p>
+</div>
+<input id="sd-tab-item-10" name="sd-tab-set-2" type="radio">
+<label aria-controls="sd-tab-item-10-content" class="sd-tab-label" data-sync-group="lang" data-sync-id="cpp" for="sd-tab-item-10">
+C++</label><div class="sd-tab-content docutils" id="sd-tab-item-10-content">
+<p>Captureless lambdas convert to the vtable’s function pointers. Keep state in an
+object passed as <code class="docutils literal notranslate"><span class="pre">data</span></code> and delete it in <code class="docutils literal notranslate"><span class="pre">release</span></code>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;fsspec/fsspec.h&gt;</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cstdlib&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cstring&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string_view&gt;</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">ExampleFs</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// backend state</span>
+<span class="p">};</span>
+
+<span class="n">fsspec_status</span><span class="w"> </span><span class="nf">register_example</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">fsspec_fs_factory</span><span class="w"> </span><span class="n">factory</span><span class="p">{};</span>
+<span class="w">    </span><span class="n">factory</span><span class="p">.</span><span class="n">struct_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="n">factory</span><span class="p">;</span>
+<span class="w">    </span><span class="n">factory</span><span class="p">.</span><span class="n">abi_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">FSSPEC_ABI_VERSION</span><span class="p">;</span>
+<span class="w">    </span><span class="n">factory</span><span class="p">.</span><span class="n">create</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">fsspec_options</span><span class="w"> </span><span class="o">*</span><span class="p">,</span>
+<span class="w">                        </span><span class="n">fsspec_fs</span><span class="w"> </span><span class="o">**</span><span class="n">out</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">fsspec_status</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">fsspec_fs_vtable</span><span class="w"> </span><span class="n">vtable</span><span class="p">{};</span>
+<span class="w">        </span><span class="n">vtable</span><span class="p">.</span><span class="n">struct_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="n">vtable</span><span class="p">;</span>
+<span class="w">        </span><span class="n">vtable</span><span class="p">.</span><span class="n">abi_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">FSSPEC_ABI_VERSION</span><span class="p">;</span>
+<span class="w">        </span><span class="n">vtable</span><span class="p">.</span><span class="n">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"example"</span><span class="p">;</span>
+<span class="w">        </span><span class="n">vtable</span><span class="p">.</span><span class="n">info</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">path_len</span><span class="p">,</span>
+<span class="w">                         </span><span class="n">fsspec_file_info</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">fsspec_status</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">std</span><span class="o">::</span><span class="n">memset</span><span class="p">(</span><span class="n">out</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="p">);</span>
+<span class="w">            </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="kt">char</span><span class="w"> </span><span class="o">*&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">malloc</span><span class="p">(</span><span class="n">path_len</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">));</span>
+<span class="w">            </span><span class="n">std</span><span class="o">::</span><span class="n">memcpy</span><span class="p">(</span><span class="n">out</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">.</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">path_len</span><span class="p">);</span>
+<span class="w">            </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">.</span><span class="n">data</span><span class="p">[</span><span class="n">path_len</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sc">'\0'</span><span class="p">;</span>
+<span class="w">            </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">.</span><span class="n">len</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">path_len</span><span class="p">;</span>
+<span class="w">            </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">file_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">FSSPEC_FILE_TYPE_FILE</span><span class="p">;</span>
+<span class="w">            </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">created_ns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">            </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">modified_ns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">FSSPEC_OK</span><span class="p">;</span>
+<span class="w">        </span><span class="p">};</span>
+<span class="w">        </span><span class="n">vtable</span><span class="p">.</span><span class="n">release</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">delete</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">ExampleFs</span><span class="w"> </span><span class="o">*&gt;</span><span class="p">(</span><span class="n">data</span><span class="p">);</span><span class="w"> </span><span class="p">};</span>
+<span class="w">        </span><span class="o">*</span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fsspec_fs_from_vtable</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vtable</span><span class="p">,</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">ExampleFs</span><span class="p">{});</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">FSSPEC_OK</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">FSSPEC_INVALID_ARGUMENT</span><span class="p">;</span>
+<span class="w">    </span><span class="p">};</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string_view</span><span class="w"> </span><span class="n">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"example"</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">fsspec_register_filesystem</span><span class="p">(</span><span class="n">protocol</span><span class="p">.</span><span class="n">data</span><span class="p">(),</span><span class="w"> </span><span class="n">protocol</span><span class="p">.</span><span class="n">size</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">factory</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Callbacks must not let exceptions escape. Catch them, call <code class="docutils literal notranslate"><span class="pre">fsspec_set_last_error</span></code>,
+and return a failing status.</p>
+</div>
+<input id="sd-tab-item-11" name="sd-tab-set-2" type="radio">
+<label aria-controls="sd-tab-item-11-content" class="sd-tab-label" data-sync-group="lang" data-sync-id="python" for="sd-tab-item-11">
+Python</label><div class="sd-tab-content docutils" id="sd-tab-item-11-content">
+<p>Python code registers a native backend by importing the package whose extension
+registers it, then checks the shared registry:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">fsspec_rs</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">my_package</span>  <span class="c1"># its extension registers "example" when imported</span>
+
+<span class="k">assert</span> <span class="s2">"example"</span> <span class="ow">in</span> <span class="n">fsspec_rs</span><span class="o">.</span><span class="n">fsspec_rs</span><span class="o">.</span><span class="n">protocols</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Import <code class="docutils literal notranslate"><span class="pre">fsspec_rs</span></code> before the package so that, on Windows, its <code class="docutils literal notranslate"><span class="pre">lib/</span></code> directory is on
+the DLL search path.</p>
+<p>A backend written in Python registers with <code class="docutils literal notranslate"><span class="pre">fsspec.register_implementation</span></code> instead.
+It is visible to fsspec but not to <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>, so native callers cannot open it.</p>
+</div>
+</div>
+</section>
+<section id="ship-a-wheel-that-links-libfsspec">
+<h2>Ship a wheel that links libfsspec<a class="headerlink" href="#ship-a-wheel-that-links-libfsspec" title="Link to this heading">¶</a></h2>
+<p>Wheel repair tools copy external libraries into the wheel by default, which would give
+your package its own copy of <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> and its own registry. Exclude it:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>auditwheel<span class="w"> </span>repair<span class="w"> </span>--exclude<span class="w"> </span><span class="s1">'libfsspec.so*'</span><span class="w"> </span>dist/*.whl
+delocate-wheel<span class="w"> </span>--exclude<span class="w"> </span>libfsspec<span class="w"> </span>dist/*.whl
+delvewheel<span class="w"> </span>repair<span class="w"> </span>--exclude<span class="w"> </span>fsspec.dll<span class="w"> </span>dist/*.whl
+</pre></div>
+</div>
+<p>Require <code class="docutils literal notranslate"><span class="pre">fsspec-rs</span></code> at run time, at least the version you built against:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[project]</span>
+<span class="n">dependencies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"fsspec-rs&gt;=0.2"</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>To fail early on a mismatched library, compare <code class="docutils literal notranslate"><span class="pre">fsspec_abi_version()</span></code> with
+<code class="docutils literal notranslate"><span class="pre">FSSPEC_ABI_VERSION</span></code> (<code class="docutils literal notranslate"><span class="pre">fsspec_sys::abi_version()</span></code> in Rust) when your library loads.</p>
+</section>
+</section>
+
+
+      </div>
+<nav class="fd-pagination" aria-label="Pagination">
+  <a class="fd-pagination-card fd-pagination-prev" href="how-to-rust.html" title="Previous: How to use the Rust crates">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="m15 18-6-6 6-6"/></svg>
+    <span class="fd-pagination-text">
+      <span class="fd-pagination-label">Previous</span>
+      <span class="fd-pagination-title">How to use the Rust crates</span>
+    </span>
+  </a>
+  <a class="fd-pagination-card fd-pagination-next" href="filesystems.html" title="Next: fsspec-rs filesystems">
+    <span class="fd-pagination-text">
+      <span class="fd-pagination-label">Next</span>
+      <span class="fd-pagination-title">fsspec-rs filesystems</span>
+    </span>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="m9 18 6-6-6-6"/></svg>
+  </a>
+</nav>
+<footer id="fd-footer">
+  <p class="fd-footer-meta"><span>&#169; the fsspec-rs authors</span><span>Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.</span>
+  </p>
+</footer>
+    </article>
+  </main>
+<nav id="fd-toc" aria-label="On this page">
+  <div class="fd-toc-header">
+    <p class="fd-toc-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>On this page</p>
+    <button type="button" class="fd-icon-button fd-toc-collapse" aria-label="Collapse page navigation" title="Collapse page navigation" aria-controls="fd-toc" aria-expanded="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg></button>
+  </div>
+  <div class="fd-toc-body"><svg class="fd-toc-rail" aria-hidden="true" preserveAspectRatio="none">
+      <path class="fd-toc-track" fill="none" />
+      <path class="fd-toc-thumb" fill="none" />
+    </svg><ul class="fd-toc-list">
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#build-against-libfsspec">Build against libfsspec</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#open-a-url">Open a URL</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#register-a-backend">Register a backend</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#ship-a-wheel-that-links-libfsspec">Ship a wheel that links libfsspec</a>
+  </li>
+</ul>
+
+  </div>
+  <div class="fd-toc-actions">
+    <a class="fd-toc-action" href="https://github.com/1kbgz/fsspec-rs/edit/HEAD/docs/src/how-to-libfsspec.md" target="_blank" rel="noopener" title="Edit this page"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg><span>Edit this page</span></a>
+    <a class="fd-toc-action" href="../../_sources/docs/src/how-to-libfsspec.md.txt" rel="nofollow" title="View source"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg><span>View source</span></a>
+  </div>
+</nav>
+<button type="button" id="fd-toc-restore" class="fd-icon-button" aria-label="Expand page navigation" title="Expand page navigation" aria-controls="fd-toc" aria-expanded="false"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg></button>
+</div>
+<dialog id="fd-search-dialog" aria-label="Search">
+  <form class="fd-search-panel" method="dialog" role="search">
+    <div class="fd-search-field">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="search" id="fd-search-input" autocomplete="off" spellcheck="false" placeholder="Search documentation..." aria-label="Search" />
+      <kbd class="fd-kbd">Esc</kbd>
+    </div>
+    <div id="fd-search-results" role="listbox" aria-label="Search results"></div>
+    <p id="fd-search-empty" class="fd-search-empty" hidden>No results found.</p>
+  </form>
+</dialog>
+  </body>
+</html>

@@ -14,9 +14,13 @@ docs/src/how-to.md
 
 docs/src/how-to-rust.md
 
+docs/src/how-to-libfsspec.md
+
 docs/src/filesystems.md
 
 docs/src/rust.md
+
+docs/src/c-api.md
 
 docs/src/api.md
 
