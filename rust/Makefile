@@ -23,7 +23,7 @@ fix:  ## fix code with rustfmt
 #alias
 format: fix
 
-.PHONY: check checks check-wasm
+.PHONY: check checks check-wasm test-wasm
 check:
 	cargo check --workspace --all-features
 # alias
@@ -32,6 +32,12 @@ checks: check
 check-wasm:  ## check that the core crate builds for wasm32 without the s3 feature
 	rustup target add wasm32-unknown-unknown
 	RUSTFLAGS="-D warnings" cargo check -p fsspec_rs --no-default-features --target wasm32-unknown-unknown
+
+test-wasm:  ## run the core crate's wasm32 tests in Node, without the s3 feature
+	rustup target add wasm32-unknown-unknown
+	cargo install wasm-bindgen-cli --locked --version $$(cargo pkgid wasm-bindgen | sed 's/.*@//')
+	CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER=wasm-bindgen-test-runner \
+		cargo test -p fsspec_rs --no-default-features --target wasm32-unknown-unknown --test wasm
 
 .PHONY: test tests test-ci tests-ci
 test:  ## run the tests

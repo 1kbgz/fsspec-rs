@@ -83,8 +83,8 @@ jobs:
         run: make checks
         if: matrix.name == 'ubuntu-24.04'
 
-      - name: Check WebAssembly build
-        run: make -C rust check-wasm
+      - name: Check and test WebAssembly build
+        run: make -C rust check-wasm test-wasm
         if: matrix.name == 'ubuntu-24.04'
 
       - name: Build

@@ -25,8 +25,11 @@ default = ["s3"]
 # S3Fs and the `s3` registry protocol. Without it the crate builds for wasm32-unknown-unknown.
 s3 = ["dep:object_store", "dep:tokio"]
 
-[dev-dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tempfile = "3"
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
 
 [workspace]
 members = [
