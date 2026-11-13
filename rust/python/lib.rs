@@ -8,6 +8,7 @@ mod local;
 mod memory;
 mod s3;
 mod types;
+mod wrapper;
 
 pub use local::{RustLocalFile, RustLocalFs};
 pub use memory::{RustMemoryFile, RustMemoryFs};
