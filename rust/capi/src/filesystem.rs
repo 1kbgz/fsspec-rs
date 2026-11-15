@@ -2,11 +2,9 @@ use std::ffi::c_char;
 use std::ptr;
 use std::slice;
 
-use std::sync::PoisonError;
-
 use fsspec_rs::{
-    CacheType, FsError, FsOptions, FsResult, OpenMode, OpenOptions, SharedFileSystem,
-    DEFAULT_FILESYSTEMS,
+    CacheType, FilesystemRegistry, FsError, FsOptions, FsResult, OpenMode, OpenOptions,
+    SharedFileSystem, DEFAULT_FILESYSTEMS,
 };
 use fsspec_sys::types::{
     fsspec_bytes, fsspec_file, fsspec_file_info, fsspec_file_info_list, fsspec_fs, fsspec_options,
@@ -53,10 +51,8 @@ pub unsafe extern "C" fn fsspec_url_to_fs(
             return Err(invalid("output filesystem pointer is null"));
         }
         // The library's own registry is the shared one; never route through hooks here.
-        let (fs, path) = DEFAULT_FILESYSTEMS
-            .read()
-            .unwrap_or_else(PoisonError::into_inner)
-            .url_to_fs(url, &options_arg(options))?;
+        let (fs, path) =
+            FilesystemRegistry::url_to_fs_shared(&DEFAULT_FILESYSTEMS, url, &options_arg(options))?;
         if !out_path.is_null() {
             out_path.write(fsspec_string::from_string(path));
         }

@@ -52,6 +52,18 @@ impl FilesystemFactory for Box<dyn FilesystemFactory> {
 
 type InstanceKey = (String, String, FsOptions);
 
+enum Lookup<'a> {
+    Cached(SharedFileSystem, String),
+    Pending(Pending<'a>),
+}
+
+/// A factory chosen for a URL that has not built its filesystem yet.
+struct Pending<'a> {
+    factory: Arc<dyn FilesystemFactory>,
+    key: InstanceKey,
+    path: &'a str,
+}
+
 /// Factories keyed by protocol, with a cache of the filesystems they built.
 pub struct FilesystemRegistry {
     factories: HashMap<String, Arc<dyn FilesystemFactory>>,
@@ -109,6 +121,33 @@ impl FilesystemRegistry {
         url: &str,
         options: &FsOptions,
     ) -> FsResult<(SharedFileSystem, String)> {
+        let pending = match self.lookup(url, options)? {
+            Lookup::Cached(fs, path) => return Ok((fs, path)),
+            Lookup::Pending(pending) => pending,
+        };
+        let fs = pending.factory.create(pending.path, options)?;
+        Ok(self.cache(pending, fs))
+    }
+
+    /// Like [`url_to_fs`](Self::url_to_fs) for a registry behind a lock, but holds the
+    /// lock only to look up and cache, never while a factory runs. A factory may then
+    /// register filesystems in the same registry, as a Python backend does when the
+    /// fallback imports it.
+    pub fn url_to_fs_shared(
+        registry: &RwLock<Self>,
+        url: &str,
+        options: &FsOptions,
+    ) -> FsResult<(SharedFileSystem, String)> {
+        let read = || registry.read().unwrap_or_else(PoisonError::into_inner);
+        let pending = match read().lookup(url, options)? {
+            Lookup::Cached(fs, path) => return Ok((fs, path)),
+            Lookup::Pending(pending) => pending,
+        };
+        let fs = pending.factory.create(pending.path, options)?;
+        Ok(read().cache(pending, fs))
+    }
+
+    fn lookup<'a>(&self, url: &'a str, options: &FsOptions) -> FsResult<Lookup<'a>> {
         let (protocol, path) = split_protocol(url)?;
         let (factory, path) = self.factory(protocol, url, path)?;
         let key = (
@@ -116,22 +155,39 @@ impl FilesystemRegistry {
             factory.instance_scope(path),
             options.clone(),
         );
-        let instances = || {
+        let cached = self
+            .instances
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&key)
+            .cloned();
+        Ok(match cached {
+            Some(fs) => {
+                let path = fs.strip_protocol(path);
+                Lookup::Cached(fs, path)
+            }
+            None => Lookup::Pending(Pending { factory, key, path }),
+        })
+    }
+
+    /// Caches `fs` unless its factory was replaced while it was built, and returns the
+    /// cached instance with its path.
+    fn cache(&self, pending: Pending<'_>, fs: SharedFileSystem) -> (SharedFileSystem, String) {
+        let current = self
+            .factory(&pending.key.0, "", "")
+            .is_ok_and(|(factory, _)| Arc::ptr_eq(&factory, &pending.factory));
+        let fs = if current {
             self.instances
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
+                .entry(pending.key)
+                .or_insert(fs)
+                .clone()
+        } else {
+            fs
         };
-        let cached = instances().get(&key).cloned();
-        let fs = match cached {
-            Some(fs) => fs,
-            // Build without holding the lock, since a factory may resolve other URLs.
-            None => {
-                let fs = factory.create(path, options)?;
-                instances().entry(key).or_insert(fs).clone()
-            }
-        };
-        let path = fs.strip_protocol(path);
-        Ok((fs, path))
+        let path = fs.strip_protocol(pending.path);
+        (fs, path)
     }
 
     /// Like [`url_to_fs`](Self::url_to_fs), but always builds a new filesystem and
@@ -250,10 +306,7 @@ pub fn url_to_fs(url: &str, options: &FsOptions) -> FsResult<(SharedFileSystem, 
     if let Some(hooks) = HOOKS.get() {
         return (hooks.url_to_fs)(url, options);
     }
-    DEFAULT_FILESYSTEMS
-        .read()
-        .unwrap_or_else(PoisonError::into_inner)
-        .url_to_fs(url, options)
+    FilesystemRegistry::url_to_fs_shared(&DEFAULT_FILESYSTEMS, url, options)
 }
 
 fn split_protocol(url: &str) -> FsResult<(&str, &str)> {
