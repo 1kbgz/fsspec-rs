@@ -163,6 +163,20 @@ fn copy_move_and_recursive_remove() {
 }
 
 #[test]
+fn recursive_copy_and_move_match_listed_names() {
+    let fs = MemoryFs::new();
+    fs.pipe_file("/x/a", b"1").unwrap();
+    fs.pipe_file("/x/y/b", b"2").unwrap();
+
+    fs.copy("x", "/c", true).unwrap();
+    assert_eq!(fs.find("/c", None, false).unwrap(), ["/c/a", "/c/y/b"]);
+
+    fs.mv("x/", "z").unwrap();
+    assert_eq!(fs.find("/z", None, false).unwrap(), ["/z/a", "/z/y/b"]);
+    assert!(!fs.exists("/x").unwrap());
+}
+
+#[test]
 fn clones_share_a_store() {
     let fs = MemoryFs::new();
     let other = fs.clone();
