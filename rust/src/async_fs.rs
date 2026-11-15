@@ -323,9 +323,9 @@ pub trait AsyncFileSystem: Send + Sync {
             return self.cp_file(src, dst).await;
         }
 
-        let files = self.find(src, None, false).await?;
-        // Listings may name files in another form than `src` (an object store
-        // drops the leading `/` and prefixes the bucket), so compare stripped paths.
+        // Walk top-down so each directory, empty ones included, exists before its files.
+        // Listings may name files in another form than `src` (an object store drops the
+        // leading `/` and prefixes the bucket), so compare stripped paths.
         let sep = self.sep();
         let stripped = |path: &str| {
             self.strip_protocol(path)
@@ -334,22 +334,29 @@ pub trait AsyncFileSystem: Send + Sync {
                 .to_string()
         };
         let root = stripped(src);
-        for file_path in &files {
-            let file = stripped(file_path);
-            let relative = file
+        let dst = dst.trim_end_matches(sep);
+        for entry in self.walk(src, None, true).await? {
+            let dir = stripped(&entry.dirpath);
+            let relative = dir
                 .strip_prefix(&root)
-                .unwrap_or(&file)
+                .unwrap_or(&dir)
                 .trim_start_matches(sep);
-            let dst_path = if dst.ends_with(sep) {
-                format!("{dst}{relative}")
+            let target = if relative.is_empty() {
+                dst.to_string()
             } else {
                 format!("{dst}{sep}{relative}")
             };
-            let parent = self.parent(&dst_path);
-            if !parent.is_empty() && !self.exists(&parent).await? {
-                self.mkdir(&parent, true).await?;
+            if !self.exists(&target).await? {
+                self.mkdir(&target, true).await?;
             }
-            self.cp_file(file_path, &dst_path).await?;
+            let source = entry.dirpath.trim_end_matches(sep);
+            for fname in &entry.filenames {
+                self.cp_file(
+                    &format!("{source}{sep}{fname}"),
+                    &format!("{target}{sep}{fname}"),
+                )
+                .await?;
+            }
         }
         Ok(())
     }

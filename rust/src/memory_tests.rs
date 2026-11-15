@@ -177,6 +177,26 @@ fn recursive_copy_and_move_match_listed_names() {
 }
 
 #[test]
+fn recursive_copy_and_move_keep_empty_directories() {
+    let fs = MemoryFs::new();
+    fs.pipe_file("/x/a", b"1").unwrap();
+    fs.mkdir("/x/empty/inner", true).unwrap();
+    fs.mkdir("/lone", false).unwrap();
+
+    fs.copy("/x", "/c", true).unwrap();
+    assert!(fs.isdir("/c/empty/inner").unwrap());
+    assert_eq!(fs.cat_file("/c/a", None, None).unwrap(), b"1");
+
+    fs.mv("/x", "/z").unwrap();
+    assert!(fs.isdir("/z/empty/inner").unwrap());
+    assert!(!fs.exists("/x").unwrap());
+
+    fs.mv("/lone", "/moved").unwrap();
+    assert!(fs.isdir("/moved").unwrap());
+    assert!(!fs.exists("/lone").unwrap());
+}
+
+#[test]
 fn clones_share_a_store() {
     let fs = MemoryFs::new();
     let other = fs.clone();
