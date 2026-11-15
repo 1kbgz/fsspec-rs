@@ -338,12 +338,22 @@ pub trait FileSystem {
 
         // Recursive directory copy
         let files = self.find(src, None, false)?;
+        // Listings may name files in another form than `src` (an object store
+        // drops the leading `/` and prefixes the bucket), so compare stripped paths.
+        let sep = self.sep();
+        let stripped = |path: &str| {
+            self.strip_protocol(path)
+                .trim_start_matches(sep)
+                .trim_end_matches(sep)
+                .to_string()
+        };
+        let root = stripped(src);
         for file_path in &files {
-            let relative = file_path
-                .strip_prefix(src)
-                .unwrap_or(file_path)
-                .trim_start_matches(self.sep());
-            let sep = self.sep();
+            let file = stripped(file_path);
+            let relative = file
+                .strip_prefix(&root)
+                .unwrap_or(&file)
+                .trim_start_matches(sep);
             let dst_path = if dst.ends_with(sep) {
                 format!("{dst}{relative}")
             } else {
