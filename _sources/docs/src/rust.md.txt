@@ -191,6 +191,11 @@ Unknown options are rejected. Boolean options accept `true`, `false`, `1`, and `
 `DEFAULT_FILESYSTEMS` is a process-wide registry. The `register_filesystem` and
 `url_to_fs` functions use it.
 
+`FilesystemRegistry::url_to_fs_shared(&lock, url, options)` resolves through a
+registry behind an `RwLock` and releases the lock while a factory runs, so a
+factory may register other protocols in the same registry. The `url_to_fs`
+function and `libfsspec` resolve this way.
+
 ## Python fsspec bridge
 
 `fsspec_rs_bridge` exports `PyFsspecFs`, `url_to_fs`, and `StorageOptions`. It is an

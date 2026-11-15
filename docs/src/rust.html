@@ -395,6 +395,10 @@ replaces its factory and drops its cached instances.</p>
 <code class="docutils literal notranslate"><span class="pre">FilesystemRegistry::empty()</span></code> starts with no protocols.</p>
 <p><code class="docutils literal notranslate"><span class="pre">DEFAULT_FILESYSTEMS</span></code> is a process-wide registry. The <code class="docutils literal notranslate"><span class="pre">register_filesystem</span></code> and
 <code class="docutils literal notranslate"><span class="pre">url_to_fs</span></code> functions use it.</p>
+<p><code class="docutils literal notranslate"><span class="pre">FilesystemRegistry::url_to_fs_shared(&amp;lock,</span> <span class="pre">url,</span> <span class="pre">options)</span></code> resolves through a
+registry behind an <code class="docutils literal notranslate"><span class="pre">RwLock</span></code> and releases the lock while a factory runs, so a
+factory may register other protocols in the same registry. The <code class="docutils literal notranslate"><span class="pre">url_to_fs</span></code>
+function and <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> resolve this way.</p>
 </section>
 <section id="python-fsspec-bridge">
 <h2>Python fsspec bridge<a class="headerlink" href="#python-fsspec-bridge" title="Link to this heading">¶</a></h2>
