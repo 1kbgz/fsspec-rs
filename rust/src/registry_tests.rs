@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, RwLock};
 
 use crate::registry::{
     set_registry_hooks, try_register_filesystem, url_to_fs, FilesystemRegistry, FsOptions,
@@ -197,4 +197,40 @@ fn fallback_factory_takes_unknown_protocols_with_the_whole_url() {
     assert!(registry
         .url_to_fs("anything://bucket/key", &FsOptions::new())
         .is_err());
+}
+
+#[test]
+fn factories_may_register_while_a_shared_registry_resolves() {
+    static REGISTRY: LazyLock<RwLock<FilesystemRegistry>> =
+        LazyLock::new(|| RwLock::new(FilesystemRegistry::empty()));
+    fn local(_: &str, _: &FsOptions) -> FsResult<SharedFileSystem> {
+        Ok(Arc::new(LocalFs::new()) as SharedFileSystem)
+    }
+    REGISTRY
+        .write()
+        .unwrap()
+        .register("outer", |_: &str, _: &FsOptions| {
+            // A Python backend registers itself like this while the fallback imports it.
+            let mut registry = REGISTRY.write().unwrap();
+            registry.register("inner", local);
+            registry.register("outer", local);
+            local("", &FsOptions::new())
+        });
+
+    let (first, path) =
+        FilesystemRegistry::url_to_fs_shared(&REGISTRY, "outer://x", &FsOptions::new()).unwrap();
+    assert_eq!(path, "x");
+    assert!(REGISTRY
+        .read()
+        .unwrap()
+        .protocols()
+        .contains(&"inner".to_string()));
+
+    // The first instance came from the replaced factory, so it is not cached.
+    let (second, _) =
+        FilesystemRegistry::url_to_fs_shared(&REGISTRY, "outer://x", &FsOptions::new()).unwrap();
+    let (third, _) =
+        FilesystemRegistry::url_to_fs_shared(&REGISTRY, "outer://x", &FsOptions::new()).unwrap();
+    assert!(!Arc::ptr_eq(&first, &second));
+    assert!(Arc::ptr_eq(&second, &third));
 }
