@@ -1945,6 +1945,13 @@ cannot span multiple unique paths. An empty path list returns an empty list with
 group’s output positions; <code class="docutils literal notranslate"><span class="pre">&quot;raise&quot;</span></code> propagates the error. Invalid argument shapes,
 options and condition types raise before I/O. Unknown keyword arguments are rejected.
 Use <code class="docutils literal notranslate"><span class="pre">read_ranges</span></code> to retain the validator with the bytes.</p>
+<p>Compatibility with the inherited fsspec implementation:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">cat_ranges</span></code> is an existing fsspec API; <code class="docutils literal notranslate"><span class="pre">read_ranges</span></code> is the typed single-object batch API added by fsspec-rs.</p></li>
+<li><p>Errors apply to a normalized path group. If a later request fails, previously fetched bytes for that path are discarded. With <code class="docutils literal notranslate"><span class="pre">on_error=&quot;return&quot;</span></code>, other path groups still run. The inherited implementation handled each range independently.</p></li>
+<li><p>All offsets are validated before any path is read. Invalid offsets raise even with <code class="docutils literal notranslate"><span class="pre">on_error=&quot;return&quot;</span></code>.</p></li>
+<li><p>S3 batches issue a metadata request and require an ETag when fetching bytes, even without <code class="docutils literal notranslate"><span class="pre">condition</span></code>. A missing ETag produces <code class="docutils literal notranslate"><span class="pre">NotImplementedError</span></code>; an object changed between requests can produce <code class="docutils literal notranslate"><span class="pre">ConflictError</span></code>. These errors follow <code class="docutils literal notranslate"><span class="pre">on_error</span></code>. Individual unconditional <code class="docutils literal notranslate"><span class="pre">cat_file</span></code> reads do not require an ETag or check consistency across calls.</p></li>
+</ul>
 <p>See the <a class="reference internal" href="rust.html"><span class="std std-doc">Rust reference</span></a> for shared endpoint concurrency limits, empty
 range behavior and memory bounds.</p>
 </section>
