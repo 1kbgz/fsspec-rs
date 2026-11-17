@@ -3,8 +3,8 @@
 //! One copy of the registry and the built-in backends per process, reached
 //! through the functions declared in `include/fsspec.h`. The types of that
 //! header live in `fsspec_sys`, which consumers depend on; this crate
-//! provides the implementations. Every entry point returns an
-//! `fsspec_status`; the message for the last failure on the calling thread
+//! provides the implementations. Fallible entry points return `fsspec_status`
+//! or, for typed object I/O, `fsspec_operation_status`; the message for the last failure on the calling thread
 //! comes from `fsspec_last_error_message`. No panic crosses the boundary: a
 //! panic is reported as `FSSPEC_OTHER`.
 //!
@@ -35,5 +35,5 @@ pub use options::*;
 pub use registry::*;
 pub use status::{
     fsspec_abi_version, fsspec_clear_last_error, fsspec_last_error_message, fsspec_set_last_error,
-    FSSPEC_ABI_VERSION,
+    FSSPEC_ABI_VERSION, FSSPEC_CONDITION_MATCH, FSSPEC_CONDITION_MISSING, FSSPEC_CONFLICT,
 };

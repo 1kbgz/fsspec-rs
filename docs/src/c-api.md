@@ -41,7 +41,7 @@ than the library's is accepted; the missing trailing fields are treated as null.
 
 ## Status codes
 
-Every fallible function returns `fsspec_status`, an `int32_t`:
+Most fallible functions return `fsspec_status`, a 32-bit enum:
 
 | Code                       | Value | Rust `FsError`     |
 | -------------------------- | ----- | ------------------ |
@@ -146,6 +146,45 @@ options are the same as the Rust registry; see
 | `fsspec_fs_rmdir(fs, path, path_len)`                                 | Removes an empty directory.                                                                                                                                                  |
 | `fsspec_fs_open(fs, path, path_len, mode, mode_len, out)`             | Opens a file with mode `rb`, `wb`, `ab`, or `xb`.                                                                                                                            |
 | `fsspec_fs_open_ex(fs, path, path_len, mode, mode_len, options, out)` | As `fsspec_fs_open`, with open options `block_size`, `max_blocks`, `autocommit`, and `cache_type` (`none`, `readahead`, `block`, `all`). Vtable backends receive no options. |
+
+## Object I/O and conditions
+
+`fsspec_fs_read(fs, path, path_len, options, out)` returns bytes and their
+validator in `fsspec_read_result`. `fsspec_fs_write(fs, path, path_len, bytes, bytes_len, options, out)` returns the committed object's validator in
+`fsspec_write_result`. Free successful outputs with `fsspec_read_result_free`
+and `fsspec_write_result_free`. On error, output storage is unchanged and must
+not be freed as a result.
+
+These two functions return `fsspec_operation_status`, an `int32_t`. Values 0–9
+retain the meanings above; `FSSPEC_CONFLICT` (10) means a failed condition.
+Existing functions and callbacks continue to return the original `fsspec_status`
+enum. Do not return conflict through a legacy callback.
+
+Read and write option structs begin with `struct_size`; initialize it to the
+struct's `sizeof`. Null options mean defaults. Read options include optional
+`start` and `end` pointers. Both include a `condition` pointer, with null meaning
+unconditional I/O. A condition has a `kind` and a borrowed validator pointer:
+
+| Kind                       | Validator                              | Meaning                                   |
+| -------------------------- | -------------------------------------- | ----------------------------------------- |
+| `FSSPEC_CONDITION_MATCH`   | Required, both scope and value strings | Operate only on the matching object.      |
+| `FSSPEC_CONDITION_MISSING` | Must be null                           | Create only if absent; invalid for reads. |
+
+Input pointers remain borrowed for the duration of the call. Result validators
+own both strings; both null means unavailable. Copy or retain the full validator
+when using it in a later request. Unknown condition kinds, short option structs,
+null output pointers and null byte pointers with nonzero lengths are invalid
+arguments. Validation occurs before writes.
+
+`fsspec_fs_io_capabilities(fs, out)` reports `read_match`, `write_match` and
+`write_missing`. The filesystem vtable appends `read`, `write` and
+`io_capabilities` callbacks. Old shorter vtables remain valid: missing read/write
+callbacks use legacy I/O only for unconditional requests and reject conditions;
+a missing capability callback reports all flags false. Clients using the new
+symbols require a library that exports them, even though the ABI version remains 1.
+
+Backend support and consistency guarantees match the
+[Rust object I/O contract](rust.md).
 
 ## Files
 

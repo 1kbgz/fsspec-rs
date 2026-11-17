@@ -16,14 +16,38 @@ use tokio::runtime::Runtime;
 
 use crate::buffered::BufferedFile;
 use crate::caching::{CacheType, Fetcher};
-use crate::error::{FsError, FsResult};
+use crate::error::{FsError, FsResult, OperationError};
 use crate::file::FsFile;
-use crate::fs::FileSystem;
-use crate::types::{FileInfo, FileType, OpenMode, OpenOptions};
+use crate::fs::{byte_range, FileSystem};
+use crate::types::{
+    Condition, FileInfo, FileType, IoCapabilities, OpenMode, OpenOptions, ReadOptions, ReadResult,
+    Validator, WriteOptions, WriteResult,
+};
 
 // ---------------------------------------------------------------------------
 // Error conversion
 // ---------------------------------------------------------------------------
+
+fn operation_error(err: object_store::Error, conditional: bool) -> OperationError {
+    match err {
+        object_store::Error::Precondition { .. } => OperationError::Conflict(err.to_string()),
+        object_store::Error::AlreadyExists { .. } | object_store::Error::NotFound { .. }
+            if conditional =>
+        {
+            OperationError::Conflict(err.to_string())
+        }
+        other => obj_err_to_fs(other).into(),
+    }
+}
+
+fn validate_expected_etag(etag: &str) -> FsResult<()> {
+    if etag.trim().is_empty() || etag.trim() == "*" || etag.contains(',') {
+        return Err(FsError::InvalidArgument(
+            "expected_etag must be one nonempty ETag, not a wildcard or list".into(),
+        ));
+    }
+    Ok(())
+}
 
 fn obj_err_to_fs(err: object_store::Error) -> FsError {
     match &err {
@@ -141,6 +165,8 @@ pub struct S3Fs {
     store: Arc<dyn ObjectStore>,
     rt: Arc<Runtime>,
     pub bucket: String,
+    endpoint: String,
+    virtual_hosted_style_request: bool,
 }
 
 impl S3Fs {
@@ -179,22 +205,67 @@ impl S3Fs {
             .map_err(|e| FsError::InvalidArgument(e.to_string()))?;
 
         let rt = Runtime::new().map_err(|e| FsError::Other(e.to_string()))?;
+        let endpoint = cfg.endpoint_url.unwrap_or_else(|| {
+            format!(
+                "https://s3.{}.amazonaws.com",
+                cfg.region.as_deref().unwrap_or("us-east-1")
+            )
+        });
+        let endpoint = url::Url::parse(&endpoint)
+            .map_err(|error| FsError::InvalidArgument(error.to_string()))?
+            .to_string()
+            .trim_end_matches('/')
+            .to_string();
 
         Ok(Self {
             store: Arc::new(store),
             rt: Arc::new(rt),
             bucket: cfg.bucket,
+            endpoint,
+            virtual_hosted_style_request: cfg.virtual_hosted_style_request,
         })
     }
 
     #[cfg(test)]
     fn from_object_store(bucket: impl Into<String>, store: Arc<dyn ObjectStore>) -> FsResult<Self> {
         let rt = Runtime::new().map_err(|e| FsError::Other(e.to_string()))?;
+        let endpoint = format!("memory://{:p}", Arc::as_ptr(&store));
         Ok(Self {
             store,
             rt: Arc::new(rt),
             bucket: bucket.into(),
+            endpoint,
+            virtual_hosted_style_request: false,
         })
+    }
+
+    fn validator_scope(&self, path: &ObjectPath) -> String {
+        format!(
+            "s3:{}:{}:{}:{}:{}:{}",
+            self.virtual_hosted_style_request,
+            self.endpoint.len(),
+            self.endpoint,
+            self.bucket.len(),
+            self.bucket,
+            path
+        )
+    }
+
+    fn validator(&self, path: &ObjectPath, value: Option<String>) -> Option<Validator> {
+        value.map(|value| Validator {
+            scope: self.validator_scope(path),
+            value,
+        })
+    }
+
+    fn match_etag(&self, path: &ObjectPath, validator: &Validator) -> FsResult<String> {
+        if validator.scope != self.validator_scope(path) {
+            return Err(FsError::InvalidArgument(
+                "validator belongs to a different object".into(),
+            ));
+        }
+        validate_expected_etag(&validator.value)?;
+        Ok(validator.value.clone())
     }
 
     /// Fetch the byte range `[start, end)` from an S3 object.
@@ -248,6 +319,101 @@ where
 }
 
 impl FileSystem for S3Fs {
+    fn read(&self, path: &str, options: ReadOptions) -> Result<ReadResult, OperationError> {
+        use object_store::{GetOptions, GetRange};
+
+        let path = to_object_path(&self.strip_protocol(path));
+        let expected = match options.condition {
+            None => None,
+            Some(Condition::Match(validator)) => Some(self.match_etag(&path, &validator)?),
+            Some(Condition::Missing) => {
+                return Err(FsError::InvalidArgument(
+                    "the Missing condition is only valid for writes".into(),
+                )
+                .into())
+            }
+        };
+        self.rt.block_on(async {
+            let mut request = GetOptions {
+                if_match: expected,
+                ..Default::default()
+            };
+            if options.start.is_some() || options.end.is_some() {
+                let head = self
+                    .store
+                    .get_opts(
+                        &path,
+                        GetOptions {
+                            head: true,
+                            ..request.clone()
+                        },
+                    )
+                    .await
+                    .map_err(|error| operation_error(error, request.if_match.is_some()))?;
+                let (start, end) = byte_range(head.meta.size, options.start, options.end);
+                let validator = self.validator(&path, head.meta.e_tag);
+                if start == end {
+                    return Ok(ReadResult {
+                        data: Vec::new(),
+                        validator,
+                    });
+                }
+                let validator = validator.ok_or_else(|| {
+                    FsError::NotSupported("ranged reads require an object validator".into())
+                })?;
+                request.if_match = Some(self.match_etag(&path, &validator)?);
+                request.range = Some(GetRange::Bounded(start..end));
+            }
+            let conditional = request.if_match.is_some();
+            let result = self
+                .store
+                .get_opts(&path, request)
+                .await
+                .map_err(|error| operation_error(error, conditional))?;
+            let validator = self.validator(&path, result.meta.e_tag.clone());
+            let data = result
+                .bytes()
+                .await
+                .map_err(|error| operation_error(error, conditional))?
+                .to_vec();
+            Ok(ReadResult { data, validator })
+        })
+    }
+
+    fn write(
+        &self,
+        path: &str,
+        data: &[u8],
+        options: WriteOptions,
+    ) -> Result<WriteResult, OperationError> {
+        let path = to_object_path(&self.strip_protocol(path));
+        let conditional = options.condition.is_some();
+        let mode = match options.condition {
+            None => PutMode::Overwrite,
+            Some(Condition::Missing) => PutMode::Create,
+            Some(Condition::Match(validator)) => PutMode::Update(object_store::UpdateVersion {
+                e_tag: Some(self.match_etag(&path, &validator)?),
+                version: None,
+            }),
+        };
+        let payload = PutPayload::from(Bytes::from(data.to_vec()));
+        let result = self
+            .rt
+            .block_on(self.store.put_opts(&path, payload, mode.into()))
+            .map_err(|error| operation_error(error, conditional))?;
+        Ok(WriteResult {
+            validator: self.validator(&path, result.e_tag),
+        })
+    }
+
+    fn io_capabilities(&self) -> IoCapabilities {
+        IoCapabilities {
+            read_match: true,
+            write_match: true,
+            write_missing: true,
+        }
+    }
+
     fn protocol(&self) -> &[&str] {
         &["s3"]
     }
@@ -1137,6 +1303,390 @@ mod tests {
 
     fn memory_fs() -> S3Fs {
         S3Fs::from_object_store("bucket", Arc::new(InMemory::new())).unwrap()
+    }
+
+    fn matching_read(validator: &Validator, start: Option<i64>, end: Option<i64>) -> ReadOptions {
+        ReadOptions {
+            start,
+            end,
+            condition: Some(Condition::Match(validator.clone())),
+        }
+    }
+
+    fn matching_write(validator: &Validator) -> WriteOptions {
+        WriteOptions {
+            condition: Some(Condition::Match(validator.clone())),
+        }
+    }
+
+    #[test]
+    fn read_and_write_return_corresponding_validators() {
+        let fs = memory_fs();
+        let first = fs
+            .write("data.txt", b"first", WriteOptions::default())
+            .unwrap()
+            .validator
+            .unwrap();
+        let read = fs
+            .read("s3://bucket/data.txt", ReadOptions::default())
+            .unwrap();
+        assert_eq!(read.data, b"first");
+        assert_eq!(read.validator.as_ref(), Some(&first));
+        let second = fs
+            .write("bucket/data.txt", b"second", matching_write(&first))
+            .unwrap()
+            .validator
+            .unwrap();
+        assert_ne!(first, second);
+        assert!(matches!(
+            fs.read("data.txt", matching_read(&first, None, None)),
+            Err(OperationError::Conflict(_))
+        ));
+        assert_eq!(
+            fs.read("data.txt", matching_read(&second, None, None))
+                .unwrap(),
+            ReadResult {
+                data: b"second".to_vec(),
+                validator: Some(second),
+            }
+        );
+        assert_eq!(
+            fs.io_capabilities(),
+            IoCapabilities {
+                read_match: true,
+                write_match: true,
+                write_missing: true
+            }
+        );
+    }
+
+    #[test]
+    fn conditional_reads_preserve_range_semantics_and_reject_stale_validators() {
+        let fs = memory_fs();
+        let validator = fs
+            .write("data.txt", b"abcdef", WriteOptions::default())
+            .unwrap()
+            .validator
+            .unwrap();
+        let cases: &[(Option<i64>, Option<i64>, &[u8])] = &[
+            (None, None, b"abcdef"),
+            (Some(1), Some(4), b"bcd"),
+            (Some(-3), None, b"def"),
+            (None, Some(-2), b"abcd"),
+            (Some(-100), Some(100), b"abcdef"),
+            (Some(2), Some(2), b""),
+            (Some(5), Some(2), b""),
+            (Some(100), None, b""),
+        ];
+        for &(start, end, expected) in cases {
+            let read = fs
+                .read(
+                    "s3://bucket/data.txt",
+                    matching_read(&validator, start, end),
+                )
+                .unwrap();
+            assert_eq!(read.data, expected);
+            assert_eq!(read.validator.as_ref(), Some(&validator));
+        }
+        seed_object(&fs, "data.txt", b"replacement");
+        for &(start, end, _) in cases {
+            assert!(matches!(
+                fs.read("data.txt", matching_read(&validator, start, end)),
+                Err(OperationError::Conflict(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn conditional_reads_handle_empty_and_deleted_objects() {
+        let fs = memory_fs();
+        let validator = fs
+            .write("empty", b"", WriteOptions::default())
+            .unwrap()
+            .validator
+            .unwrap();
+        for (start, end) in [(None, None), (Some(0), Some(0))] {
+            let read = fs
+                .read("empty", matching_read(&validator, start, end))
+                .unwrap();
+            assert_eq!(read.data, b"");
+            assert_eq!(read.validator.as_ref(), Some(&validator));
+            let stale = Validator {
+                value: "stale".into(),
+                ..validator.clone()
+            };
+            assert!(matches!(
+                fs.read("empty", matching_read(&stale, start, end)),
+                Err(OperationError::Conflict(_))
+            ));
+        }
+        fs.rm_file("empty").unwrap();
+        for (start, end) in [(None, None), (Some(0), Some(0))] {
+            assert!(matches!(
+                fs.read("empty", matching_read(&validator, start, end)),
+                Err(OperationError::Conflict(_))
+            ));
+        }
+        assert!(matches!(
+            fs.read("empty", ReadOptions::default()),
+            Err(OperationError::FileSystem(FsError::NotFound(_)))
+        ));
+    }
+
+    #[test]
+    fn conditional_replacement_rejects_stale_and_deleted_objects() {
+        let fs = memory_fs();
+        let validator = fs
+            .write("manifest.json", b"old", WriteOptions::default())
+            .unwrap()
+            .validator
+            .unwrap();
+        fs.write(
+            "s3://bucket/manifest.json",
+            b"new",
+            matching_write(&validator),
+        )
+        .unwrap();
+        assert!(matches!(
+            fs.write("manifest.json", b"stale", matching_write(&validator)),
+            Err(OperationError::Conflict(_))
+        ));
+        assert_eq!(fs.cat_file("manifest.json", None, None).unwrap(), b"new");
+        fs.rm_file("manifest.json").unwrap();
+        assert!(matches!(
+            fs.write("manifest.json", b"recreated", matching_write(&validator)),
+            Err(OperationError::Conflict(_))
+        ));
+        assert!(!fs.exists("manifest.json").unwrap());
+    }
+
+    #[test]
+    fn conditional_replacement_allows_one_concurrent_writer() {
+        let fs = memory_fs();
+        let validator = fs
+            .write("manifest.json", b"old", WriteOptions::default())
+            .unwrap()
+            .validator
+            .unwrap();
+        let barrier = std::sync::Barrier::new(2);
+        let results = std::thread::scope(|scope| {
+            let handles: Vec<_> = [b"first".as_slice(), b"second".as_slice()]
+                .into_iter()
+                .map(|data| {
+                    let fs = &fs;
+                    let validator = &validator;
+                    let barrier = &barrier;
+                    scope.spawn(move || {
+                        barrier.wait();
+                        (
+                            data,
+                            fs.write("manifest.json", data, matching_write(validator)),
+                        )
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().unwrap())
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(
+            results.iter().filter(|(_, result)| result.is_ok()).count(),
+            1
+        );
+        assert_eq!(
+            results
+                .iter()
+                .filter(|(_, result)| matches!(result, Err(OperationError::Conflict(_))))
+                .count(),
+            1
+        );
+        let (winner, result) = results.iter().find(|(_, result)| result.is_ok()).unwrap();
+        let read = fs.read("manifest.json", ReadOptions::default()).unwrap();
+        assert_eq!(read.data, *winner);
+        assert_eq!(read.validator, result.as_ref().unwrap().validator);
+    }
+
+    #[test]
+    fn missing_condition_creates_once_and_is_invalid_for_reads() {
+        let fs = memory_fs();
+        let create = WriteOptions {
+            condition: Some(Condition::Missing),
+        };
+        let result = fs.write("new", b"first", create.clone()).unwrap();
+        assert!(result.validator.is_some());
+        assert!(matches!(
+            fs.write("new", b"second", create),
+            Err(OperationError::Conflict(_))
+        ));
+        assert_eq!(fs.cat_file("new", None, None).unwrap(), b"first");
+        assert!(matches!(
+            fs.read(
+                "new",
+                ReadOptions {
+                    condition: Some(Condition::Missing),
+                    ..Default::default()
+                }
+            ),
+            Err(OperationError::FileSystem(FsError::InvalidArgument(_)))
+        ));
+    }
+
+    #[test]
+    fn validators_reject_other_paths_buckets_and_endpoints() {
+        let store: Arc<dyn ObjectStore> = Arc::new(InMemory::new());
+        let first = S3Fs::from_object_store("bucket", store.clone()).unwrap();
+        let same = S3Fs::from_object_store("bucket", store.clone()).unwrap();
+        let other_bucket = S3Fs::from_object_store("other", store).unwrap();
+        let other_endpoint = memory_fs();
+        let validator = first
+            .write("key", b"value", WriteOptions::default())
+            .unwrap()
+            .validator
+            .unwrap();
+        assert_eq!(
+            same.read("s3://bucket/key", matching_read(&validator, None, None))
+                .unwrap()
+                .data,
+            b"value"
+        );
+        for (fs, path) in [
+            (&first, "other"),
+            (&other_bucket, "key"),
+            (&other_endpoint, "key"),
+        ] {
+            assert!(matches!(
+                fs.read(path, matching_read(&validator, None, None)),
+                Err(OperationError::FileSystem(FsError::InvalidArgument(_)))
+            ));
+            assert!(matches!(
+                fs.write(path, b"changed", matching_write(&validator)),
+                Err(OperationError::FileSystem(FsError::InvalidArgument(_)))
+            ));
+        }
+    }
+
+    #[test]
+    fn validator_scopes_are_stable_for_equivalent_s3_configuration() {
+        let config = |endpoint: &str| {
+            let mut cfg = S3Config::new("bucket");
+            cfg.anon = true;
+            cfg.endpoint_url = Some(endpoint.into());
+            cfg
+        };
+        let first = S3Fs::new(config("http://localhost:9000")).unwrap();
+        let second = S3Fs::new(config("http://LOCALHOST:9000/")).unwrap();
+        let path = to_object_path("nested/key");
+        assert_eq!(first.validator_scope(&path), second.validator_scope(&path));
+    }
+
+    #[test]
+    fn validator_scopes_distinguish_s3_addressing_modes() {
+        let mut config = S3Config::new("bucket");
+        config.anon = true;
+        config.endpoint_url = Some("http://localhost:9000".into());
+        let path_style = S3Fs::new(config.clone()).unwrap();
+        config.virtual_hosted_style_request = true;
+        let host_style = S3Fs::new(config).unwrap();
+        let path = to_object_path("key");
+        let validator = path_style.validator(&path, Some("etag".into())).unwrap();
+        assert_ne!(validator.scope, host_style.validator_scope(&path));
+        assert!(matches!(
+            host_style.match_etag(&path, &validator),
+            Err(FsError::InvalidArgument(_))
+        ));
+    }
+
+    #[test]
+    fn ranged_read_pins_the_metadata_version_before_fetching_bytes() {
+        use std::net::TcpListener;
+        use std::time::{Duration, Instant};
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            let mut requests = Vec::new();
+            for index in 0..2 {
+                let mut socket = loop {
+                    match listener.accept() {
+                        Ok((socket, _)) => break socket,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            assert!(Instant::now() < deadline, "missing S3 request");
+                            std::thread::sleep(Duration::from_millis(1));
+                        }
+                        Err(error) => panic!("{error}"),
+                    }
+                };
+                // Windows inherits the listener's nonblocking mode on accept.
+                socket.set_nonblocking(false).unwrap();
+                socket
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                let mut request = Vec::new();
+                while !request.ends_with(b"\r\n\r\n") {
+                    let mut byte = [0];
+                    socket.read_exact(&mut byte).unwrap();
+                    request.push(byte[0]);
+                }
+                requests.push(String::from_utf8(request).unwrap().to_ascii_lowercase());
+                if index == 0 {
+                    socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\nETag: \"old\"\r\nLast-Modified: Tue, 17 Nov 2026 00:00:00 GMT\r\nConnection: close\r\n\r\n").unwrap();
+                } else {
+                    // The object changed after HEAD; the conditional GET must fail.
+                    socket.write_all(b"HTTP/1.1 412 Precondition Failed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+                }
+            }
+            requests
+        });
+        let mut config = S3Config::new("bucket");
+        config.endpoint_url = Some(endpoint);
+        config.anon = true;
+        let fs = S3Fs::new(config).unwrap();
+        let result = fs.read(
+            "key",
+            ReadOptions {
+                start: Some(1),
+                end: Some(4),
+                condition: None,
+            },
+        );
+        let requests = server.join().unwrap();
+        assert!(
+            matches!(result, Err(OperationError::Conflict(_))),
+            "{result:?}"
+        );
+        assert!(requests[0].starts_with("head /bucket/key "));
+        assert!(!requests[0].contains("if-match:"));
+        assert!(requests[1].starts_with("get /bucket/key "));
+        assert!(requests[1].contains("if-match: \"old\"\r\n"));
+        assert!(requests[1].contains("range: bytes=1-3\r\n"));
+    }
+
+    #[test]
+    fn conditional_operations_reject_empty_wildcard_and_multiple_etags() {
+        let fs = memory_fs();
+        let validator = fs
+            .write("data.txt", b"original", WriteOptions::default())
+            .unwrap()
+            .validator
+            .unwrap();
+        for invalid in ["", " ", "*", " * ", &format!("{},other", validator.value)] {
+            let invalid = Validator {
+                value: invalid.into(),
+                ..validator.clone()
+            };
+            assert!(matches!(
+                fs.read("data.txt", matching_read(&invalid, None, None)),
+                Err(OperationError::FileSystem(FsError::InvalidArgument(_)))
+            ));
+            assert!(matches!(
+                fs.write("data.txt", b"changed", matching_write(&invalid)),
+                Err(OperationError::FileSystem(FsError::InvalidArgument(_)))
+            ));
+        }
+        assert_eq!(fs.cat_file("data.txt", None, None).unwrap(), b"original");
     }
 
     fn seed_object(fs: &S3Fs, key: &str, data: &[u8]) {

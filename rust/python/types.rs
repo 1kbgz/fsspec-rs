@@ -1,6 +1,6 @@
 use pyo3::exceptions::{
     PyFileExistsError, PyFileNotFoundError, PyIsADirectoryError, PyNotADirectoryError,
-    PyNotImplementedError, PyOSError, PyPermissionError, PyValueError,
+    PyNotImplementedError, PyOSError, PyPermissionError, PyTimeoutError, PyValueError,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -199,6 +199,9 @@ pub fn fs_error_to_pyerr(err: FsError) -> PyErr {
         FsError::AlreadyExists(msg) => PyFileExistsError::new_err(msg),
         FsError::NotADirectory(msg) => PyNotADirectoryError::new_err(msg),
         FsError::IsADirectory(msg) => PyIsADirectoryError::new_err(msg),
+        FsError::IoError(err) if err.kind() == std::io::ErrorKind::TimedOut => {
+            PyTimeoutError::new_err(err.to_string())
+        }
         FsError::IoError(err) => PyOSError::new_err(err.to_string()),
         FsError::InvalidArgument(msg) => PyValueError::new_err(msg),
         FsError::NotSupported(msg) => PyNotImplementedError::new_err(msg),

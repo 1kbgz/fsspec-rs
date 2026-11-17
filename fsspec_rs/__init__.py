@@ -15,14 +15,21 @@ if _os.name == "nt" and (_PREFIX / "lib").is_dir():
 from fsspec.registry import register_implementation as _register
 
 from fsspec_rs.fsspec_rs import (
+    ConflictError,
     FileInfo,
     FileType,
+    IoCapabilities,
+    Match,
+    Missing,
+    ReadResult,
     RustLocalFile,
     RustLocalFs,
     RustMemoryFile,
     RustMemoryFs,
     RustS3File,
     RustS3Fs,
+    Validator,
+    WriteResult,
 )
 
 # Re-export Python wrappers

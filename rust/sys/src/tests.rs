@@ -377,3 +377,64 @@ fn overridden_methods_reach_the_backend_through_the_abi() {
         );
     }
 }
+
+#[test]
+fn conditional_io_crosses_both_abi_directions() {
+    use fsspec_rs::{Condition, OperationError, ReadOptions, Validator, WriteOptions};
+    let dir = tempfile::tempdir().unwrap();
+    let handle = export_filesystem(Arc::new(LocalFs::new())).unwrap();
+    let foreign = unsafe { ForeignFileSystem::from_raw(handle) }.unwrap();
+    let path = join(dir.path(), "conditional.txt");
+    assert!(foreign.io_capabilities().write_missing);
+    assert!(!foreign.io_capabilities().read_match);
+    let options = || WriteOptions {
+        condition: Some(Condition::Missing),
+    };
+    assert_eq!(
+        foreign
+            .write(&path, b"original", options())
+            .unwrap()
+            .validator,
+        None
+    );
+    assert!(matches!(
+        foreign.write(&path, b"changed", options()),
+        Err(OperationError::Conflict(_))
+    ));
+    let validator = Validator {
+        scope: "test".into(),
+        value: "etag".into(),
+    };
+    assert!(matches!(
+        foreign.read(
+            &path,
+            ReadOptions {
+                condition: Some(Condition::Match(validator.clone())),
+                ..Default::default()
+            }
+        ),
+        Err(OperationError::FileSystem(FsError::NotSupported(_)))
+    ));
+    assert!(matches!(
+        foreign.write(
+            &path,
+            b"changed",
+            WriteOptions {
+                condition: Some(Condition::Match(validator))
+            }
+        ),
+        Err(OperationError::FileSystem(FsError::NotSupported(_)))
+    ));
+    let result = foreign
+        .read(
+            &path,
+            ReadOptions {
+                start: Some(-3),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(result.data, b"nal");
+    assert_eq!(result.validator, None);
+    assert_eq!(foreign.cat_file(&path, None, None).unwrap(), b"original");
+}

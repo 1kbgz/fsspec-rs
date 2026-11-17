@@ -24,6 +24,42 @@ pub enum FsError {
     Other(String),
 }
 
+/// Failure from a byte read or write, including a failed condition.
+///
+/// Kept separate from [`FsError`] so existing backend error matches remain valid.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum OperationError {
+    /// A read or write condition was not satisfied.
+    Conflict(String),
+    /// A filesystem failure, including unsupported conditional operations.
+    FileSystem(FsError),
+}
+
+impl fmt::Display for OperationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Conflict(message) => write!(f, "condition conflict: {message}"),
+            Self::FileSystem(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for OperationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Conflict(_) => None,
+            Self::FileSystem(error) => Some(error),
+        }
+    }
+}
+
+impl From<FsError> for OperationError {
+    fn from(error: FsError) -> Self {
+        Self::FileSystem(error)
+    }
+}
+
 /// Result type alias for filesystem operations
 pub type FsResult<T> = Result<T, FsError>;
 

@@ -232,6 +232,22 @@ impl MemoryFs {
 }
 
 impl FileSystem for MemoryFs {
+    fn write(
+        &self,
+        path: &str,
+        data: &[u8],
+        options: crate::WriteOptions,
+    ) -> Result<crate::WriteResult, crate::OperationError> {
+        crate::fs::write_with_exclusive_create(self, path, data, options)
+    }
+
+    fn io_capabilities(&self) -> crate::IoCapabilities {
+        crate::IoCapabilities {
+            write_missing: true,
+            ..Default::default()
+        }
+    }
+
     fn protocol(&self) -> &[&str] {
         &["memory"]
     }

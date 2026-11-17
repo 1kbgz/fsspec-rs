@@ -215,6 +215,65 @@ impl FileSystem for ForeignFileSystem {
         }
     }
 
+    fn read(
+        &self,
+        path: &str,
+        options: fsspec_rs::ReadOptions,
+    ) -> Result<fsspec_rs::ReadResult, fsspec_rs::OperationError> {
+        let Some(call) = self.vtable.read else {
+            return fsspec_rs::read_default(self, path, options);
+        };
+        let mut out = std::mem::MaybeUninit::<fsspec_sys::types::fsspec_read_result>::uninit();
+        let status = fsspec_sys::operations::with_read_options(&options, |options| unsafe {
+            call(
+                self.data,
+                path.as_ptr().cast(),
+                path.len(),
+                options,
+                out.as_mut_ptr(),
+            )
+        });
+        crate::status::check_operation(status, "read")?;
+        Ok(unsafe { out.assume_init().into_result()? })
+    }
+
+    fn write(
+        &self,
+        path: &str,
+        data: &[u8],
+        options: fsspec_rs::WriteOptions,
+    ) -> Result<fsspec_rs::WriteResult, fsspec_rs::OperationError> {
+        let Some(call) = self.vtable.write else {
+            return fsspec_rs::write_default(self, path, data, options);
+        };
+        let mut out = std::mem::MaybeUninit::<fsspec_sys::types::fsspec_write_result>::uninit();
+        let status = fsspec_sys::operations::with_write_options(&options, |options| unsafe {
+            call(
+                self.data,
+                path.as_ptr().cast(),
+                path.len(),
+                data.as_ptr(),
+                data.len(),
+                options,
+                out.as_mut_ptr(),
+            )
+        });
+        crate::status::check_operation(status, "write")?;
+        Ok(unsafe { out.assume_init().into_result()? })
+    }
+
+    fn io_capabilities(&self) -> fsspec_rs::IoCapabilities {
+        let Some(call) = self.vtable.io_capabilities else {
+            return fsspec_rs::IoCapabilities::default();
+        };
+        let mut out = fsspec_sys::types::fsspec_io_capabilities::default();
+        let status = unsafe { call(self.data, &mut out) };
+        if check(status, "io_capabilities").is_err() {
+            return fsspec_rs::IoCapabilities::default();
+        }
+        out.into()
+    }
+
     fn cat_file(&self, path: &str, start: Option<i64>, end: Option<i64>) -> FsResult<Vec<u8>> {
         let Some(cat_file) = self.vtable.cat_file else {
             return cat_file_default(self, path, start, end);

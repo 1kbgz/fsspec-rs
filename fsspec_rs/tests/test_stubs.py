@@ -32,4 +32,6 @@ def test_stub_lists_each_class_member():
     for node in _stub().body:
         if isinstance(node, ast.ClassDef):
             members = {item.name for item in node.body if isinstance(item, ast.FunctionDef)} - TYPING_ONLY
-            assert members == _public(dir(getattr(compiled, node.name))), node.name
+            runtime_class = getattr(compiled, node.name)
+            inherited = {name for base in runtime_class.__bases__ for name in dir(base)}
+            assert members == _public(set(dir(runtime_class)) - inherited), node.name

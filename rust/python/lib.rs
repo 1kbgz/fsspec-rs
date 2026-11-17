@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 mod backend;
+mod io;
 mod local;
 mod memory;
 mod s3;
@@ -17,6 +18,14 @@ pub use types::{PyFileInfo, PyFileType};
 
 #[pymodule]
 fn fsspec_rs(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
+    m.add_class::<io::PyValidator>()?;
+    m.add_class::<io::PyMatch>()?;
+    m.add_class::<io::PyMissing>()?;
+    m.add_class::<io::PyReadResult>()?;
+    m.add_class::<io::PyWriteResult>()?;
+    m.add_class::<io::PyIoCapabilities>()?;
+    m.add("ConflictError", py.get_type::<io::ConflictError>())?;
+
     // Core types
     m.add_class::<PyFileType>()?;
     m.add_class::<PyFileInfo>()?;

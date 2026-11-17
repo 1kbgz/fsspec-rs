@@ -12,6 +12,13 @@ use fsspec_sys::types::fsspec_status::*;
 /// different version must not use the library.
 pub const FSSPEC_ABI_VERSION: u32 = 1;
 
+/// Failed condition, returned only by typed object operations.
+pub const FSSPEC_CONFLICT: i32 = 10;
+/// Match the supplied object validator.
+pub const FSSPEC_CONDITION_MATCH: u32 = 1;
+/// Create only when the object is absent.
+pub const FSSPEC_CONDITION_MISSING: u32 = 2;
+
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
 }
@@ -140,4 +147,27 @@ pub unsafe extern "C" fn fsspec_set_last_error(message: *const c_char, len: usiz
 #[no_mangle]
 pub extern "C" fn fsspec_clear_last_error() {
     LAST_ERROR.with(|slot| *slot.borrow_mut() = None);
+}
+
+pub(crate) fn guard_operation(body: impl FnOnce() -> Result<(), fsspec_rs::OperationError>) -> i32 {
+    match catch_unwind(AssertUnwindSafe(body)) {
+        Ok(Ok(())) => 0,
+        Ok(Err(error)) => {
+            set_last_error(&error.to_string());
+            fsspec_sys::operations::operation_status(&error)
+        }
+        Err(_) => {
+            set_last_error("panic across the object operation boundary");
+            FSSPEC_OTHER as i32
+        }
+    }
+}
+
+pub(crate) fn check_operation(status: i32, context: &str) -> Result<(), fsspec_rs::OperationError> {
+    if status == 0 {
+        return Ok(());
+    }
+    let message =
+        take_last_error().unwrap_or_else(|| format!("{context} failed with status {status}"));
+    Err(fsspec_sys::operations::operation_error(status, message))
 }

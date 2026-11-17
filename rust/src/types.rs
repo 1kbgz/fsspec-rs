@@ -74,6 +74,62 @@ impl FileInfo {
     }
 }
 
+/// An opaque backend-issued version token scoped to one object.
+///
+/// Pass validators returned by reads or writes unchanged to [`Condition::Match`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Validator {
+    pub scope: String,
+    pub value: String,
+}
+
+/// A condition checked atomically with a byte operation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum Condition {
+    /// The object must still match this validator.
+    Match(Validator),
+    /// The object must not exist. Valid only for writes.
+    Missing,
+}
+
+/// Options for a whole-object or ranged byte read.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ReadOptions {
+    /// Inclusive start; negative offsets count from the end.
+    pub start: Option<i64>,
+    /// Exclusive end; negative offsets count from the end.
+    pub end: Option<i64>,
+    pub condition: Option<Condition>,
+}
+
+/// Options for a byte write.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct WriteOptions {
+    pub condition: Option<Condition>,
+}
+
+/// Bytes and the validator of the object from which they were read.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReadResult {
+    pub data: Vec<u8>,
+    pub validator: Option<Validator>,
+}
+
+/// The validator of the object produced by a successful write, when available.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WriteResult {
+    pub validator: Option<Validator>,
+}
+
+/// Conditions a filesystem can enforce for byte reads and writes.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct IoCapabilities {
+    pub read_match: bool,
+    pub write_match: bool,
+    pub write_missing: bool,
+}
+
 /// Mode for opening a file.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OpenMode {

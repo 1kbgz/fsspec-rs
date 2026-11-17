@@ -338,22 +338,75 @@ macro_rules! filesystem_methods {
                     .map_err(fs_error_to_pyerr)
             }
 
+            #[pyo3(signature = (path, start = None, end = None, condition = None))]
+            fn read(
+                &self,
+                py: Python<'_>,
+                path: &str,
+                start: Option<i64>,
+                end: Option<i64>,
+                condition: Option<&Bound<'_, PyAny>>,
+            ) -> PyResult<crate::io::PyReadResult> {
+                let options = fsspec_rs::ReadOptions {
+                    start, end, condition: crate::io::condition(condition)?,
+                };
+                let result = py.detach(|| self.inner.read(path, options))
+                    .map_err(crate::io::operation_error_to_pyerr)?;
+                Ok(crate::io::PyReadResult::from_rust(py, result))
+            }
+
+            #[pyo3(signature = (path, data, condition = None))]
+            fn write(
+                &self,
+                py: Python<'_>,
+                path: &str,
+                data: &[u8],
+                condition: Option<&Bound<'_, PyAny>>,
+            ) -> PyResult<crate::io::PyWriteResult> {
+                let options = fsspec_rs::WriteOptions { condition: crate::io::condition(condition)? };
+                let data = data.to_vec();
+                let result = py.detach(|| self.inner.write(path, &data, options))
+                    .map_err(crate::io::operation_error_to_pyerr)?;
+                Ok(crate::io::PyWriteResult { validator: result.validator.map(Into::into) })
+            }
+
+            fn io_capabilities(&self) -> crate::io::PyIoCapabilities {
+                let capabilities = self.inner.io_capabilities();
+                crate::io::PyIoCapabilities {
+                    read_match: capabilities.read_match,
+                    write_match: capabilities.write_match,
+                    write_missing: capabilities.write_missing,
+                }
+            }
+
             /// Read file contents as bytes.
-            #[pyo3(signature = (path, start = None, end = None))]
+            #[pyo3(signature = (path, start = None, end = None, condition = None))]
             fn cat_file(
                 &self,
                 py: Python<'_>,
                 path: &str,
                 start: Option<i64>,
                 end: Option<i64>,
+                condition: Option<&Bound<'_, PyAny>>,
             ) -> PyResult<Vec<u8>> {
+                if let Some(condition) = crate::io::condition(condition)? {
+                    return py.detach(|| self.inner.read(path, fsspec_rs::ReadOptions {
+                        start, end, condition: Some(condition),
+                    })).map(|result| result.data).map_err(crate::io::operation_error_to_pyerr);
+                }
                 py.detach(|| self.inner.cat_file(path, start, end))
                     .map_err(fs_error_to_pyerr)
             }
 
             /// Write bytes to a file.
-            fn pipe_file(&self, py: Python<'_>, path: &str, data: &[u8]) -> PyResult<()> {
+            #[pyo3(signature = (path, data, condition = None))]
+            fn pipe_file(&self, py: Python<'_>, path: &str, data: &[u8], condition: Option<&Bound<'_, PyAny>>) -> PyResult<()> {
+                let condition = crate::io::condition(condition)?;
                 let data = data.to_vec();
+                if condition.is_some() {
+                    return py.detach(|| self.inner.write(path, &data, fsspec_rs::WriteOptions { condition }))
+                        .map(|_| ()).map_err(crate::io::operation_error_to_pyerr);
+                }
                 py.detach(|| self.inner.pipe_file(path, &data))
                     .map_err(fs_error_to_pyerr)
             }

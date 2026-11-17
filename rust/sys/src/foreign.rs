@@ -287,6 +287,56 @@ impl FileSystem for ForeignFileSystem {
         Ok(out)
     }
 
+    fn read(
+        &self,
+        path: &str,
+        options: fsspec_rs::ReadOptions,
+    ) -> Result<fsspec_rs::ReadResult, fsspec_rs::OperationError> {
+        let mut out = std::mem::MaybeUninit::<crate::types::fsspec_read_result>::uninit();
+        let status = crate::operations::with_read_options(&options, |options| unsafe {
+            ffi::fsspec_fs_read(
+                self.handle,
+                path.as_ptr().cast(),
+                path.len(),
+                options,
+                out.as_mut_ptr(),
+            )
+        });
+        crate::util::check_operation(status, "read")?;
+        Ok(unsafe { out.assume_init().into_result()? })
+    }
+
+    fn write(
+        &self,
+        path: &str,
+        data: &[u8],
+        options: fsspec_rs::WriteOptions,
+    ) -> Result<fsspec_rs::WriteResult, fsspec_rs::OperationError> {
+        let mut out = std::mem::MaybeUninit::<crate::types::fsspec_write_result>::uninit();
+        let status = crate::operations::with_write_options(&options, |options| unsafe {
+            ffi::fsspec_fs_write(
+                self.handle,
+                path.as_ptr().cast(),
+                path.len(),
+                data.as_ptr(),
+                data.len(),
+                options,
+                out.as_mut_ptr(),
+            )
+        });
+        crate::util::check_operation(status, "write")?;
+        Ok(unsafe { out.assume_init().into_result()? })
+    }
+
+    fn io_capabilities(&self) -> fsspec_rs::IoCapabilities {
+        let mut out = crate::types::fsspec_io_capabilities::default();
+        let status = unsafe { ffi::fsspec_fs_io_capabilities(self.handle, &mut out) };
+        if check(status, "io_capabilities").is_err() {
+            return fsspec_rs::IoCapabilities::default();
+        }
+        out.into()
+    }
+
     fn cat_file(&self, path: &str, start: Option<i64>, end: Option<i64>) -> FsResult<Vec<u8>> {
         let (path_ptr, path_len) = arg(path);
         let mut out = empty_bytes();

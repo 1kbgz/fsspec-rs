@@ -4,9 +4,11 @@ import fsspec
 from fsspec.config import conf
 from fsspec.spec import AbstractBufferedFile
 
-from fsspec_rs.fsspec_rs import RustS3Fs
+from fsspec_rs._conditions import reject_unsupported_conditions
+from fsspec_rs.fsspec_rs import IoCapabilities, Match, Missing, ReadResult, RustS3Fs, WriteResult
 
 
+@reject_unsupported_conditions
 class S3FileSystem(fsspec.AbstractFileSystem):
     """S3 filesystem backed by the Rust ``S3Fs`` implementation.
 
@@ -109,6 +111,8 @@ class S3FileSystem(fsspec.AbstractFileSystem):
         **kwargs,
     ):
         """Return a Rust-backed S3 file object."""
+        if "condition" in kwargs:
+            raise NotImplementedError("conditions are supported by read/write, not open")
         return S3File(
             self,
             path,
@@ -149,10 +153,24 @@ class S3FileSystem(fsspec.AbstractFileSystem):
     def size(self, path: str) -> int:
         return self._rust.size(path)
 
-    def cat_file(self, path: str, start=None, end=None, **kwargs) -> bytes:
+    def read(self, path: str, start=None, end=None, condition: Match | Missing | None = None) -> ReadResult:
+        return self._rust.read(path, start=start, end=end, condition=condition)
+
+    def write(self, path: str, data: bytes, condition: Match | Missing | None = None) -> WriteResult:
+        return self._rust.write(path, data, condition=condition)
+
+    def io_capabilities(self) -> IoCapabilities:
+        return self._rust.io_capabilities()
+
+    def cat_file(self, path: str, start=None, end=None, condition: Match | Missing | None = None, **kwargs) -> bytes:
+        if condition is not None:
+            return self.read(path, start=start, end=end, condition=condition).data
         return bytes(self._rust.cat_file(path, start=start, end=end))
 
-    def pipe_file(self, path: str, value: bytes, **kwargs):
+    def pipe_file(self, path: str, value: bytes, condition: Match | Missing | None = None, **kwargs):
+        if condition is not None:
+            self.write(path, value, condition=condition)
+            return None
         return self._rust.pipe_file(path, value)
 
     def head(self, path: str, size: int = 1024) -> bytes:
@@ -180,6 +198,8 @@ class S3File(AbstractBufferedFile):
 
     def __init__(self, fs: S3FileSystem, path: str, mode: str = "rb", cache_type=None, block_size=None, **kwargs):
         self._rust_file = None  # set early so __del__/closed don't blow up
+        if "condition" in kwargs:
+            raise NotImplementedError("conditions are supported by read/write, not open")
         open_kwargs = {}
         if cache_type is not None:
             open_kwargs["cache_type"] = cache_type

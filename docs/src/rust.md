@@ -88,6 +88,72 @@ The default methods built on those primitives include:
 - Tree operations: `walk`, `find`, `copy`, `mv`, `rm`, `du`, `makedirs`
 - Local transfers: `get_file`, `put_file`
 
+### Object I/O and conditions
+
+`FileSystem::read(path, ReadOptions)` returns `ReadResult { data, validator }`.
+`FileSystem::write(path, data, WriteOptions)` returns `WriteResult { validator }`
+after committing the write. A validator, when available, describes the object
+read or committed by that operation. Obtain it from the result and pass it back
+unchanged; it contains an opaque scope and value, not a general content hash.
+
+Both options structs accept `condition: Option<Condition>`:
+
+| Condition          | Read                           | Write                             |
+| ------------------ | ------------------------------ | --------------------------------- |
+| `None`             | Read current bytes.            | Replace or create.                |
+| `Match(validator)` | Read only the matching object. | Replace only the matching object. |
+| `Missing`          | Invalid argument.              | Create only if absent.            |
+
+```rust
+use fsspec_rs::{Condition, FileSystem, OperationError, ReadOptions, WriteOptions};
+
+fn replace(fs: &dyn FileSystem, path: &str, data: &[u8]) -> Result<(), OperationError> {
+    let current = fs.read(path, ReadOptions::default())?;
+    let validator = current.validator.ok_or_else(|| {
+        fsspec_rs::FsError::NotSupported("backend returned no validator".into())
+    })?;
+    fs.write(path, data, WriteOptions {
+        condition: Some(Condition::Match(validator)),
+    })?;
+    Ok(())
+}
+```
+
+`ReadOptions.start` and `.end` follow `cat_file` slicing semantics: negative
+offsets count from the end, bounds are clamped, and reversed ranges are empty.
+Empty reads still check the condition. S3 pins a ranged read to the validator
+returned by its metadata request, even without a caller-supplied condition.
+A concurrent replacement between metadata and data requests returns a conflict.
+
+`OperationError::Conflict` means a condition failed, including a Match against a
+deleted object. `OperationError::FileSystem` wraps existing filesystem errors;
+unconditional reads of missing objects return `FsError::NotFound`. Unsupported
+conditions return `FsError::NotSupported` before I/O. `FsError` itself is unchanged.
+
+`io_capabilities()` reports `read_match`, `write_match`, and `write_missing`:
+
+| Backend                                               | Match read | Match write | Missing write | Result validator                                                 |
+| ----------------------------------------------------- | ---------- | ----------- | ------------- | ---------------------------------------------------------------- |
+| S3                                                    | Yes        | Yes         | Yes           | ETag scoped to endpoint, addressing mode, bucket and object path |
+| Local, memory                                         | No         | No          | Yes           | None                                                             |
+| Default implementation, Python bridge, old C backends | No         | No          | No            | None                                                             |
+
+S3 enforces conditions in the backend request. Validators from another endpoint, addressing mode,
+bucket or path are invalid arguments, as are empty ETags, wildcards and ETag lists.
+ETags are equality tokens: writing identical content can retain an ETag, so Match
+does not promise detection of every intervening write.
+
+Local and memory Missing writes use exclusive creation. Local creation reserves
+the name atomically, but readers can observe bytes while the file is being written;
+a failed write can leave a partial file. These are the existing exclusive-file
+semantics, not transactional publication.
+
+The Rust bindings, C ABI and Python wrappers expose the same operations. Older C
+backends reject conditions and retain unconditional I/O through their existing
+callbacks. Conditions currently apply to whole-object writes and whole-object or
+ranged byte reads. Open handles, append, copy, delete and async APIs do not accept
+conditions. Table row predicates remain a separate concern in `fsspec-data`.
+
 ## AsyncFileSystem
 
 `AsyncFileSystem` is the experimental async version of `FileSystem`. Its
@@ -232,7 +298,8 @@ retrieves the half-open byte range `[start, end)` from the backend.
 
 ## Error handling
 
-All trait methods return `FsResult<T> = Result<T, FsError>`. `FsError` represents
+Except for typed object I/O, fallible filesystem methods return
+`FsResult<T> = Result<T, FsError>`. `FsError` represents
 filesystem errors with these variants:
 
 - `NotFound`
