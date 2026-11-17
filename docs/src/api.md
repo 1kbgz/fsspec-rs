@@ -66,6 +66,37 @@ Python exception types. Passing `condition=` to open handles is unsupported.
 See [Rust object I/O](rust.md) for capability flags,
 range consistency and local exclusive-creation semantics.
 
+## Range reads
+
+`read_ranges(path, ranges, *, condition=None, max_gap=65536, max_request_size=8388608, max_concurrency=8)` returns a frozen `RangeReadResult`.
+Its `.data` is a tuple of bytes in requested order; `.validator` identifies the
+shared S3 object version or is `None` when unavailable. `ranges` contains
+`(start, end)` pairs with signed integers or `None`, as for `read` bounds.
+
+```python
+result = fs.read_ranges("events.parquet", [(0, 16), (32, 48), (-8, None)])
+first, second, footer = result.data
+```
+
+Nearby ranges are merged and oversized requests split. S3 fetches merged ranges
+concurrently against one validator. Local and memory use sequential reads without
+a snapshot guarantee. Match is supported by S3; Missing is invalid. Conditions and
+errors follow the typed read API. A failed operation returns no partial result.
+
+`cat_ranges(paths, starts, ends, max_gap=None, on_error="return", *, condition=None, max_request_size=8388608, max_concurrency=8)` adapts fsspec's list interface.
+`paths` is a list; scalar start/end bounds broadcast to its length. List lengths
+must match. Requests for the same normalized path are grouped and coalesced, then
+restored to input order. Different path groups execute sequentially. A condition
+cannot span multiple unique paths. An empty path list returns an empty list without I/O. `max_gap=None` selects the 65,536-byte default.
+
+With `on_error="return"`, a failed path group places its exception at each of that
+group's output positions; `"raise"` propagates the error. Invalid argument shapes,
+options and condition types raise before I/O. Unknown keyword arguments are rejected.
+Use `read_ranges` to retain the validator with the bytes.
+
+See the [Rust reference](rust.md) for shared endpoint concurrency limits, empty
+range behavior and memory bounds.
+
 ## Open files
 
 ```{eval-rst}

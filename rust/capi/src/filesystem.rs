@@ -428,3 +428,30 @@ pub unsafe extern "C" fn fsspec_fs_io_capabilities(
 ) -> fsspec_status {
     guard(|| write_out(out, fs_arg(fs)?.io_capabilities().into()))
 }
+
+use fsspec_sys::types::{fsspec_byte_range, fsspec_range_read_options, fsspec_range_read_result};
+
+use fsspec_sys::operations::{range_read_options, ranges_arg};
+
+/// Reads ordered ranges with bounded coalescing. On failure out is unchanged.
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_fs_read_ranges(
+    fs: *const fsspec_fs,
+    path: *const c_char,
+    path_len: usize,
+    ranges: *const fsspec_byte_range,
+    ranges_len: usize,
+    options: *const fsspec_range_read_options,
+    out: *mut fsspec_range_read_result,
+) -> fsspec_operation_status {
+    guard_operation(|| {
+        if out.is_null() {
+            return Err(invalid("range read result pointer is null").into());
+        }
+        let options = range_read_options(options)?;
+        let ranges = ranges_arg(ranges, ranges_len)?;
+        let result = fs_arg(fs)?.read_ranges(str_arg(path, path_len)?, &ranges, options)?;
+        out.write(fsspec_range_read_result::from_result(result));
+        Ok(())
+    })
+}

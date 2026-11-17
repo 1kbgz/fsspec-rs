@@ -91,6 +91,34 @@ pub struct fsspec_write_result {
     pub validator: fsspec_validator,
 }
 
+/// Borrowed signed bounds. Null start/end mean unbounded, as for a single read.
+#[repr(C)]
+pub struct fsspec_byte_range {
+    pub start: *const i64,
+    pub end: *const i64,
+}
+
+/// Range read options. Set struct_size to sizeof(fsspec_range_read_options).
+/// Null options select defaults: gap 65536, request size 8388608, concurrency 8.
+/// max_request_size and max_concurrency must be positive.
+#[repr(C)]
+pub struct fsspec_range_read_options {
+    pub struct_size: usize,
+    pub condition: *const fsspec_condition,
+    pub max_gap: u64,
+    pub max_request_size: u64,
+    pub max_concurrency: usize,
+}
+
+/// Owned buffers in requested order, plus their shared validator when available.
+/// Free a successful result with fsspec_range_read_result_free.
+#[repr(C)]
+pub struct fsspec_range_read_result {
+    pub data: *mut fsspec_bytes,
+    pub len: usize,
+    pub validator: fsspec_validator,
+}
+
 /// Conditions enforced atomically by the backend.
 #[repr(C)]
 #[derive(Default)]
@@ -339,6 +367,19 @@ pub struct fsspec_fs_vtable {
     /// Absent means no conditional I/O support.
     pub io_capabilities: Option<
         unsafe extern "C" fn(data: *mut c_void, out: *mut fsspec_io_capabilities) -> fsspec_status,
+    >,
+    /// Optional coalesced range reads. Absent callbacks use sequential legacy reads
+    /// without validators and reject conditional requests.
+    pub read_ranges: Option<
+        unsafe extern "C" fn(
+            data: *mut c_void,
+            path: *const c_char,
+            path_len: usize,
+            ranges: *const fsspec_byte_range,
+            ranges_len: usize,
+            options: *const fsspec_range_read_options,
+            out: *mut fsspec_range_read_result,
+        ) -> fsspec_operation_status,
     >,
 }
 
@@ -590,5 +631,50 @@ impl fsspec_file_info_list {
         for item in take_array(self.items, self.len) {
             item.free();
         }
+    }
+}
+
+impl fsspec_range_read_result {
+    pub fn from_result(result: fsspec_rs::RangeReadResult) -> Self {
+        let (data, len) = alloc_array(
+            result
+                .data
+                .into_iter()
+                .map(fsspec_bytes::from_vec)
+                .collect(),
+        );
+        Self {
+            data,
+            len,
+            validator: fsspec_validator::from_validator(result.validator),
+        }
+    }
+
+    pub unsafe fn into_result(self) -> fsspec_rs::FsResult<fsspec_rs::RangeReadResult> {
+        let validator = self.validator.to_validator();
+        let valid = !(self.data.is_null() && self.len != 0);
+        let buffers = take_array(self.data, self.len);
+        let mut data = Vec::with_capacity(buffers.len());
+        let mut valid = valid;
+        for buffer in buffers {
+            valid &= !(buffer.data.is_null() && buffer.len != 0);
+            data.push(buffer.as_slice().to_vec());
+            buffer.free();
+        }
+        self.validator.free();
+        if !valid {
+            return Err(crate::util::invalid("range result buffer is null"));
+        }
+        Ok(fsspec_rs::RangeReadResult {
+            data,
+            validator: validator?,
+        })
+    }
+
+    pub unsafe fn free(self) {
+        for buffer in take_array(self.data, self.len) {
+            buffer.free();
+        }
+        self.validator.free();
     }
 }

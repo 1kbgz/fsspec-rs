@@ -209,6 +209,37 @@ typedef struct fsspec_io_capabilities {
 } fsspec_io_capabilities;
 
 /**
+ * Borrowed signed bounds. Null start/end mean unbounded, as for a single read.
+ */
+typedef struct fsspec_byte_range {
+  const int64_t *start;
+  const int64_t *end;
+} fsspec_byte_range;
+
+/**
+ * Range read options. Set struct_size to sizeof(fsspec_range_read_options).
+ * Null options select defaults: gap 65536, request size 8388608, concurrency 8.
+ * max_request_size and max_concurrency must be positive.
+ */
+typedef struct fsspec_range_read_options {
+  size_t struct_size;
+  const struct fsspec_condition *condition;
+  uint64_t max_gap;
+  uint64_t max_request_size;
+  size_t max_concurrency;
+} fsspec_range_read_options;
+
+/**
+ * Owned buffers in requested order, plus their shared validator when available.
+ * Free a successful result with fsspec_range_read_result_free.
+ */
+typedef struct fsspec_range_read_result {
+  struct fsspec_bytes *data;
+  size_t len;
+  struct fsspec_validator validator;
+} fsspec_range_read_result;
+
+/**
  * Builds filesystems for one protocol. `struct_size` is
  * `sizeof(fsspec_fs_factory)` and `abi_version` is `FSSPEC_ABI_VERSION` as
  * seen by the caller; new members are appended, so older callers keep
@@ -309,6 +340,17 @@ typedef struct fsspec_fs_vtable {
    * Absent means no conditional I/O support.
    */
   fsspec_status (*io_capabilities)(void *data, struct fsspec_io_capabilities *out);
+  /**
+   * Optional coalesced range reads. Absent callbacks use sequential legacy reads
+   * without validators and reject conditional requests.
+   */
+  fsspec_operation_status (*read_ranges)(void *data,
+                                         const char *path,
+                                         size_t path_len,
+                                         const struct fsspec_byte_range *ranges,
+                                         size_t ranges_len,
+                                         const struct fsspec_range_read_options *options,
+                                         struct fsspec_range_read_result *out);
 } fsspec_fs_vtable;
 
 /**
@@ -565,6 +607,17 @@ fsspec_status fsspec_fs_io_capabilities(const struct fsspec_fs *fs,
                                         struct fsspec_io_capabilities *out);
 
 /**
+ * Reads ordered ranges with bounded coalescing. On failure out is unchanged.
+ */
+fsspec_operation_status fsspec_fs_read_ranges(const struct fsspec_fs *fs,
+                                              const char *path,
+                                              size_t path_len,
+                                              const struct fsspec_byte_range *ranges,
+                                              size_t ranges_len,
+                                              const struct fsspec_range_read_options *options,
+                                              struct fsspec_range_read_result *out);
+
+/**
  * Frees bytes returned by libfsspec.
  */
 void fsspec_bytes_free(struct fsspec_bytes bytes);
@@ -598,6 +651,11 @@ void fsspec_read_result_free(struct fsspec_read_result result);
  * Frees all buffers in a successful write result.
  */
 void fsspec_write_result_free(struct fsspec_write_result result);
+
+/**
+ * Frees all buffers and the validator in a successful range-read result.
+ */
+void fsspec_range_read_result_free(struct fsspec_range_read_result result);
 
 /**
  * Creates an empty option set. Free with `fsspec_options_free`.

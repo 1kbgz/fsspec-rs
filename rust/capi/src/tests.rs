@@ -424,6 +424,7 @@ fn local_vtable() -> fsspec_fs_vtable {
         read: None,
         write: None,
         io_capabilities: None,
+        read_ranges: None,
     }
 }
 
@@ -951,4 +952,183 @@ fn object_operation_constants_match_bindings() {
         FSSPEC_CONDITION_MISSING,
         fsspec_sys::FSSPEC_CONDITION_MISSING
     );
+}
+
+#[test]
+fn old_vtable_keeps_unconditional_ranges_and_rejects_conditions() {
+    use fsspec_rs::{ByteRange, Condition, OperationError, RangeReadOptions, Validator};
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("ranges").to_string_lossy().into_owned();
+    std::fs::write(&path, b"abcdef").unwrap();
+    let mut vtable = local_vtable();
+    vtable.struct_size = std::mem::offset_of!(fsspec_fs_vtable, read_ranges);
+    let data = Box::into_raw(Box::new(LocalFs::new())).cast();
+    unsafe {
+        let fs =
+            fsspec_sys::ForeignFileSystem::from_raw(fsspec_fs_from_vtable(&vtable, data)).unwrap();
+        let ranges = [
+            ByteRange {
+                start: Some(2),
+                end: Some(4),
+            },
+            ByteRange::default(),
+        ];
+        let result = fs
+            .read_ranges(&path, &ranges, RangeReadOptions::default())
+            .unwrap();
+        assert_eq!(result.data, [b"cd".to_vec(), b"abcdef".to_vec()]);
+        assert_eq!(result.validator, None);
+        assert!(matches!(
+            fs.read_ranges(
+                &path,
+                &ranges,
+                RangeReadOptions {
+                    condition: Some(Condition::Match(Validator {
+                        scope: "scope".into(),
+                        value: "version".into()
+                    })),
+                    ..Default::default()
+                }
+            ),
+            Err(OperationError::FileSystem(FsError::NotSupported(_)))
+        ));
+    }
+}
+
+#[test]
+fn range_callback_preserves_options_validators_and_conflicts() {
+    use fsspec_rs::{
+        ByteRange, Condition, OperationError, RangeReadOptions, RangeReadResult, Validator,
+    };
+    unsafe extern "C" fn read_ranges(
+        _: *mut c_void,
+        _: *const c_char,
+        _: usize,
+        ranges: *const fsspec_byte_range,
+        len: usize,
+        options: *const fsspec_range_read_options,
+        out: *mut fsspec_range_read_result,
+    ) -> fsspec_operation_status {
+        crate::status::guard_operation(|| {
+            let options = fsspec_sys::operations::range_read_options(options)?;
+            let ranges = fsspec_sys::operations::ranges_arg(ranges, len)?;
+            assert_eq!(
+                ranges,
+                [ByteRange {
+                    start: Some(-3),
+                    end: Some(-1)
+                }]
+            );
+            assert_eq!(
+                (
+                    options.max_gap,
+                    options.max_request_size,
+                    options.max_concurrency
+                ),
+                (2, 16, 3)
+            );
+            let Some(Condition::Match(validator)) = options.condition else {
+                return Err(OperationError::Conflict("object replaced".into()));
+            };
+            out.write(fsspec_range_read_result::from_result(RangeReadResult {
+                data: vec![b"ab".to_vec()],
+                validator: Some(validator),
+            }));
+            Ok(())
+        })
+    }
+    let mut vtable = local_vtable();
+    vtable.read_ranges = Some(read_ranges);
+    let data = Box::into_raw(Box::new(LocalFs::new())).cast();
+    unsafe {
+        let fs =
+            fsspec_sys::ForeignFileSystem::from_raw(fsspec_fs_from_vtable(&vtable, data)).unwrap();
+        let validator = Validator {
+            scope: "object".into(),
+            value: "version".into(),
+        };
+        let ranges = [ByteRange {
+            start: Some(-3),
+            end: Some(-1),
+        }];
+        let options = RangeReadOptions {
+            condition: Some(Condition::Match(validator.clone())),
+            max_gap: 2,
+            max_request_size: 16,
+            max_concurrency: 3,
+        };
+        let result = fs.read_ranges("object", &ranges, options.clone()).unwrap();
+        assert_eq!(result.data, [b"ab".to_vec()]);
+        assert_eq!(result.validator, Some(validator));
+        assert!(
+            matches!(fs.read_ranges("object", &ranges, RangeReadOptions { condition: None, ..options }), Err(OperationError::Conflict(message)) if message.contains("object replaced"))
+        );
+    }
+}
+
+#[test]
+fn range_entry_rejects_invalid_pointers_and_options() {
+    unsafe {
+        let fs = FsData::into_raw(std::sync::Arc::new(LocalFs::new()));
+        let mut result = std::mem::MaybeUninit::uninit();
+        assert_eq!(
+            fsspec_fs_read_ranges(
+                fs,
+                ptr::null(),
+                0,
+                ptr::null(),
+                1,
+                ptr::null(),
+                result.as_mut_ptr()
+            ),
+            FSSPEC_INVALID_ARGUMENT as i32
+        );
+        assert_eq!(
+            fsspec_fs_read_ranges(
+                fs,
+                ptr::null(),
+                0,
+                ptr::null(),
+                0,
+                ptr::null(),
+                ptr::null_mut()
+            ),
+            FSSPEC_INVALID_ARGUMENT as i32
+        );
+        let options = fsspec_range_read_options {
+            struct_size: size_of::<usize>(),
+            condition: ptr::null(),
+            max_gap: 0,
+            max_request_size: 1,
+            max_concurrency: 1,
+        };
+        assert_eq!(
+            fsspec_fs_read_ranges(
+                fs,
+                ptr::null(),
+                0,
+                ptr::null(),
+                0,
+                &options,
+                result.as_mut_ptr()
+            ),
+            FSSPEC_INVALID_ARGUMENT as i32
+        );
+        assert_eq!(
+            fsspec_fs_read_ranges(
+                fs,
+                ptr::null(),
+                0,
+                ptr::null(),
+                0,
+                ptr::null(),
+                result.as_mut_ptr()
+            ),
+            0
+        );
+        let result = result.assume_init();
+        assert_eq!(result.len, 0);
+        fsspec_range_read_result_free(result);
+        fsspec_fs_release(fs);
+    }
 }

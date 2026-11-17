@@ -21,6 +21,7 @@ from fsspec_rs.fsspec_rs import (
     IoCapabilities,
     Match,
     Missing,
+    RangeReadResult,
     ReadResult,
     RustLocalFile,
     RustLocalFs,

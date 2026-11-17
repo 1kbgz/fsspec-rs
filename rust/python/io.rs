@@ -1,6 +1,6 @@
 use pyo3::exceptions::{PyOSError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyBytes, PyTuple};
 
 use fsspec_rs::{Condition, OperationError, Validator};
 
@@ -70,6 +70,21 @@ impl PyReadResult {
             data: PyBytes::new(py, &result.data).unbind(),
             validator: result.validator.map(Into::into),
         }
+    }
+}
+
+#[pyclass(name = "RangeReadResult", frozen, get_all)]
+pub struct PyRangeReadResult {
+    pub data: Py<PyTuple>,
+    pub validator: Option<PyValidator>,
+}
+
+impl PyRangeReadResult {
+    pub fn from_rust(py: Python<'_>, result: fsspec_rs::RangeReadResult) -> PyResult<Self> {
+        Ok(Self {
+            data: PyTuple::new(py, result.data.iter().map(|data| PyBytes::new(py, data)))?.unbind(),
+            validator: result.validator.map(Into::into),
+        })
     }
 }
 

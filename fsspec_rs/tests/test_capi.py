@@ -200,6 +200,12 @@ int main(int argc, char **argv) {
     fsspec_file_info info;
     if (fsspec_fs_open(fs, path.data, path.len, "rb", 2, &file) != FSSPEC_OK) return 4;
     if (fsspec_file_get_info(file, &info) != FSSPEC_OK) return 5;
+    const int64_t start = 1, end = 4;
+    fsspec_byte_range range = {&start, &end};
+    fsspec_range_read_result ranges;
+    if (fsspec_fs_read_ranges(fs, path.data, path.len, &range, 1, NULL, &ranges) != FSSPEC_OK) return 6;
+    if (ranges.len != 1 || ranges.data[0].len != 3 || memcmp(ranges.data[0].data, "ell", 3)) return 7;
+    fsspec_range_read_result_free(ranges);
     printf("%llu", (unsigned long long)info.size);
     fsspec_file_info_free(info);
     fsspec_file_close(file);
@@ -325,5 +331,59 @@ def test_conditional_object_io_through_c_api(lib, tmp_path):
         assert string_at(read.data.data, read.data.len) == b"first"
         assert not read.validator.value.data
         lib.fsspec_read_result_free(read)
+    finally:
+        lib.fsspec_fs_release(fs)
+
+
+class ByteRange(Structure):
+    _fields_ = [("start", POINTER(c_int64)), ("end", POINTER(c_int64))]
+
+
+class RangeReadOptions(Structure):
+    _fields_ = [
+        ("struct_size", c_size_t),
+        ("condition", POINTER(Condition)),
+        ("max_gap", c_uint64),
+        ("max_request_size", c_uint64),
+        ("max_concurrency", c_size_t),
+    ]
+
+
+class RangeReadResult(Structure):
+    _fields_ = [("data", POINTER(Bytes)), ("len", c_size_t), ("validator", Validator)]
+
+
+def test_coalesced_ranges_through_c_api(lib, tmp_path):
+    lib.fsspec_fs_read_ranges.argtypes = [
+        c_void_p,
+        c_char_p,
+        c_size_t,
+        POINTER(ByteRange),
+        c_size_t,
+        POINTER(RangeReadOptions),
+        POINTER(RangeReadResult),
+    ]
+    lib.fsspec_range_read_result_free.argtypes = [RangeReadResult]
+    fs, _ = _url_to_fs(lib, f"file://{tmp_path}")
+    try:
+        path = str(tmp_path / "ranges").encode()
+        assert lib.fsspec_fs_pipe_file(fs, path, len(path), b"0123456789", 10) == 0
+        ranges = (ByteRange * 3)(
+            ByteRange(pointer(c_int64(-3)), None),
+            ByteRange(pointer(c_int64(1)), pointer(c_int64(5))),
+            ByteRange(pointer(c_int64(5)), pointer(c_int64(3))),
+        )
+        options = RangeReadOptions(sizeof(RangeReadOptions), None, 1, 2, 2)
+        result = RangeReadResult()
+        assert lib.fsspec_fs_read_ranges(fs, path, len(path), ranges, len(ranges), byref(options), byref(result)) == 0
+        try:
+            assert result.len == 3
+            assert [string_at(result.data[index].data, result.data[index].len) for index in range(result.len)] == [b"789", b"1234", b""]
+            assert not result.validator.scope.data
+        finally:
+            lib.fsspec_range_read_result_free(result)
+        assert lib.fsspec_fs_read_ranges(fs, path, len(path), None, 1, None, byref(result)) == 7
+        options.max_concurrency = 0
+        assert lib.fsspec_fs_read_ranges(fs, path, len(path), ranges, len(ranges), byref(options), byref(result)) == 7
     finally:
         lib.fsspec_fs_release(fs)

@@ -22,6 +22,7 @@ fn fsspec_rs(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<io::PyMatch>()?;
     m.add_class::<io::PyMissing>()?;
     m.add_class::<io::PyReadResult>()?;
+    m.add_class::<io::PyRangeReadResult>()?;
     m.add_class::<io::PyWriteResult>()?;
     m.add_class::<io::PyIoCapabilities>()?;
     m.add("ConflictError", py.get_type::<io::ConflictError>())?;

@@ -78,6 +78,16 @@ extern "C" {
         path_len: usize,
         out: *mut bool,
     ) -> fsspec_status;
+    pub fn fsspec_fs_read_ranges(
+        fs: *const fsspec_fs,
+        path: *const c_char,
+        path_len: usize,
+        ranges: *const fsspec_byte_range,
+        ranges_len: usize,
+        options: *const fsspec_range_read_options,
+        out: *mut fsspec_range_read_result,
+    ) -> fsspec_operation_status;
+    pub fn fsspec_range_read_result_free(result: fsspec_range_read_result);
     pub fn fsspec_fs_read(
         fs: *const fsspec_fs,
         path: *const c_char,
