@@ -127,6 +127,7 @@ def test_cat_ranges_returns_path_errors_and_can_raise(cat_filesystem):
         (["first"], 0, 1, {"condition": Missing()}, ValueError),
         (["first", "second"], 0, 1, {"condition": Match(Validator("scope", "value"))}, ValueError),
         (["first"], "start", 1, {}, TypeError),
+        (["first", "second"], [0, "start"], [1, 2], {"on_error": "return"}, TypeError),
         (["first"], 1 << 63, 1, {}, OverflowError),
     ],
 )
@@ -166,6 +167,52 @@ def test_s3_cat_ranges_keeps_condition_and_alias_grouping(s3_endpoint):
     assert version is not None
     assert fs.cat_ranges(["key", "test/key", "s3-rs://test/key"], [3, 0, 1], [5, 2, 3], condition=Match(version)) == [b"34", b"01", b"12"]
     assert sum(method == "HEAD" for method, _, _, _ in s3_endpoint.requests) == 1
+
+
+@pytest.mark.parametrize("on_error", ["return", "raise"])
+def test_s3_cat_ranges_discards_successful_ranges_on_later_conflict(s3_endpoint, monkeypatch, on_error):
+    fs = S3FileSystem(bucket="test", region="us-east-1", anon=True, endpoint_url=s3_endpoint)
+    version = fs.write("key", b"0123").validator
+    fs.write("other", b"abcd")
+    original_get = s3_endpoint.handler.do_GET
+
+    def replace_before_second_range(handler):
+        if handler.path == "/test/key" and handler.headers.get("Range") == "bytes=2-3":
+            s3_endpoint.objects[handler.path] = (b"4567", '"replacement"')
+        return original_get(handler)
+
+    monkeypatch.setattr(s3_endpoint.handler, "do_GET", replace_before_second_range)
+    args = (["key", "other", "s3-rs://test/key"], [0, 0, 2], [2, 2, 4])
+    options = {"max_request_size": 2, "max_concurrency": 1, "on_error": on_error}
+    if on_error == "raise":
+        with pytest.raises(ConflictError):
+            fs.cat_ranges(*args, **options)
+    else:
+        result = fs.cat_ranges(*args, **options)
+        assert isinstance(result[0], ConflictError)
+        assert result[2] is result[0]
+        assert result[1] == b"ab"
+    key_requests = [(method, bounds, match) for method, path, bounds, match in s3_endpoint.requests if path == "/test/key"]
+    assert key_requests == [("HEAD", None, None), ("GET", "bytes=0-1", version.value), ("GET", "bytes=2-3", version.value)]
+    if on_error == "raise":
+        assert all(path != "/test/other" for _, path, _, _ in s3_endpoint.requests)
+
+
+@pytest.mark.parametrize("on_error", ["return", "raise"])
+def test_s3_cat_ranges_requires_validator_even_without_condition(s3_endpoint, on_error):
+    fs = S3FileSystem(bucket="test", region="us-east-1", anon=True, endpoint_url=s3_endpoint)
+    s3_endpoint.objects["/test/key"] = (b"0123", None)
+    assert bytes(fs.cat_file("key", start=0, end=2)) == b"01"
+    s3_endpoint.requests.clear()
+    args = (["key", "key"], [0, 2], [2, 4])
+    if on_error == "raise":
+        with pytest.raises(NotImplementedError):
+            fs.cat_ranges(*args, on_error=on_error)
+    else:
+        result = fs.cat_ranges(*args, on_error=on_error)
+        assert isinstance(result[0], NotImplementedError)
+        assert result[1] is result[0]
+    assert s3_endpoint.requests == [("HEAD", "/test/key", None, None)]
 
 
 def test_s3_cat_ranges_preserves_bucket_root_identity(s3_endpoint):
