@@ -207,6 +207,12 @@
     <a href="#fsspec_rs.LocalFileSystem.write">LocalFileSystem.write()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
+    <a href="#fsspec_rs.LocalFileSystem.read_ranges">LocalFileSystem.read_ranges()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#fsspec_rs.LocalFileSystem.cat_ranges">LocalFileSystem.cat_ranges()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.LocalFileSystem.io_capabilities">LocalFileSystem.io_capabilities()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
@@ -247,9 +253,6 @@
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.LocalFileSystem.cat">LocalFileSystem.cat()</a>
-  </li>
-  <li class="fd-toc-item" data-depth="3">
-    <a href="#fsspec_rs.LocalFileSystem.cat_ranges">LocalFileSystem.cat_ranges()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.LocalFileSystem.cp">LocalFileSystem.cp()</a>
@@ -357,6 +360,12 @@
     <a href="#fsspec_rs.S3FileSystem.write">S3FileSystem.write()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
+    <a href="#fsspec_rs.S3FileSystem.read_ranges">S3FileSystem.read_ranges()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#fsspec_rs.S3FileSystem.cat_ranges">S3FileSystem.cat_ranges()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.S3FileSystem.io_capabilities">S3FileSystem.io_capabilities()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
@@ -382,9 +391,6 @@
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.S3FileSystem.cat">S3FileSystem.cat()</a>
-  </li>
-  <li class="fd-toc-item" data-depth="3">
-    <a href="#fsspec_rs.S3FileSystem.cat_ranges">S3FileSystem.cat_ranges()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.S3FileSystem.copy">S3FileSystem.copy()</a>
@@ -466,6 +472,9 @@
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#range-reads">Range reads</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#open-files">Open files</a>
@@ -816,6 +825,28 @@ raise unless recursive is true, where the default is ignore</p>
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.read_ranges">
+<span class="sig-name descname"><span class="pre">read_ranges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ranges</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Match</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Missing</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_gap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">65536</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_request_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">8388608</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_concurrency</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">8</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">RangeReadResult</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.read_ranges"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.read_ranges" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.cat_ranges">
+<span class="sig-name descname"><span class="pre">cat_ranges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">starts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ends</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_gap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'return'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.cat_ranges"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.cat_ranges" title="Link to this definition">¶</a></dt>
+<dd><p>Get the contents of byte ranges from one or more files</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paths</strong> (<em>list</em>) – A list of of filepaths on this filesystems</p></li>
+<li><p><strong>starts</strong> (<em>int</em><em> or </em><em>list</em>) – Bytes limits of the read. If using a single int, the same value will be
+used to read all the specified files.</p></li>
+<li><p><strong>ends</strong> (<em>int</em><em> or </em><em>list</em>) – Bytes limits of the read. If using a single int, the same value will be
+used to read all the specified files.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.io_capabilities">
 <span class="sig-name descname"><span class="pre">io_capabilities</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">IoCapabilities</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem.io_capabilities"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem.io_capabilities" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -1017,23 +1048,6 @@ instance.</p></li>
 <li><p><em>or the path has been otherwise expanded</em></p></li>
 </ul>
 </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem.cat_ranges">
-<span class="sig-name descname"><span class="pre">cat_ranges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">starts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ends</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_gap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'return'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#fsspec_rs.LocalFileSystem.cat_ranges" title="Link to this definition">¶</a></dt>
-<dd><p>Get the contents of byte ranges from one or more files</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>paths</strong> (<em>list</em>) – A list of of filepaths on this filesystems</p></li>
-<li><p><strong>starts</strong> (<em>int</em><em> or </em><em>list</em>) – Bytes limits of the read. If using a single int, the same value will be
-used to read all the specified files.</p></li>
-<li><p><strong>ends</strong> (<em>int</em><em> or </em><em>list</em>) – Bytes limits of the read. If using a single int, the same value will be
-used to read all the specified files.</p></li>
-</ul>
 </dd>
 </dl>
 </dd></dl>
@@ -1422,6 +1436,28 @@ possible.</p></li>
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.read_ranges">
+<span class="sig-name descname"><span class="pre">read_ranges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ranges</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Match</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Missing</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_gap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">65536</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_request_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">8388608</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_concurrency</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">8</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">RangeReadResult</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.read_ranges"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.read_ranges" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.cat_ranges">
+<span class="sig-name descname"><span class="pre">cat_ranges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">starts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ends</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_gap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'return'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.cat_ranges"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.cat_ranges" title="Link to this definition">¶</a></dt>
+<dd><p>Get the contents of byte ranges from one or more files</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paths</strong> (<em>list</em>) – A list of of filepaths on this filesystems</p></li>
+<li><p><strong>starts</strong> (<em>int</em><em> or </em><em>list</em>) – Bytes limits of the read. If using a single int, the same value will be
+used to read all the specified files.</p></li>
+<li><p><strong>ends</strong> (<em>int</em><em> or </em><em>list</em>) – Bytes limits of the read. If using a single int, the same value will be
+used to read all the specified files.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.io_capabilities">
 <span class="sig-name descname"><span class="pre">io_capabilities</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">IoCapabilities</span></span></span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem.io_capabilities"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem.io_capabilities" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -1553,23 +1589,6 @@ instance.</p></li>
 <li><p><em>or the path has been otherwise expanded</em></p></li>
 </ul>
 </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.cat_ranges">
-<span class="sig-name descname"><span class="pre">cat_ranges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">starts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ends</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_gap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'return'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#fsspec_rs.S3FileSystem.cat_ranges" title="Link to this definition">¶</a></dt>
-<dd><p>Get the contents of byte ranges from one or more files</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>paths</strong> (<em>list</em>) – A list of of filepaths on this filesystems</p></li>
-<li><p><strong>starts</strong> (<em>int</em><em> or </em><em>list</em>) – Bytes limits of the read. If using a single int, the same value will be
-used to read all the specified files.</p></li>
-<li><p><strong>ends</strong> (<em>int</em><em> or </em><em>list</em>) – Bytes limits of the read. If using a single int, the same value will be
-used to read all the specified files.</p></li>
-</ul>
 </dd>
 </dl>
 </dd></dl>
@@ -1902,6 +1921,32 @@ unsupported conditions raise <code class="docutils literal notranslate"><span cl
 Python exception types. Passing <code class="docutils literal notranslate"><span class="pre">condition=</span></code> to open handles is unsupported.</p>
 <p>See <a class="reference internal" href="rust.html"><span class="std std-doc">Rust object I/O</span></a> for capability flags,
 range consistency and local exclusive-creation semantics.</p>
+</section>
+<section id="range-reads">
+<h2>Range reads<a class="headerlink" href="#range-reads" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">read_ranges(path,</span> <span class="pre">ranges,</span> <span class="pre">*,</span> <span class="pre">condition=None,</span> <span class="pre">max_gap=65536,</span> <span class="pre">max_request_size=8388608,</span> <span class="pre">max_concurrency=8)</span></code> returns a frozen <code class="docutils literal notranslate"><span class="pre">RangeReadResult</span></code>.
+Its <code class="docutils literal notranslate"><span class="pre">.data</span></code> is a tuple of bytes in requested order; <code class="docutils literal notranslate"><span class="pre">.validator</span></code> identifies the
+shared S3 object version or is <code class="docutils literal notranslate"><span class="pre">None</span></code> when unavailable. <code class="docutils literal notranslate"><span class="pre">ranges</span></code> contains
+<code class="docutils literal notranslate"><span class="pre">(start,</span> <span class="pre">end)</span></code> pairs with signed integers or <code class="docutils literal notranslate"><span class="pre">None</span></code>, as for <code class="docutils literal notranslate"><span class="pre">read</span></code> bounds.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">fs</span><span class="o">.</span><span class="n">read_ranges</span><span class="p">(</span><span class="s2">"events.parquet"</span><span class="p">,</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span> <span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">48</span><span class="p">),</span> <span class="p">(</span><span class="o">-</span><span class="mi">8</span><span class="p">,</span> <span class="kc">None</span><span class="p">)])</span>
+<span class="n">first</span><span class="p">,</span> <span class="n">second</span><span class="p">,</span> <span class="n">footer</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">data</span>
+</pre></div>
+</div>
+<p>Nearby ranges are merged and oversized requests split. S3 fetches merged ranges
+concurrently against one validator. Local and memory use sequential reads without
+a snapshot guarantee. Match is supported by S3; Missing is invalid. Conditions and
+errors follow the typed read API. A failed operation returns no partial result.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cat_ranges(paths,</span> <span class="pre">starts,</span> <span class="pre">ends,</span> <span class="pre">max_gap=None,</span> <span class="pre">on_error=&quot;return&quot;,</span> <span class="pre">*,</span> <span class="pre">condition=None,</span> <span class="pre">max_request_size=8388608,</span> <span class="pre">max_concurrency=8)</span></code> adapts fsspec’s list interface.
+<code class="docutils literal notranslate"><span class="pre">paths</span></code> is a list; scalar start/end bounds broadcast to its length. List lengths
+must match. Requests for the same normalized path are grouped and coalesced, then
+restored to input order. Different path groups execute sequentially. A condition
+cannot span multiple unique paths. An empty path list returns an empty list without I/O. <code class="docutils literal notranslate"><span class="pre">max_gap=None</span></code> selects the 65,536-byte default.</p>
+<p>With <code class="docutils literal notranslate"><span class="pre">on_error=&quot;return&quot;</span></code>, a failed path group places its exception at each of that
+group’s output positions; <code class="docutils literal notranslate"><span class="pre">&quot;raise&quot;</span></code> propagates the error. Invalid argument shapes,
+options and condition types raise before I/O. Unknown keyword arguments are rejected.
+Use <code class="docutils literal notranslate"><span class="pre">read_ranges</span></code> to retain the validator with the bytes.</p>
+<p>See the <a class="reference internal" href="rust.html"><span class="std std-doc">Rust reference</span></a> for shared endpoint concurrency limits, empty
+range behavior and memory bounds.</p>
 </section>
 <section id="open-files">
 <h2>Open files<a class="headerlink" href="#open-files" title="Link to this heading">¶</a></h2>
@@ -2272,6 +2317,12 @@ blocks are allowed to be. Disallows further writing to this file.</p>
     <a href="#fsspec_rs.LocalFileSystem.write">LocalFileSystem.write()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
+    <a href="#fsspec_rs.LocalFileSystem.read_ranges">LocalFileSystem.read_ranges()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#fsspec_rs.LocalFileSystem.cat_ranges">LocalFileSystem.cat_ranges()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.LocalFileSystem.io_capabilities">LocalFileSystem.io_capabilities()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
@@ -2312,9 +2363,6 @@ blocks are allowed to be. Disallows further writing to this file.</p>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.LocalFileSystem.cat">LocalFileSystem.cat()</a>
-  </li>
-  <li class="fd-toc-item" data-depth="3">
-    <a href="#fsspec_rs.LocalFileSystem.cat_ranges">LocalFileSystem.cat_ranges()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.LocalFileSystem.cp">LocalFileSystem.cp()</a>
@@ -2422,6 +2470,12 @@ blocks are allowed to be. Disallows further writing to this file.</p>
     <a href="#fsspec_rs.S3FileSystem.write">S3FileSystem.write()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
+    <a href="#fsspec_rs.S3FileSystem.read_ranges">S3FileSystem.read_ranges()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#fsspec_rs.S3FileSystem.cat_ranges">S3FileSystem.cat_ranges()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.S3FileSystem.io_capabilities">S3FileSystem.io_capabilities()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
@@ -2447,9 +2501,6 @@ blocks are allowed to be. Disallows further writing to this file.</p>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.S3FileSystem.cat">S3FileSystem.cat()</a>
-  </li>
-  <li class="fd-toc-item" data-depth="3">
-    <a href="#fsspec_rs.S3FileSystem.cat_ranges">S3FileSystem.cat_ranges()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.S3FileSystem.copy">S3FileSystem.copy()</a>
@@ -2531,6 +2582,9 @@ blocks are allowed to be. Disallows further writing to this file.</p>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#range-reads">Range reads</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#open-files">Open files</a>

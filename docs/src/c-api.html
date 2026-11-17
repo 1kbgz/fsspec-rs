@@ -168,6 +168,9 @@
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
+    <a href="#range-reads">Range reads</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
     <a href="#id1">Files</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
@@ -569,6 +572,31 @@ symbols require a library that exports them, even though the ABI version remains
 <p>Backend support and consistency guarantees match the
 <a class="reference internal" href="rust.html"><span class="std std-doc">Rust object I/O contract</span></a>.</p>
 </section>
+<section id="range-reads">
+<h2>Range reads<a class="headerlink" href="#range-reads" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">fsspec_fs_read_ranges(fs,</span> <span class="pre">path,</span> <span class="pre">path_len,</span> <span class="pre">ranges,</span> <span class="pre">ranges_len,</span> <span class="pre">options,</span> <span class="pre">out)</span></code> returns
+<code class="docutils literal notranslate"><span class="pre">fsspec_operation_status</span></code>. Its input is a borrowed array of <code class="docutils literal notranslate"><span class="pre">fsspec_byte_range</span></code>:
+<code class="docutils literal notranslate"><span class="pre">start</span></code> and <code class="docutils literal notranslate"><span class="pre">end</span></code> point to signed offsets, or are null for unbounded endpoints.
+The array may be null only when its length is zero. Input pointers remain valid
+for the duration of the call.</p>
+<p><code class="docutils literal notranslate"><span class="pre">fsspec_range_read_options</span></code> starts with <code class="docutils literal notranslate"><span class="pre">struct_size</span></code>, initialized to its <code class="docutils literal notranslate"><span class="pre">sizeof</span></code>,
+followed by <code class="docutils literal notranslate"><span class="pre">condition</span></code>, <code class="docutils literal notranslate"><span class="pre">max_gap</span></code>, <code class="docutils literal notranslate"><span class="pre">max_request_size</span></code> and <code class="docutils literal notranslate"><span class="pre">max_concurrency</span></code>.
+Null options use defaults of 65,536 bytes, 8,388,608 bytes and eight requests.
+Request size and concurrency must be positive. Conditions use the same representation
+as single-object reads.</p>
+<p>Successful output is <code class="docutils literal notranslate"><span class="pre">fsspec_range_read_result</span></code>: an owned <code class="docutils literal notranslate"><span class="pre">data</span></code> array of
+<code class="docutils literal notranslate"><span class="pre">fsspec_bytes</span></code>, its <code class="docutils literal notranslate"><span class="pre">len</span></code>, and a shared <code class="docutils literal notranslate"><span class="pre">validator</span></code>. Call
+<code class="docutils literal notranslate"><span class="pre">fsspec_range_read_result_free</span></code> once to free the array, its buffers and validator.
+On failure output storage is unchanged. Null output pointers, invalid input arrays
+and short option structs are rejected before backend calls.</p>
+<p>The filesystem vtable appends an optional <code class="docutils literal notranslate"><span class="pre">read_ranges</span></code> callback. Older shorter
+vtables retain coalesced sequential reads through their legacy callbacks and reject
+conditions. Native S3 retains concurrent pinned reads through both ABI directions.
+Existing status values, structs and callbacks retain their layouts. Clients using
+the new symbols require an updated library.</p>
+<p>Range ordering, consistency and request limits follow the
+<a class="reference internal" href="rust.html"><span class="std std-doc">Rust range-read contract</span></a>.</p>
+</section>
 <section id="id1">
 <h2>Files<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">fsspec_file</span> <span class="pre">*</span></code> is an open file, closed with <code class="docutils literal notranslate"><span class="pre">fsspec_file_close</span></code>.</p>
@@ -751,6 +779,9 @@ registry state.</p>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#range-reads">Range reads</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#id1">Files</a>

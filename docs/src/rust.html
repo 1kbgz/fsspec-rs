@@ -152,6 +152,9 @@
   <li class="fd-toc-item" data-depth="2">
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
   </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#coalesced-range-reads">Coalesced range reads</a>
+  </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#asyncfilesystem">AsyncFileSystem</a>
   </li>
@@ -389,6 +392,70 @@ callbacks. Conditions currently apply to whole-object writes and whole-object or
 ranged byte reads. Open handles, append, copy, delete and async APIs do not accept
 conditions. Table row predicates remain a separate concern in <code class="docutils literal notranslate"><span class="pre">fsspec-data</span></code>.</p>
 </section>
+<section id="coalesced-range-reads">
+<h3>Coalesced range reads<a class="headerlink" href="#coalesced-range-reads" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">FileSystem::read_ranges(path,</span> <span class="pre">&amp;[ByteRange],</span> <span class="pre">RangeReadOptions)</span></code> returns a
+<code class="docutils literal notranslate"><span class="pre">RangeReadResult</span></code> containing <code class="docutils literal notranslate"><span class="pre">data:</span> <span class="pre">Vec&lt;Vec&lt;u8&gt;&gt;</span></code> in input order and an optional
+shared validator. Each <code class="docutils literal notranslate"><span class="pre">ByteRange</span> <span class="pre">{</span> <span class="pre">start,</span> <span class="pre">end</span> <span class="pre">}</span></code> uses the same signed, optional
+bounds as <code class="docutils literal notranslate"><span class="pre">read</span></code>: ends are exclusive, negative offsets count from the end,
+bounds are clamped, and reversed ranges are empty. Duplicates and overlapping
+ranges each receive their own output buffer.</p>
+<p><code class="docutils literal notranslate"><span class="pre">RangeReadOptions</span></code> accepts:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">condition</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Optional <code class="docutils literal notranslate"><span class="pre">Match(validator)</span></code>; <code class="docutils literal notranslate"><span class="pre">Missing</span></code> is invalid.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max_gap</span></code></p></td>
+<td><p>65,536 bytes</p></td>
+<td><p>Largest gap eligible for coalescing. Zero still merges adjacent or overlapping ranges.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">max_request_size</span></code></p></td>
+<td><p>8,388,608 bytes</p></td>
+<td><p>Maximum data span per request; larger input ranges are split. Must be positive.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max_concurrency</span></code></p></td>
+<td><p>8</p></td>
+<td><p>Maximum concurrent requests within this call. Must be positive.</p></td>
+</tr>
+</tbody>
+</table>
+<p>S3 reads metadata once, then pins data requests to its validator, including
+requests made without a caller-supplied Match. It rejects changed validators,
+response bounds or response lengths instead of returning partial results. All
+range-read calls and S3 instances using the same canonical endpoint share an
+additional cap of eight active requests, including metadata requests. Data-request
+permits remain held until their response bodies finish. The first request failure
+drops the operation’s remaining futures.</p>
+<p>The default implementation coalesces requests and reads them sequentially through
+<code class="docutils literal notranslate"><span class="pre">cat_file</span></code>. Local, memory and older C backends use this fallback, return no validator,
+and reject Match. Such results have no snapshot guarantee during concurrent writes.
+Existing single-read capability flags do not promise conditional range-read support.</p>
+<p>An empty range list performs no I/O when unconditional. A conditional empty list
+still validates its condition on S3. Empty or out-of-bounds individual ranges still
+require metadata and preserve the corresponding empty output buffers.</p>
+<p>Request size and concurrency bound in-flight fetching, not the total result size:
+all requested output buffers remain in memory. This API does not add async trait
+methods or integrate Parquet decoding.</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::{</span><span class="n">ByteRange</span><span class="p">,</span><span class="w"> </span><span class="n">FileSystem</span><span class="p">,</span><span class="w"> </span><span class="n">OperationError</span><span class="p">,</span><span class="w"> </span><span class="n">RangeReadOptions</span><span class="p">};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">chunks</span><span class="p">(</span><span class="n">fs</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="nc">dyn</span><span class="w"> </span><span class="n">FileSystem</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="kt">str</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">Vec</span><span class="o">&lt;</span><span class="kt">u8</span><span class="o">&gt;&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">OperationError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fs</span><span class="p">.</span><span class="n">read_ranges</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="p">[</span>
+<span class="w">        </span><span class="n">ByteRange</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">start</span><span class="p">:</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span><span class="w"> </span><span class="n">end</span><span class="p">:</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span><span class="w"> </span><span class="p">},</span>
+<span class="w">        </span><span class="n">ByteRange</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">start</span><span class="p">:</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="mi">32</span><span class="p">),</span><span class="w"> </span><span class="n">end</span><span class="p">:</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="mi">48</span><span class="p">)</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="p">],</span><span class="w"> </span><span class="n">RangeReadOptions</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(</span><span class="n">result</span><span class="p">.</span><span class="n">data</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
 </section>
 <section id="asyncfilesystem">
 <h2>AsyncFileSystem<a class="headerlink" href="#asyncfilesystem" title="Link to this heading">¶</a></h2>
@@ -609,6 +676,9 @@ filesystem errors with these variants:</p>
   </li>
   <li class="fd-toc-item" data-depth="2">
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#coalesced-range-reads">Coalesced range reads</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#asyncfilesystem">AsyncFileSystem</a>

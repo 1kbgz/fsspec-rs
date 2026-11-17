@@ -558,12 +558,15 @@ window.runMermaid = runMermaid;</script>
   <h1>Source code for fsspec_rs.s3</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sequence</span>
+
 <span class="kn">import</span><span class="w"> </span><span class="nn">fsspec</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">fsspec.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">conf</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">fsspec.spec</span><span class="w"> </span><span class="kn">import</span> <span class="n">AbstractBufferedFile</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs._conditions</span><span class="w"> </span><span class="kn">import</span> <span class="n">reject_unsupported_conditions</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs.fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">IoCapabilities</span><span class="p">,</span> <span class="n">Match</span><span class="p">,</span> <span class="n">Missing</span><span class="p">,</span> <span class="n">ReadResult</span><span class="p">,</span> <span class="n">RustS3Fs</span><span class="p">,</span> <span class="n">WriteResult</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs._ranges</span><span class="w"> </span><span class="kn">import</span> <span class="n">cat_ranges</span> <span class="k">as</span> <span class="n">_cat_ranges</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs.fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">IoCapabilities</span><span class="p">,</span> <span class="n">Match</span><span class="p">,</span> <span class="n">Missing</span><span class="p">,</span> <span class="n">RangeReadResult</span><span class="p">,</span> <span class="n">ReadResult</span><span class="p">,</span> <span class="n">RustS3Fs</span><span class="p">,</span> <span class="n">WriteResult</span>
 
 
 <div class="viewcode-block" id="S3FileSystem">
@@ -609,6 +612,8 @@ window.runMermaid = runMermaid;</script>
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.S3FileSystem.unstrip_protocol">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">unstrip_protocol</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">"""Reconstruct ``s3-rs://bucket/key`` from ``bucket/key``."""</span>
+        <span class="k">if</span> <span class="n">path</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">"s3-rs://</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">"</span>
         <span class="n">bucket_prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="si">}</span><span class="s2">/"</span>
         <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">bucket_prefix</span><span class="p">):</span>
             <span class="n">key</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">bucket_prefix</span><span class="p">)</span> <span class="p">:]</span>
@@ -759,6 +764,34 @@ window.runMermaid = runMermaid;</script>
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.S3FileSystem.write">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Match</span> <span class="o">|</span> <span class="n">Missing</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">WriteResult</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">condition</span><span class="o">=</span><span class="n">condition</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="S3FileSystem.read_ranges">
+<a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.S3FileSystem.read_ranges">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read_ranges</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">ranges</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]],</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">condition</span><span class="p">:</span> <span class="n">Match</span> <span class="o">|</span> <span class="n">Missing</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">max_gap</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">65536</span><span class="p">,</span>
+        <span class="n">max_request_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8388608</span><span class="p">,</span>
+        <span class="n">max_concurrency</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RangeReadResult</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">read_ranges</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+            <span class="n">ranges</span><span class="p">,</span>
+            <span class="n">condition</span><span class="o">=</span><span class="n">condition</span><span class="p">,</span>
+            <span class="n">max_gap</span><span class="o">=</span><span class="n">max_gap</span><span class="p">,</span>
+            <span class="n">max_request_size</span><span class="o">=</span><span class="n">max_request_size</span><span class="p">,</span>
+            <span class="n">max_concurrency</span><span class="o">=</span><span class="n">max_concurrency</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="S3FileSystem.cat_ranges">
+<a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.S3FileSystem.cat_ranges">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cat_ranges</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span> <span class="n">starts</span><span class="p">,</span> <span class="n">ends</span><span class="p">,</span> <span class="n">max_gap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">on_error</span><span class="o">=</span><span class="s2">"return"</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">_cat_ranges</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span> <span class="n">starts</span><span class="p">,</span> <span class="n">ends</span><span class="p">,</span> <span class="n">max_gap</span><span class="o">=</span><span class="n">max_gap</span><span class="p">,</span> <span class="n">on_error</span><span class="o">=</span><span class="n">on_error</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="S3FileSystem.io_capabilities">
