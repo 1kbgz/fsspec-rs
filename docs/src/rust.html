@@ -149,6 +149,9 @@
   <li class="fd-toc-item" data-depth="1">
     <a href="#filesystem">FileSystem</a>
   </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
+  </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#asyncfilesystem">AsyncFileSystem</a>
   </li>
@@ -288,6 +291,104 @@ needs bucket-aware or authority-aware paths.</p>
 <li><p>Tree operations: <code class="docutils literal notranslate"><span class="pre">walk</span></code>, <code class="docutils literal notranslate"><span class="pre">find</span></code>, <code class="docutils literal notranslate"><span class="pre">copy</span></code>, <code class="docutils literal notranslate"><span class="pre">mv</span></code>, <code class="docutils literal notranslate"><span class="pre">rm</span></code>, <code class="docutils literal notranslate"><span class="pre">du</span></code>, <code class="docutils literal notranslate"><span class="pre">makedirs</span></code></p></li>
 <li><p>Local transfers: <code class="docutils literal notranslate"><span class="pre">get_file</span></code>, <code class="docutils literal notranslate"><span class="pre">put_file</span></code></p></li>
 </ul>
+<section id="object-i-o-and-conditions">
+<h3>Object I/O and conditions<a class="headerlink" href="#object-i-o-and-conditions" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">FileSystem::read(path,</span> <span class="pre">ReadOptions)</span></code> returns <code class="docutils literal notranslate"><span class="pre">ReadResult</span> <span class="pre">{</span> <span class="pre">data,</span> <span class="pre">validator</span> <span class="pre">}</span></code>.
+<code class="docutils literal notranslate"><span class="pre">FileSystem::write(path,</span> <span class="pre">data,</span> <span class="pre">WriteOptions)</span></code> returns <code class="docutils literal notranslate"><span class="pre">WriteResult</span> <span class="pre">{</span> <span class="pre">validator</span> <span class="pre">}</span></code>
+after committing the write. A validator, when available, describes the object
+read or committed by that operation. Obtain it from the result and pass it back
+unchanged; it contains an opaque scope and value, not a general content hash.</p>
+<p>Both options structs accept <code class="docutils literal notranslate"><span class="pre">condition:</span> <span class="pre">Option&lt;Condition&gt;</span></code>:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Condition</p></th>
+<th class="head"><p>Read</p></th>
+<th class="head"><p>Write</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Read current bytes.</p></td>
+<td><p>Replace or create.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Match(validator)</span></code></p></td>
+<td><p>Read only the matching object.</p></td>
+<td><p>Replace only the matching object.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Missing</span></code></p></td>
+<td><p>Invalid argument.</p></td>
+<td><p>Create only if absent.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::{</span><span class="n">Condition</span><span class="p">,</span><span class="w"> </span><span class="n">FileSystem</span><span class="p">,</span><span class="w"> </span><span class="n">OperationError</span><span class="p">,</span><span class="w"> </span><span class="n">ReadOptions</span><span class="p">,</span><span class="w"> </span><span class="n">WriteOptions</span><span class="p">};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">replace</span><span class="p">(</span><span class="n">fs</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="nc">dyn</span><span class="w"> </span><span class="n">FileSystem</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="kt">str</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="p">[</span><span class="kt">u8</span><span class="p">])</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">OperationError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fs</span><span class="p">.</span><span class="n">read</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">ReadOptions</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">validator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">current</span><span class="p">.</span><span class="n">validator</span><span class="p">.</span><span class="n">ok_or_else</span><span class="p">(</span><span class="o">||</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">fsspec_rs</span><span class="p">::</span><span class="n">FsError</span><span class="p">::</span><span class="n">NotSupported</span><span class="p">(</span><span class="s">"backend returned no validator"</span><span class="p">.</span><span class="n">into</span><span class="p">())</span>
+<span class="w">    </span><span class="p">})</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">fs</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">WriteOptions</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">condition</span><span class="p">:</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">Condition</span><span class="p">::</span><span class="n">Match</span><span class="p">(</span><span class="n">validator</span><span class="p">)),</span>
+<span class="w">    </span><span class="p">})</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">ReadOptions.start</span></code> and <code class="docutils literal notranslate"><span class="pre">.end</span></code> follow <code class="docutils literal notranslate"><span class="pre">cat_file</span></code> slicing semantics: negative
+offsets count from the end, bounds are clamped, and reversed ranges are empty.
+Empty reads still check the condition. S3 pins a ranged read to the validator
+returned by its metadata request, even without a caller-supplied condition.
+A concurrent replacement between metadata and data requests returns a conflict.</p>
+<p><code class="docutils literal notranslate"><span class="pre">OperationError::Conflict</span></code> means a condition failed, including a Match against a
+deleted object. <code class="docutils literal notranslate"><span class="pre">OperationError::FileSystem</span></code> wraps existing filesystem errors;
+unconditional reads of missing objects return <code class="docutils literal notranslate"><span class="pre">FsError::NotFound</span></code>. Unsupported
+conditions return <code class="docutils literal notranslate"><span class="pre">FsError::NotSupported</span></code> before I/O. <code class="docutils literal notranslate"><span class="pre">FsError</span></code> itself is unchanged.</p>
+<p><code class="docutils literal notranslate"><span class="pre">io_capabilities()</span></code> reports <code class="docutils literal notranslate"><span class="pre">read_match</span></code>, <code class="docutils literal notranslate"><span class="pre">write_match</span></code>, and <code class="docutils literal notranslate"><span class="pre">write_missing</span></code>:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Backend</p></th>
+<th class="head"><p>Match read</p></th>
+<th class="head"><p>Match write</p></th>
+<th class="head"><p>Missing write</p></th>
+<th class="head"><p>Result validator</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>S3</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+<td><p>ETag scoped to endpoint, addressing mode, bucket and object path</p></td>
+</tr>
+<tr class="row-odd"><td><p>Local, memory</p></td>
+<td><p>No</p></td>
+<td><p>No</p></td>
+<td><p>Yes</p></td>
+<td><p>None</p></td>
+</tr>
+<tr class="row-even"><td><p>Default implementation, Python bridge, old C backends</p></td>
+<td><p>No</p></td>
+<td><p>No</p></td>
+<td><p>No</p></td>
+<td><p>None</p></td>
+</tr>
+</tbody>
+</table>
+<p>S3 enforces conditions in the backend request. Validators from another endpoint, addressing mode,
+bucket or path are invalid arguments, as are empty ETags, wildcards and ETag lists.
+ETags are equality tokens: writing identical content can retain an ETag, so Match
+does not promise detection of every intervening write.</p>
+<p>Local and memory Missing writes use exclusive creation. Local creation reserves
+the name atomically, but readers can observe bytes while the file is being written;
+a failed write can leave a partial file. These are the existing exclusive-file
+semantics, not transactional publication.</p>
+<p>The Rust bindings, C ABI and Python wrappers expose the same operations. Older C
+backends reject conditions and retain unconditional I/O through their existing
+callbacks. Conditions currently apply to whole-object writes and whole-object or
+ranged byte reads. Open handles, append, copy, delete and async APIs do not accept
+conditions. Table row predicates remain a separate concern in <code class="docutils literal notranslate"><span class="pre">fsspec-data</span></code>.</p>
+</section>
 </section>
 <section id="asyncfilesystem">
 <h2>AsyncFileSystem<a class="headerlink" href="#asyncfilesystem" title="Link to this heading">¶</a></h2>
@@ -446,7 +547,8 @@ retrieves the half-open byte range <code class="docutils literal notranslate"><s
 </section>
 <section id="error-handling">
 <h2>Error handling<a class="headerlink" href="#error-handling" title="Link to this heading">¶</a></h2>
-<p>All trait methods return <code class="docutils literal notranslate"><span class="pre">FsResult&lt;T&gt;</span> <span class="pre">=</span> <span class="pre">Result&lt;T,</span> <span class="pre">FsError&gt;</span></code>. <code class="docutils literal notranslate"><span class="pre">FsError</span></code> represents
+<p>Except for typed object I/O, fallible filesystem methods return
+<code class="docutils literal notranslate"><span class="pre">FsResult&lt;T&gt;</span> <span class="pre">=</span> <span class="pre">Result&lt;T,</span> <span class="pre">FsError&gt;</span></code>. <code class="docutils literal notranslate"><span class="pre">FsError</span></code> represents
 filesystem errors with these variants:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">NotFound</span></code></p></li>
@@ -504,6 +606,9 @@ filesystem errors with these variants:</p>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#filesystem">FileSystem</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#asyncfilesystem">AsyncFileSystem</a>

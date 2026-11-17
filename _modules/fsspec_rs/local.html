@@ -563,7 +563,8 @@ window.runMermaid = runMermaid;</script>
 <span class="kn">import</span><span class="w"> </span><span class="nn">fsspec</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">fsspec.spec</span><span class="w"> </span><span class="kn">import</span> <span class="n">AbstractBufferedFile</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs.fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">RustLocalFs</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs._conditions</span><span class="w"> </span><span class="kn">import</span> <span class="n">reject_unsupported_conditions</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs.fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">IoCapabilities</span><span class="p">,</span> <span class="n">Match</span><span class="p">,</span> <span class="n">Missing</span><span class="p">,</span> <span class="n">ReadResult</span><span class="p">,</span> <span class="n">RustLocalFs</span><span class="p">,</span> <span class="n">WriteResult</span>
 
 <span class="n">_WINDOWS</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">==</span> <span class="s2">"</span><span class="se">\\</span><span class="s2">"</span>
 
@@ -580,6 +581,7 @@ window.runMermaid = runMermaid;</script>
 
 <div class="viewcode-block" id="LocalFileSystem">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem">[docs]</a>
+<span class="nd">@reject_unsupported_conditions</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">LocalFileSystem</span><span class="p">(</span><span class="n">fsspec</span><span class="o">.</span><span class="n">AbstractFileSystem</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Local filesystem backed by the Rust ``LocalFs`` implementation.</span>
 
@@ -638,6 +640,8 @@ window.runMermaid = runMermaid;</script>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">"""Return a Rust-backed file object."""</span>
+        <span class="k">if</span> <span class="s2">"condition"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"conditions are supported by read/write, not open"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">LocalFile</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
@@ -723,15 +727,38 @@ window.runMermaid = runMermaid;</script>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">))</span></div>
 
 
+<div class="viewcode-block" id="LocalFileSystem.read">
+<a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.read">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Match</span> <span class="o">|</span> <span class="n">Missing</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ReadResult</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">start</span><span class="o">=</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="n">end</span><span class="p">,</span> <span class="n">condition</span><span class="o">=</span><span class="n">condition</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LocalFileSystem.write">
+<a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.write">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Match</span> <span class="o">|</span> <span class="n">Missing</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">WriteResult</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">data</span><span class="p">,</span> <span class="n">condition</span><span class="o">=</span><span class="n">condition</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LocalFileSystem.io_capabilities">
+<a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.io_capabilities">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">io_capabilities</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IoCapabilities</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">io_capabilities</span><span class="p">()</span></div>
+
+
 <div class="viewcode-block" id="LocalFileSystem.cat_file">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.cat_file">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">cat_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cat_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Match</span> <span class="o">|</span> <span class="n">Missing</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">condition</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="n">end</span><span class="p">,</span> <span class="n">condition</span><span class="o">=</span><span class="n">condition</span><span class="p">)</span><span class="o">.</span><span class="n">data</span>
         <span class="k">return</span> <span class="nb">bytes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">cat_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">start</span><span class="o">=</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="n">end</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="LocalFileSystem.pipe_file">
 <a class="viewcode-back" href="../../docs/src/api.html#fsspec_rs.LocalFileSystem.pipe_file">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">pipe_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">pipe_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Match</span> <span class="o">|</span> <span class="n">Missing</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">condition</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">condition</span><span class="o">=</span><span class="n">condition</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rust</span><span class="o">.</span><span class="n">pipe_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strip_protocol</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">value</span><span class="p">)</span></div>
 
 
@@ -808,6 +835,8 @@ window.runMermaid = runMermaid;</script>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fs</span><span class="p">:</span> <span class="n">LocalFileSystem</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"rb"</span><span class="p">,</span> <span class="n">cache_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">block_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="c1"># Open the Rust file handle right away</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_rust_file</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># set early so __del__/closed don't blow up</span>
+        <span class="k">if</span> <span class="s2">"condition"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"conditions are supported by read/write, not open"</span><span class="p">)</span>
         <span class="n">open_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">if</span> <span class="n">cache_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">open_kwargs</span><span class="p">[</span><span class="s2">"cache_type"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cache_type</span>
