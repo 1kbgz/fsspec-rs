@@ -24,6 +24,41 @@ pub enum FsError {
     Other(String),
 }
 
+/// Failure from an operation conditional on an expected object version.
+///
+/// Kept separate from [`FsError`] so existing backend error matches remain valid.
+#[derive(Debug)]
+pub enum ConditionalIoError {
+    /// The expected version no longer matches the object.
+    Conflict(String),
+    /// A filesystem failure, including unsupported conditional operations.
+    FileSystem(FsError),
+}
+
+impl fmt::Display for ConditionalIoError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Conflict(message) => write!(f, "version conflict: {message}"),
+            Self::FileSystem(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for ConditionalIoError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Conflict(_) => None,
+            Self::FileSystem(error) => Some(error),
+        }
+    }
+}
+
+impl From<FsError> for ConditionalIoError {
+    fn from(error: FsError) -> Self {
+        Self::FileSystem(error)
+    }
+}
+
 /// Result type alias for filesystem operations
 pub type FsResult<T> = Result<T, FsError>;
 

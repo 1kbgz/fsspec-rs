@@ -88,6 +88,30 @@ The default methods built on those primitives include:
 - Tree operations: `walk`, `find`, `copy`, `mv`, `rm`, `du`, `makedirs`
 - Local transfers: `get_file`, `put_file`
 
+### Conditional object I/O
+
+`FileSystem::cat_file_if_match(path, expected_etag, start, end)` reads bytes only
+when the object matches the expected ETag. Range offsets follow `cat_file`:
+negative offsets count from the end, bounds are clamped, and reversed ranges
+are empty. Empty ranges still validate the ETag.
+
+`FileSystem::pipe_file_if_match(path, data, expected_etag)` atomically replaces
+an existing object only when its ETag matches. A missing target is not created.
+Both methods take the exact `FileInfo.extra["etag"]` value, including quotes
+when present. Empty ETags, wildcards and ETag lists are rejected.
+
+Native Rust `S3Fs` implements these methods with conditional S3 requests. Range
+reads validate the ETag on both the metadata request and the data request.
+`ConditionalIoError::Conflict` identifies a failed condition;
+`ConditionalIoError::FileSystem` preserves other filesystem errors. A read of a
+missing object returns `FileSystem(FsError::NotFound(...))`; conditional
+replacement of a missing object returns `Conflict`.
+
+Other backends return `FileSystem(FsError::NotSupported(...))` by default.
+These methods are not exposed through Python or the C ABI. Rust
+`ForeignFileSystem` and Python bridge adapters also return `NotSupported`,
+including when the underlying backend is S3. `open` remains unconditional.
+
 ## AsyncFileSystem
 
 `AsyncFileSystem` is the experimental async version of `FileSystem`. Its
@@ -232,7 +256,8 @@ retrieves the half-open byte range `[start, end)` from the backend.
 
 ## Error handling
 
-All trait methods return `FsResult<T> = Result<T, FsError>`. `FsError` represents
+Except for conditional object I/O, fallible filesystem methods return
+`FsResult<T> = Result<T, FsError>`. `FsError` represents
 filesystem errors with these variants:
 
 - `NotFound`

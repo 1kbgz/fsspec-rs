@@ -377,3 +377,24 @@ fn overridden_methods_reach_the_backend_through_the_abi() {
         );
     }
 }
+
+#[test]
+fn foreign_filesystem_rejects_conditional_io() {
+    let dir = tempfile::tempdir().unwrap();
+    let (foreign, _) = url_to_fs(&local_url(dir.path()), &FsOptions::new()).unwrap();
+    let path = join(dir.path(), "conditional.txt");
+    foreign.pipe_file(&path, b"original").unwrap();
+    assert!(matches!(
+        foreign.cat_file_if_match(&path, "etag", None, None),
+        Err(fsspec_rs::ConditionalIoError::FileSystem(
+            FsError::NotSupported(_)
+        ))
+    ));
+    assert!(matches!(
+        foreign.pipe_file_if_match(&path, b"changed", "etag"),
+        Err(fsspec_rs::ConditionalIoError::FileSystem(
+            FsError::NotSupported(_)
+        ))
+    ));
+    assert_eq!(foreign.cat_file(&path, None, None).unwrap(), b"original");
+}

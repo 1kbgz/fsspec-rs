@@ -850,3 +850,26 @@ fn put_file_returns_commit_errors() {
         .unwrap_err();
     assert!(error.to_string().contains("upload rejected"));
 }
+
+#[test]
+fn conditional_defaults_reject_operations_without_modifying_files() {
+    let fs = MockFs::new();
+    fs.pipe_file("/existing", b"original").unwrap();
+    let fs: &dyn FileSystem = &fs;
+    for path in ["/existing", "/missing"] {
+        assert!(matches!(
+            fs.cat_file_if_match(path, "etag", None, None),
+            Err(crate::ConditionalIoError::FileSystem(
+                FsError::NotSupported(_)
+            ))
+        ));
+        assert!(matches!(
+            fs.pipe_file_if_match(path, b"replacement", "etag"),
+            Err(crate::ConditionalIoError::FileSystem(
+                FsError::NotSupported(_)
+            ))
+        ));
+    }
+    assert_eq!(fs.cat_file("/existing", None, None).unwrap(), b"original");
+    assert!(!fs.exists("/missing").unwrap());
+}

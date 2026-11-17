@@ -16,14 +16,30 @@ use tokio::runtime::Runtime;
 
 use crate::buffered::BufferedFile;
 use crate::caching::{CacheType, Fetcher};
-use crate::error::{FsError, FsResult};
+use crate::error::{ConditionalIoError, FsError, FsResult};
 use crate::file::FsFile;
-use crate::fs::FileSystem;
+use crate::fs::{byte_range, FileSystem};
 use crate::types::{FileInfo, FileType, OpenMode, OpenOptions};
 
 // ---------------------------------------------------------------------------
 // Error conversion
 // ---------------------------------------------------------------------------
+
+fn conditional_error(err: object_store::Error) -> ConditionalIoError {
+    match err {
+        object_store::Error::Precondition { .. } => ConditionalIoError::Conflict(err.to_string()),
+        other => obj_err_to_fs(other).into(),
+    }
+}
+
+fn validate_expected_etag(etag: &str) -> FsResult<()> {
+    if etag.trim().is_empty() || etag.trim() == "*" || etag.contains(',') {
+        return Err(FsError::InvalidArgument(
+            "expected_etag must be one nonempty ETag, not a wildcard or list".into(),
+        ));
+    }
+    Ok(())
+}
 
 fn obj_err_to_fs(err: object_store::Error) -> FsError {
     match &err {
@@ -248,6 +264,68 @@ where
 }
 
 impl FileSystem for S3Fs {
+    fn cat_file_if_match(
+        &self,
+        path: &str,
+        expected_etag: &str,
+        start: Option<i64>,
+        end: Option<i64>,
+    ) -> Result<Vec<u8>, ConditionalIoError> {
+        use object_store::{GetOptions, GetRange};
+
+        validate_expected_etag(expected_etag)?;
+        let path = to_object_path(&self.strip_protocol(path));
+        self.rt.block_on(async {
+            let mut options = GetOptions {
+                if_match: Some(expected_etag.to_string()),
+                ..Default::default()
+            };
+            if start.is_some() || end.is_some() {
+                let head = self
+                    .store
+                    .get_opts(
+                        &path,
+                        GetOptions {
+                            head: true,
+                            ..options.clone()
+                        },
+                    )
+                    .await
+                    .map_err(conditional_error)?;
+                let (start, end) = byte_range(head.meta.size, start, end);
+                if start == end {
+                    return Ok(Vec::new());
+                }
+                options.range = Some(GetRange::Bounded(start..end));
+            }
+            let result = self
+                .store
+                .get_opts(&path, options)
+                .await
+                .map_err(conditional_error)?;
+            Ok(result.bytes().await.map_err(conditional_error)?.to_vec())
+        })
+    }
+
+    fn pipe_file_if_match(
+        &self,
+        path: &str,
+        data: &[u8],
+        expected_etag: &str,
+    ) -> Result<(), ConditionalIoError> {
+        validate_expected_etag(expected_etag)?;
+        let path = to_object_path(&self.strip_protocol(path));
+        let payload = PutPayload::from(Bytes::from(data.to_vec()));
+        let mode = PutMode::Update(object_store::UpdateVersion {
+            e_tag: Some(expected_etag.to_string()),
+            version: None,
+        });
+        self.rt
+            .block_on(self.store.put_opts(&path, payload, mode.into()))
+            .map_err(conditional_error)?;
+        Ok(())
+    }
+
     fn protocol(&self) -> &[&str] {
         &["s3"]
     }
@@ -1137,6 +1215,135 @@ mod tests {
 
     fn memory_fs() -> S3Fs {
         S3Fs::from_object_store("bucket", Arc::new(InMemory::new())).unwrap()
+    }
+
+    #[test]
+    fn conditional_reads_preserve_range_semantics_and_reject_stale_etags() {
+        let fs = memory_fs();
+        seed_object(&fs, "data.txt", b"abcdef");
+        let etag = fs.info("data.txt").unwrap().extra["etag"].clone();
+        let cases: &[(Option<i64>, Option<i64>, &[u8])] = &[
+            (None, None, b"abcdef"),
+            (Some(1), Some(4), b"bcd"),
+            (Some(-3), None, b"def"),
+            (None, Some(-2), b"abcd"),
+            (Some(-100), Some(100), b"abcdef"),
+            (Some(2), Some(2), b""),
+            (Some(5), Some(2), b""),
+            (Some(100), None, b""),
+        ];
+        for &(start, end, expected) in cases {
+            assert_eq!(
+                fs.cat_file_if_match("s3://bucket/data.txt", &etag, start, end)
+                    .unwrap(),
+                expected
+            );
+        }
+        seed_object(&fs, "data.txt", b"replacement");
+        for &(start, end, _) in cases {
+            assert!(matches!(
+                fs.cat_file_if_match("data.txt", &etag, start, end),
+                Err(ConditionalIoError::Conflict(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn conditional_reads_handle_empty_and_missing_objects() {
+        let fs = memory_fs();
+        seed_object(&fs, "empty", b"");
+        let etag = fs.info("empty").unwrap().extra["etag"].clone();
+        for (start, end) in [(None, None), (Some(0), Some(0))] {
+            assert_eq!(
+                fs.cat_file_if_match("empty", &etag, start, end).unwrap(),
+                b""
+            );
+            assert!(matches!(
+                fs.cat_file_if_match("empty", "stale", start, end),
+                Err(ConditionalIoError::Conflict(_))
+            ));
+            assert!(matches!(
+                fs.cat_file_if_match("missing", &etag, start, end),
+                Err(ConditionalIoError::FileSystem(FsError::NotFound(_)))
+            ));
+        }
+    }
+
+    #[test]
+    fn conditional_replacement_rejects_stale_and_deleted_objects() {
+        let fs = memory_fs();
+        seed_object(&fs, "manifest.json", b"old");
+        let etag = fs.info("manifest.json").unwrap().extra["etag"].clone();
+        fs.pipe_file_if_match("s3://bucket/manifest.json", b"new", &etag)
+            .unwrap();
+        assert!(matches!(
+            fs.pipe_file_if_match("manifest.json", b"stale", &etag),
+            Err(ConditionalIoError::Conflict(_))
+        ));
+        assert_eq!(fs.cat_file("manifest.json", None, None).unwrap(), b"new");
+        fs.rm_file("manifest.json").unwrap();
+        assert!(matches!(
+            fs.pipe_file_if_match("manifest.json", b"recreated", &etag),
+            Err(ConditionalIoError::Conflict(_))
+        ));
+        assert!(!fs.exists("manifest.json").unwrap());
+    }
+
+    #[test]
+    fn conditional_replacement_allows_one_concurrent_writer() {
+        let fs = memory_fs();
+        seed_object(&fs, "manifest.json", b"old");
+        let etag = fs.info("manifest.json").unwrap().extra["etag"].clone();
+        let barrier = std::sync::Barrier::new(2);
+        let results = std::thread::scope(|scope| {
+            let handles: Vec<_> = [b"first".as_slice(), b"second".as_slice()]
+                .into_iter()
+                .map(|data| {
+                    let fs = &fs;
+                    let etag = &etag;
+                    let barrier = &barrier;
+                    scope.spawn(move || {
+                        barrier.wait();
+                        (data, fs.pipe_file_if_match("manifest.json", data, etag))
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().unwrap())
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(
+            results.iter().filter(|(_, result)| result.is_ok()).count(),
+            1
+        );
+        assert_eq!(
+            results
+                .iter()
+                .filter(|(_, result)| matches!(result, Err(ConditionalIoError::Conflict(_))))
+                .count(),
+            1
+        );
+        let winner = results.iter().find(|(_, result)| result.is_ok()).unwrap().0;
+        assert_eq!(fs.cat_file("manifest.json", None, None).unwrap(), winner);
+    }
+
+    #[test]
+    fn conditional_operations_reject_empty_wildcard_and_multiple_etags() {
+        let fs = memory_fs();
+        seed_object(&fs, "data.txt", b"original");
+        let etag = fs.info("data.txt").unwrap().extra["etag"].clone();
+        for invalid in ["", " ", "*", " * ", &format!("{etag},other")] {
+            assert!(matches!(
+                fs.cat_file_if_match("data.txt", invalid, None, None),
+                Err(ConditionalIoError::FileSystem(FsError::InvalidArgument(_)))
+            ));
+            assert!(matches!(
+                fs.pipe_file_if_match("data.txt", b"changed", invalid),
+                Err(ConditionalIoError::FileSystem(FsError::InvalidArgument(_)))
+            ));
+        }
+        assert_eq!(fs.cat_file("data.txt", None, None).unwrap(), b"original");
     }
 
     fn seed_object(fs: &S3Fs, key: &str, data: &[u8]) {

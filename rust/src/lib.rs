@@ -37,7 +37,7 @@ mod tests;
 pub use async_fs::AsyncFileSystem;
 pub use buffered::BufferedFile;
 pub use caching::CacheType;
-pub use error::{FsError, FsResult};
+pub use error::{ConditionalIoError, FsError, FsResult};
 pub use file::FsFile;
 pub use fs::{
     cat_file_default, pipe_file_default, strip_protocol_default, unstrip_protocol_default,

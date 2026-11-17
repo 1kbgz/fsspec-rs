@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::error::{FsError, FsResult};
+use crate::error::{ConditionalIoError, FsError, FsResult};
 use crate::file::FsFile;
 use crate::types::{DuResult, FileInfo, FileType, OpenMode, OpenOptions, WalkEntry};
 
@@ -219,6 +219,40 @@ pub trait FileSystem {
     /// Write bytes directly to a file. Default: [`pipe_file_default`].
     fn pipe_file(&self, path: &str, data: &[u8]) -> FsResult<()> {
         pipe_file_default(self, path, data)
+    }
+
+    /// Read bytes only if the object matches `expected_etag`.
+    ///
+    /// `start` and `end` have the same semantics as [`Self::cat_file`]. Pass the
+    /// exact `FileInfo.extra["etag"]` value, including quotes if present. An empty
+    /// range still validates the condition. S3 supports this operation; other
+    /// backends, including C ABI and Python adapters, return `NotSupported` by
+    /// default. A backend must never silently ignore the condition.
+    fn cat_file_if_match(
+        &self,
+        path: &str,
+        expected_etag: &str,
+        start: Option<i64>,
+        end: Option<i64>,
+    ) -> Result<Vec<u8>, ConditionalIoError> {
+        let _ = (expected_etag, start, end);
+        Err(FsError::NotSupported(format!("conditional read: {path}")).into())
+    }
+
+    /// Atomically replace an existing object only if it matches `expected_etag`.
+    ///
+    /// Pass the exact `FileInfo.extra["etag"]` value. A failed condition returns
+    /// [`ConditionalIoError::Conflict`] without writing. S3 supports this operation;
+    /// other backends return `NotSupported` by default. This operation does not
+    /// create a missing object or emulate compare-and-swap with a check then write.
+    fn pipe_file_if_match(
+        &self,
+        path: &str,
+        data: &[u8],
+        expected_etag: &str,
+    ) -> Result<(), ConditionalIoError> {
+        let _ = (data, expected_etag);
+        Err(FsError::NotSupported(format!("conditional write: {path}")).into())
     }
 
     /// Read the first `size` bytes of a file.
