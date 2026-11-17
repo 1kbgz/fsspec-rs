@@ -64,9 +64,13 @@ def s3_endpoint():
 
     class Endpoint(str):
         requests: list[tuple[str, str, str | None, str | None]]
+        objects: dict[str, tuple[bytes, str | None]]
+        handler: type[Handler]
 
     endpoint = Endpoint(f"http://127.0.0.1:{server.server_port}")
     endpoint.requests = requests
+    endpoint.objects = objects
+    endpoint.handler = Handler
     try:
         yield endpoint
     finally:

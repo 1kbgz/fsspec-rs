@@ -94,6 +94,13 @@ group's output positions; `"raise"` propagates the error. Invalid argument shape
 options and condition types raise before I/O. Unknown keyword arguments are rejected.
 Use `read_ranges` to retain the validator with the bytes.
 
+Compatibility with the inherited fsspec implementation:
+
+- `cat_ranges` is an existing fsspec API; `read_ranges` is the typed single-object batch API added by fsspec-rs.
+- Errors apply to a normalized path group. If a later request fails, previously fetched bytes for that path are discarded. With `on_error="return"`, other path groups still run. The inherited implementation handled each range independently.
+- All offsets are validated before any path is read. Invalid offsets raise even with `on_error="return"`.
+- S3 batches issue a metadata request and require an ETag when fetching bytes, even without `condition`. A missing ETag produces `NotImplementedError`; an object changed between requests can produce `ConflictError`. These errors follow `on_error`. Individual unconditional `cat_file` reads do not require an ETag or check consistency across calls.
+
 See the [Rust reference](rust.md) for shared endpoint concurrency limits, empty
 range behavior and memory bounds.
 
