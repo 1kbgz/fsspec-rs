@@ -1081,3 +1081,112 @@ fn conditional_create_discards_files_after_write_or_commit_failure() {
         assert_eq!(state.attempts, usize::from(!fail_on_write));
     }
 }
+
+#[test]
+fn default_range_reads_preserve_order_and_fail_closed() {
+    use crate::{ByteRange, Condition, OperationError, RangeReadOptions, Validator};
+
+    let fs = MockFs::new().with_files(&[("/data", b"0123456789abcdef")]);
+    let ranges = [
+        ByteRange {
+            start: Some(8),
+            end: Some(12),
+        },
+        ByteRange {
+            start: Some(0),
+            end: Some(4),
+        },
+        ByteRange {
+            start: Some(2),
+            end: Some(6),
+        },
+        ByteRange {
+            start: Some(-4),
+            end: None,
+        },
+        ByteRange {
+            start: Some(5),
+            end: Some(1),
+        },
+        ByteRange {
+            start: Some(0),
+            end: Some(4),
+        },
+    ];
+    let result = fs
+        .read_ranges(
+            "/data",
+            &ranges,
+            RangeReadOptions {
+                max_gap: 2,
+                max_request_size: 5,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(result.validator, None);
+    for (range, data) in ranges.iter().zip(result.data) {
+        assert_eq!(data, fs.cat_file("/data", range.start, range.end).unwrap());
+    }
+    assert_eq!(
+        fs.read_ranges("/missing", &[], RangeReadOptions::default())
+            .unwrap()
+            .data,
+        Vec::<Vec<u8>>::new()
+    );
+    for options in [
+        RangeReadOptions {
+            max_request_size: 0,
+            ..Default::default()
+        },
+        RangeReadOptions {
+            max_concurrency: 0,
+            ..Default::default()
+        },
+        RangeReadOptions {
+            condition: Some(Condition::Missing),
+            ..Default::default()
+        },
+    ] {
+        assert!(matches!(
+            fs.read_ranges("/missing", &[], options),
+            Err(OperationError::FileSystem(FsError::InvalidArgument(_)))
+        ));
+    }
+    let options = RangeReadOptions {
+        condition: Some(Condition::Match(Validator {
+            scope: "object".into(),
+            value: "v".into(),
+        })),
+        ..Default::default()
+    };
+    assert!(matches!(
+        fs.read_ranges("/missing", &[], options),
+        Err(OperationError::FileSystem(FsError::NotSupported(_)))
+    ));
+}
+
+#[test]
+fn default_range_reads_reject_directories_even_for_empty_ranges() {
+    use crate::{ByteRange, OperationError, RangeReadOptions};
+
+    let dir = tempfile::tempdir().unwrap();
+    let local = crate::LocalFs::new();
+    let memory = crate::MemoryFs::new();
+    let path = dir.path().to_str().unwrap();
+    memory.mkdir(path, true).unwrap();
+    for fs in [&local as &dyn FileSystem, &memory] {
+        for range in [
+            ByteRange::default(),
+            ByteRange {
+                start: Some(0),
+                end: Some(0),
+            },
+        ] {
+            assert!(matches!(
+                fs.read_ranges(path, &[range], RangeReadOptions::default()),
+                Err(OperationError::FileSystem(FsError::IsADirectory(_)))
+            ));
+        }
+    }
+}

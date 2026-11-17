@@ -13,7 +13,7 @@ def _reject_condition(method: Callable[_P, _R]) -> Callable[_P, _R]:
     @wraps(method)
     def guarded(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         if "condition" in kwargs:
-            raise NotImplementedError("conditions are supported only by read, write, cat_file and pipe_file")
+            raise NotImplementedError("conditions are supported only by read, read_ranges, write, cat_file, cat_ranges and pipe_file")
         return method(*args, **kwargs)
 
     return guarded
@@ -24,7 +24,6 @@ def reject_unsupported_conditions(cls: _T) -> _T:
     # from their underlying operations, so rejection must happen at the entry point.
     for name in (
         "cat",
-        "cat_ranges",
         "copy",
         "cp",
         "cp_file",

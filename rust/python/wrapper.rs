@@ -370,6 +370,27 @@ macro_rules! filesystem_methods {
                 Ok(crate::io::PyWriteResult { validator: result.validator.map(Into::into) })
             }
 
+            #[pyo3(signature = (path, ranges, *, condition = None, max_gap = 65536, max_request_size = 8388608, max_concurrency = 8))]
+            #[allow(clippy::too_many_arguments)]
+            fn read_ranges(
+                &self,
+                py: Python<'_>,
+                path: &str,
+                ranges: Vec<(Option<i64>, Option<i64>)>,
+                condition: Option<&Bound<'_, PyAny>>,
+                max_gap: u64,
+                max_request_size: u64,
+                max_concurrency: usize,
+            ) -> PyResult<crate::io::PyRangeReadResult> {
+                let ranges: Vec<_> = ranges.into_iter().map(|(start, end)| fsspec_rs::ByteRange { start, end }).collect();
+                let options = fsspec_rs::RangeReadOptions {
+                    condition: crate::io::condition(condition)?, max_gap, max_request_size, max_concurrency,
+                };
+                let result = py.detach(|| self.inner.read_ranges(path, &ranges, options))
+                    .map_err(crate::io::operation_error_to_pyerr)?;
+                crate::io::PyRangeReadResult::from_rust(py, result)
+            }
+
             fn io_capabilities(&self) -> crate::io::PyIoCapabilities {
                 let capabilities = self.inner.io_capabilities();
                 crate::io::PyIoCapabilities {

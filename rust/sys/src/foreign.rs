@@ -287,6 +287,30 @@ impl FileSystem for ForeignFileSystem {
         Ok(out)
     }
 
+    fn read_ranges(
+        &self,
+        path: &str,
+        ranges: &[fsspec_rs::ByteRange],
+        options: fsspec_rs::RangeReadOptions,
+    ) -> Result<fsspec_rs::RangeReadResult, fsspec_rs::OperationError> {
+        let mut out = std::mem::MaybeUninit::<crate::types::fsspec_range_read_result>::uninit();
+        let status = crate::operations::with_range_read_options(&options, |options| {
+            crate::operations::with_ranges(ranges, |ranges, ranges_len| unsafe {
+                ffi::fsspec_fs_read_ranges(
+                    self.handle,
+                    path.as_ptr().cast(),
+                    path.len(),
+                    ranges,
+                    ranges_len,
+                    options,
+                    out.as_mut_ptr(),
+                )
+            })
+        });
+        crate::util::check_operation(status, "read_ranges")?;
+        Ok(unsafe { out.assume_init().into_result()? })
+    }
+
     fn read(
         &self,
         path: &str,

@@ -243,3 +243,70 @@ impl From<fsspec_io_capabilities> for IoCapabilities {
         }
     }
 }
+
+/// Copies borrowed C bounds into owned Rust values for the duration of an operation.
+pub unsafe fn ranges_arg(
+    ranges: *const fsspec_byte_range,
+    len: usize,
+) -> FsResult<Vec<fsspec_rs::ByteRange>> {
+    if len == 0 {
+        return Ok(Vec::new());
+    }
+    if ranges.is_null() || len > isize::MAX as usize / size_of::<fsspec_byte_range>() {
+        return Err(invalid("invalid ranges pointer or length"));
+    }
+    Ok(std::slice::from_raw_parts(ranges, len)
+        .iter()
+        .map(|range| fsspec_rs::ByteRange {
+            start: range.start.as_ref().copied(),
+            end: range.end.as_ref().copied(),
+        })
+        .collect())
+}
+
+pub unsafe fn range_read_options(
+    options: *const fsspec_range_read_options,
+) -> FsResult<fsspec_rs::RangeReadOptions> {
+    if options.is_null() {
+        return Ok(fsspec_rs::RangeReadOptions::default());
+    }
+    if ptr::read(options.cast::<usize>()) < size_of::<fsspec_range_read_options>() {
+        return Err(invalid("range read options struct_size is too small"));
+    }
+    let options = &*options;
+    Ok(fsspec_rs::RangeReadOptions {
+        condition: condition_arg(options.condition)?,
+        max_gap: options.max_gap,
+        max_request_size: options.max_request_size,
+        max_concurrency: options.max_concurrency,
+    })
+}
+
+pub fn with_range_read_options<T>(
+    options: &fsspec_rs::RangeReadOptions,
+    call: impl FnOnce(*const fsspec_range_read_options) -> T,
+) -> T {
+    with_condition(&options.condition, |condition| {
+        call(&fsspec_range_read_options {
+            struct_size: size_of::<fsspec_range_read_options>(),
+            condition,
+            max_gap: options.max_gap,
+            max_request_size: options.max_request_size,
+            max_concurrency: options.max_concurrency,
+        })
+    })
+}
+
+pub fn with_ranges<T>(
+    ranges: &[fsspec_rs::ByteRange],
+    call: impl FnOnce(*const fsspec_byte_range, usize) -> T,
+) -> T {
+    let borrowed: Vec<_> = ranges
+        .iter()
+        .map(|range| fsspec_byte_range {
+            start: range.start.as_ref().map_or(ptr::null(), |value| value),
+            end: range.end.as_ref().map_or(ptr::null(), |value| value),
+        })
+        .collect();
+    call(borrowed.as_ptr(), borrowed.len())
+}

@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use crate::error::{FsError, FsResult, OperationError};
 use crate::file::FsFile;
 use crate::types::{
-    Condition, DuResult, FileInfo, FileType, IoCapabilities, OpenMode, OpenOptions, ReadOptions,
-    ReadResult, WalkEntry, WriteOptions, WriteResult,
+    ByteRange, Condition, DuResult, FileInfo, FileType, IoCapabilities, OpenMode, OpenOptions,
+    RangeReadOptions, RangeReadResult, ReadOptions, ReadResult, WalkEntry, WriteOptions,
+    WriteResult,
 };
 
 /// Core filesystem trait. Backends implement the primitive methods
@@ -14,11 +15,16 @@ use crate::types::{
 /// The `[start, end)` byte range of a `size`-byte file for `cat_file` arguments. Negative
 /// offsets count from the end, and both ends are clamped to the file.
 pub(crate) fn byte_range(size: u64, start: Option<i64>, end: Option<i64>) -> (u64, u64) {
-    let size = size as i64;
-    let bound = |offset: i64| (if offset < 0 { size + offset } else { offset }).clamp(0, size);
+    let bound = |offset: i64| {
+        if offset < 0 {
+            size.saturating_sub(offset.unsigned_abs())
+        } else {
+            (offset as u64).min(size)
+        }
+    };
     let start = start.map_or(0, bound);
     let end = end.map_or(size, bound).max(start);
-    (start as u64, end as u64)
+    (start, end)
 }
 
 /// Removes the first matching `"protocol://"` prefix; an empty result becomes
@@ -113,6 +119,48 @@ pub fn read_default<F: FileSystem + ?Sized>(
     }
     Ok(ReadResult {
         data: fs.cat_file(path, options.start, options.end)?,
+        validator: None,
+    })
+}
+
+/// Sequential coalesced range reads for backends without a snapshot-aware override.
+///
+/// Conditions are rejected before I/O. The size is read once, followed by bounded
+/// `cat_file` requests. The result has no validator or snapshot guarantee.
+pub fn read_ranges_default<F: FileSystem + ?Sized>(
+    fs: &F,
+    path: &str,
+    ranges: &[ByteRange],
+    options: RangeReadOptions,
+) -> Result<RangeReadResult, OperationError> {
+    crate::ranges::validate_options(&options)?;
+    if options.condition.is_some() {
+        return Err(FsError::NotSupported(format!("conditional range read: {path}")).into());
+    }
+    if ranges.is_empty() {
+        return Ok(RangeReadResult {
+            data: Vec::new(),
+            validator: None,
+        });
+    }
+    let info = fs.info(path)?;
+    if info.is_dir() {
+        return Err(FsError::IsADirectory(path.to_string()).into());
+    }
+    let plan = crate::ranges::RangePlan::new(info.size, ranges, &options);
+    let mut data = plan.output()?;
+    for request in &plan.requests {
+        let start = i64::try_from(request.start).map_err(|_| {
+            FsError::InvalidArgument("range start exceeds signed offset limit".into())
+        })?;
+        let end = i64::try_from(request.end).map_err(|_| {
+            FsError::InvalidArgument("range end exceeds signed offset limit".into())
+        })?;
+        let bytes = fs.cat_file(path, Some(start), Some(end))?;
+        plan.copy_response(request, &bytes, &mut data)?;
+    }
+    Ok(RangeReadResult {
+        data,
         validator: None,
     })
 }
@@ -317,6 +365,20 @@ pub trait FileSystem {
         options: WriteOptions,
     ) -> Result<WriteResult, OperationError> {
         write_default(self, path, data, options)
+    }
+
+    /// Read several ranges from one object in input order.
+    ///
+    /// Nearby ranges may share requests; each request is bounded by the options.
+    /// The default is sequential and provides no snapshot guarantee. S3 pins all
+    /// requests to one validator and applies both per-call and per-endpoint limits.
+    fn read_ranges(
+        &self,
+        path: &str,
+        ranges: &[ByteRange],
+        options: RangeReadOptions,
+    ) -> Result<RangeReadResult, OperationError> {
+        read_ranges_default(self, path, ranges, options)
     }
 
     /// Conditions enforced by [`Self::read`] and [`Self::write`].

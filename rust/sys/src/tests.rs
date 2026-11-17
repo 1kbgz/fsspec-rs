@@ -438,3 +438,63 @@ fn conditional_io_crosses_both_abi_directions() {
     assert_eq!(result.validator, None);
     assert_eq!(foreign.cat_file(&path, None, None).unwrap(), b"original");
 }
+
+#[test]
+fn range_reads_cross_both_abi_directions() {
+    use fsspec_rs::{ByteRange, Condition, OperationError, RangeReadOptions, Validator};
+    let dir = tempfile::tempdir().unwrap();
+    let path = join(dir.path(), "ranges.txt");
+    let local = Arc::new(LocalFs::new());
+    local.pipe_file(&path, b"0123456789").unwrap();
+    let handle = export_filesystem(local).unwrap();
+    let foreign = unsafe { ForeignFileSystem::from_raw(handle) }.unwrap();
+    let ranges = [
+        ByteRange {
+            start: Some(-3),
+            end: None,
+        },
+        ByteRange {
+            start: Some(1),
+            end: Some(5),
+        },
+        ByteRange {
+            start: Some(4),
+            end: Some(2),
+        },
+        ByteRange {
+            start: Some(1),
+            end: Some(5),
+        },
+    ];
+    let result = foreign
+        .read_ranges(
+            &path,
+            &ranges,
+            RangeReadOptions {
+                max_gap: 0,
+                max_request_size: 2,
+                max_concurrency: 1,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        result.data,
+        [b"789".to_vec(), b"1234".to_vec(), vec![], b"1234".to_vec()]
+    );
+    assert_eq!(result.validator, None);
+    assert!(matches!(
+        foreign.read_ranges(
+            &path,
+            &ranges,
+            RangeReadOptions {
+                condition: Some(Condition::Match(Validator {
+                    scope: "scope".into(),
+                    value: "version".into()
+                })),
+                ..Default::default()
+            }
+        ),
+        Err(OperationError::FileSystem(FsError::NotSupported(_)))
+    ));
+}

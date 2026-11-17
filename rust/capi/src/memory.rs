@@ -43,3 +43,11 @@ pub unsafe extern "C" fn fsspec_read_result_free(result: fsspec_sys::types::fssp
 pub unsafe extern "C" fn fsspec_write_result_free(result: fsspec_sys::types::fsspec_write_result) {
     result.free();
 }
+
+/// Frees all buffers and the validator in a successful range-read result.
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_range_read_result_free(
+    result: fsspec_sys::types::fsspec_range_read_result,
+) {
+    result.free();
+}

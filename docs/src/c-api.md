@@ -186,6 +186,35 @@ symbols require a library that exports them, even though the ABI version remains
 Backend support and consistency guarantees match the
 [Rust object I/O contract](rust.md).
 
+## Range reads
+
+`fsspec_fs_read_ranges(fs, path, path_len, ranges, ranges_len, options, out)` returns
+`fsspec_operation_status`. Its input is a borrowed array of `fsspec_byte_range`:
+`start` and `end` point to signed offsets, or are null for unbounded endpoints.
+The array may be null only when its length is zero. Input pointers remain valid
+for the duration of the call.
+
+`fsspec_range_read_options` starts with `struct_size`, initialized to its `sizeof`,
+followed by `condition`, `max_gap`, `max_request_size` and `max_concurrency`.
+Null options use defaults of 65,536 bytes, 8,388,608 bytes and eight requests.
+Request size and concurrency must be positive. Conditions use the same representation
+as single-object reads.
+
+Successful output is `fsspec_range_read_result`: an owned `data` array of
+`fsspec_bytes`, its `len`, and a shared `validator`. Call
+`fsspec_range_read_result_free` once to free the array, its buffers and validator.
+On failure output storage is unchanged. Null output pointers, invalid input arrays
+and short option structs are rejected before backend calls.
+
+The filesystem vtable appends an optional `read_ranges` callback. Older shorter
+vtables retain coalesced sequential reads through their legacy callbacks and reject
+conditions. Native S3 retains concurrent pinned reads through both ABI directions.
+Existing status values, structs and callbacks retain their layouts. Clients using
+the new symbols require an updated library.
+
+Range ordering, consistency and request limits follow the
+[Rust range-read contract](rust.md).
+
 ## Files
 
 `fsspec_file *` is an open file, closed with `fsspec_file_close`.

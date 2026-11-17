@@ -154,6 +154,57 @@ callbacks. Conditions currently apply to whole-object writes and whole-object or
 ranged byte reads. Open handles, append, copy, delete and async APIs do not accept
 conditions. Table row predicates remain a separate concern in `fsspec-data`.
 
+### Coalesced range reads
+
+`FileSystem::read_ranges(path, &[ByteRange], RangeReadOptions)` returns a
+`RangeReadResult` containing `data: Vec<Vec<u8>>` in input order and an optional
+shared validator. Each `ByteRange { start, end }` uses the same signed, optional
+bounds as `read`: ends are exclusive, negative offsets count from the end,
+bounds are clamped, and reversed ranges are empty. Duplicates and overlapping
+ranges each receive their own output buffer.
+
+`RangeReadOptions` accepts:
+
+| Field              | Default         | Meaning                                                                                |
+| ------------------ | --------------- | -------------------------------------------------------------------------------------- |
+| `condition`        | `None`          | Optional `Match(validator)`; `Missing` is invalid.                                     |
+| `max_gap`          | 65,536 bytes    | Largest gap eligible for coalescing. Zero still merges adjacent or overlapping ranges. |
+| `max_request_size` | 8,388,608 bytes | Maximum data span per request; larger input ranges are split. Must be positive.        |
+| `max_concurrency`  | 8               | Maximum concurrent requests within this call. Must be positive.                        |
+
+S3 reads metadata once, then pins data requests to its validator, including
+requests made without a caller-supplied Match. It rejects changed validators,
+response bounds or response lengths instead of returning partial results. All
+range-read calls and S3 instances using the same canonical endpoint share an
+additional cap of eight active requests, including metadata requests. Data-request
+permits remain held until their response bodies finish. The first request failure
+drops the operation's remaining futures.
+
+The default implementation coalesces requests and reads them sequentially through
+`cat_file`. Local, memory and older C backends use this fallback, return no validator,
+and reject Match. Such results have no snapshot guarantee during concurrent writes.
+Existing single-read capability flags do not promise conditional range-read support.
+
+An empty range list performs no I/O when unconditional. A conditional empty list
+still validates its condition on S3. Empty or out-of-bounds individual ranges still
+require metadata and preserve the corresponding empty output buffers.
+
+Request size and concurrency bound in-flight fetching, not the total result size:
+all requested output buffers remain in memory. This API does not add async trait
+methods or integrate Parquet decoding.
+
+```rust
+use fsspec_rs::{ByteRange, FileSystem, OperationError, RangeReadOptions};
+
+fn chunks(fs: &dyn FileSystem, path: &str) -> Result<Vec<Vec<u8>>, OperationError> {
+    let result = fs.read_ranges(path, &[
+        ByteRange { start: Some(0), end: Some(16) },
+        ByteRange { start: Some(32), end: Some(48) },
+    ], RangeReadOptions::default())?;
+    Ok(result.data)
+}
+```
+
 ## AsyncFileSystem
 
 `AsyncFileSystem` is the experimental async version of `FileSystem`. Its

@@ -103,6 +103,43 @@ pub struct ReadOptions {
     pub condition: Option<Condition>,
 }
 
+/// A half-open byte range. Negative offsets count from the end of the object.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ByteRange {
+    pub start: Option<i64>,
+    pub end: Option<i64>,
+}
+
+/// Bounds and condition for coalesced reads of several ranges from one object.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RangeReadOptions {
+    pub condition: Option<Condition>,
+    /// Maximum gap fetched when joining nearby ranges.
+    pub max_gap: u64,
+    /// Maximum bytes in one request; must be positive.
+    pub max_request_size: u64,
+    /// Maximum requests in flight for this call; must be positive.
+    pub max_concurrency: usize,
+}
+
+impl Default for RangeReadOptions {
+    fn default() -> Self {
+        Self {
+            condition: None,
+            max_gap: 65_536,
+            max_request_size: 8_388_608,
+            max_concurrency: 8,
+        }
+    }
+}
+
+/// Requested byte ranges in input order, with a shared object validator if available.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RangeReadResult {
+    pub data: Vec<Vec<u8>>,
+    pub validator: Option<Validator>,
+}
+
 /// Options for a byte write.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct WriteOptions {

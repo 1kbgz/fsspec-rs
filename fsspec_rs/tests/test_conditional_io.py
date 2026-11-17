@@ -146,64 +146,6 @@ def test_s3_capabilities_and_condition_validation_without_requests(fs_class):
         fs.open("key", "wb", condition=Missing())
 
 
-@pytest.fixture
-def s3_endpoint():
-    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-    from threading import Thread
-
-    objects = {}
-    generations = {}
-
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self, format, *args):
-            pass
-
-        def respond(self, status, body=b"", etag=None):
-            self.send_response(status)
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Last-Modified", "Tue, 17 Nov 2026 12:00:00 GMT")
-            if etag is not None:
-                self.send_header("ETag", etag)
-            self.end_headers()
-            if self.command != "HEAD":
-                self.wfile.write(body)
-
-        def do_PUT(self):
-            body = self.rfile.read(int(self.headers["Content-Length"]))
-            current = objects.get(self.path)
-            if self.headers.get("If-None-Match") == "*" and current is not None:
-                return self.respond(412)
-            expected = self.headers.get("If-Match")
-            if expected is not None and (current is None or current[1] != expected):
-                return self.respond(412)
-            generations[self.path] = generations.get(self.path, 0) + 1
-            etag = f'"version-{generations[self.path]}"'
-            objects[self.path] = (body, etag)
-            return self.respond(200, etag=etag)
-
-        def do_GET(self):
-            current = objects.get(self.path)
-            if current is None:
-                return self.respond(404)
-            body, etag = current
-            expected = self.headers.get("If-Match")
-            if expected is not None and expected != etag:
-                return self.respond(412)
-            return self.respond(200, body, etag)
-
-        do_HEAD = do_GET
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_port}"
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join()
-
-
 @pytest.mark.parametrize("fs_class", [S3FileSystem, RustS3Fs])
 def test_s3_validator_roundtrip_and_conflicts(s3_endpoint, fs_class):
     fs = fs_class(bucket="test", region="us-east-1", anon=True, endpoint_url=s3_endpoint)
@@ -261,7 +203,6 @@ def test_s3_validator_roundtrip_and_conflicts(s3_endpoint, fs_class):
         ("find", ("source",)),
         ("du", ("source",)),
         ("cat", ("source",)),
-        ("cat_ranges", (["source"], [0], [1])),
         ("pipe", ({"source": b"replacement"},)),
         ("read_bytes", ("source",)),
         ("write_bytes", ("source", b"replacement")),

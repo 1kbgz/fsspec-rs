@@ -18,6 +18,7 @@ mod async_fs;
 mod fs;
 mod local;
 mod memory;
+mod ranges;
 #[cfg(feature = "s3")]
 mod s3;
 
@@ -30,6 +31,8 @@ mod memory_tests;
 #[cfg(test)]
 mod registry_tests;
 #[cfg(all(test, feature = "s3"))]
+mod s3_range_tests;
+#[cfg(all(test, feature = "s3"))]
 mod s3_tests;
 #[cfg(test)]
 mod tests;
@@ -40,7 +43,7 @@ pub use caching::CacheType;
 pub use error::{FsError, FsResult, OperationError};
 pub use file::FsFile;
 pub use fs::{
-    cat_file_default, pipe_file_default, read_default, strip_protocol_default,
+    cat_file_default, pipe_file_default, read_default, read_ranges_default, strip_protocol_default,
     unstrip_protocol_default, write_default, FileSystem,
 };
 pub use local::{LocalFile, LocalFs};
@@ -53,6 +56,7 @@ pub use registry::{
 #[cfg(feature = "s3")]
 pub use s3::{S3Config, S3File, S3Fs};
 pub use types::{
-    Condition, DuResult, FileInfo, FileType, IoCapabilities, OpenMode, OpenOptions, ReadOptions,
-    ReadResult, Validator, WalkEntry, WriteOptions, WriteResult,
+    ByteRange, Condition, DuResult, FileInfo, FileType, IoCapabilities, OpenMode, OpenOptions,
+    RangeReadOptions, RangeReadResult, ReadOptions, ReadResult, Validator, WalkEntry, WriteOptions,
+    WriteResult,
 };

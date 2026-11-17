@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 
 import fsspec
 from fsspec.spec import AbstractBufferedFile
 
 from fsspec_rs._conditions import reject_unsupported_conditions
-from fsspec_rs.fsspec_rs import IoCapabilities, Match, Missing, ReadResult, RustLocalFs, WriteResult
+from fsspec_rs._ranges import cat_ranges as _cat_ranges
+from fsspec_rs.fsspec_rs import IoCapabilities, Match, Missing, RangeReadResult, ReadResult, RustLocalFs, WriteResult
 
 _WINDOWS = os.sep == "\\"
 
@@ -127,6 +129,28 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
 
     def write(self, path: str, data: bytes, condition: Match | Missing | None = None) -> WriteResult:
         return self._rust.write(self._strip_protocol(path), data, condition=condition)
+
+    def read_ranges(
+        self,
+        path: str,
+        ranges: Sequence[tuple[int | None, int | None]],
+        *,
+        condition: Match | Missing | None = None,
+        max_gap: int = 65536,
+        max_request_size: int = 8388608,
+        max_concurrency: int = 8,
+    ) -> RangeReadResult:
+        return self._rust.read_ranges(
+            self._strip_protocol(path),
+            ranges,
+            condition=condition,
+            max_gap=max_gap,
+            max_request_size=max_request_size,
+            max_concurrency=max_concurrency,
+        )
+
+    def cat_ranges(self, paths, starts, ends, max_gap=None, on_error="return", **kwargs):
+        return _cat_ranges(self, paths, starts, ends, max_gap=max_gap, on_error=on_error, **kwargs)
 
     def io_capabilities(self) -> IoCapabilities:
         return self._rust.io_capabilities()

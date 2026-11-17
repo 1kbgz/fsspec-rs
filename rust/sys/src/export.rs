@@ -185,6 +185,7 @@ pub fn export_filesystem(fs: SharedFileSystem) -> FsResult<*mut fsspec_fs> {
         read: Some(fs_read),
         write: Some(fs_write),
         io_capabilities: Some(fs_io_capabilities),
+        read_ranges: Some(fs_read_ranges),
     };
     let data = Box::into_raw(Box::new(FsData { fs })) as *mut c_void;
     let handle = unsafe { ffi::fsspec_fs_from_vtable(&vtable, data) };
@@ -439,4 +440,28 @@ unsafe extern "C" fn fs_io_capabilities(
     out: *mut fsspec_io_capabilities,
 ) -> fsspec_status {
     guard(|| write_out(out, fs_data(data).io_capabilities().into()))
+}
+
+use crate::operations::{range_read_options, ranges_arg};
+
+/// Reads ordered ranges with bounded coalescing. On failure out is unchanged.
+unsafe extern "C" fn fs_read_ranges(
+    data: *mut c_void,
+    path: *const c_char,
+    path_len: usize,
+    ranges: *const fsspec_byte_range,
+    ranges_len: usize,
+    options: *const fsspec_range_read_options,
+    out: *mut fsspec_range_read_result,
+) -> fsspec_operation_status {
+    guard_operation(|| {
+        if out.is_null() {
+            return Err(invalid("range read result pointer is null").into());
+        }
+        let options = range_read_options(options)?;
+        let ranges = ranges_arg(ranges, ranges_len)?;
+        let result = fs_data(data).read_ranges(str_arg(path, path_len)?, &ranges, options)?;
+        out.write(fsspec_range_read_result::from_result(result));
+        Ok(())
+    })
 }
