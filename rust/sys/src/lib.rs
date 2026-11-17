@@ -17,6 +17,7 @@
 mod export;
 pub mod ffi;
 mod foreign;
+pub mod operations;
 pub mod types;
 mod util;
 

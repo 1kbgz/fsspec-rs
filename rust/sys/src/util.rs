@@ -152,3 +152,26 @@ pub(crate) fn empty_info_list() -> fsspec_file_info_list {
         len: 0,
     }
 }
+
+pub(crate) fn guard_operation(body: impl FnOnce() -> Result<(), fsspec_rs::OperationError>) -> i32 {
+    match catch_unwind(AssertUnwindSafe(body)) {
+        Ok(Ok(())) => 0,
+        Ok(Err(error)) => {
+            set_last_error(&error.to_string());
+            crate::operations::operation_status(&error)
+        }
+        Err(_) => {
+            set_last_error("panic across the object operation boundary");
+            FSSPEC_OTHER as i32
+        }
+    }
+}
+
+pub(crate) fn check_operation(status: i32, context: &str) -> Result<(), fsspec_rs::OperationError> {
+    if status == 0 {
+        return Ok(());
+    }
+    let message =
+        take_last_error().unwrap_or_else(|| format!("{context} failed with status {status}"));
+    Err(crate::operations::operation_error(status, message))
+}

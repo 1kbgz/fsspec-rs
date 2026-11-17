@@ -182,6 +182,9 @@ pub fn export_filesystem(fs: SharedFileSystem) -> FsResult<*mut fsspec_fs> {
         unstrip_protocol: Some(fs_unstrip_protocol),
         cat_file: Some(fs_cat_file),
         pipe_file: Some(fs_pipe_file),
+        read: Some(fs_read),
+        write: Some(fs_write),
+        io_capabilities: Some(fs_io_capabilities),
     };
     let data = Box::into_raw(Box::new(FsData { fs })) as *mut c_void;
     let handle = unsafe { ffi::fsspec_fs_from_vtable(&vtable, data) };
@@ -380,4 +383,60 @@ pub(crate) fn register_factory(protocol: &str, factory: BoxedFactory) -> FsResul
         unsafe { factory_release(data) };
     }
     check(status, "fsspec_register_filesystem")
+}
+
+use crate::operations::{read_options, write_options};
+use crate::util::guard_operation;
+
+unsafe extern "C" fn fs_read(
+    data: *mut c_void,
+    path: *const c_char,
+    path_len: usize,
+    options: *const fsspec_read_options,
+    out: *mut fsspec_read_result,
+) -> fsspec_operation_status {
+    guard_operation(|| {
+        if out.is_null() {
+            return Err(invalid("read result pointer is null").into());
+        }
+        let options = read_options(options)?;
+        let result = fs_data(data).read(str_arg(path, path_len)?, options)?;
+        out.write(fsspec_read_result::from_result(result));
+        Ok(())
+    })
+}
+
+unsafe extern "C" fn fs_write(
+    data: *mut c_void,
+    path: *const c_char,
+    path_len: usize,
+    bytes: *const u8,
+    bytes_len: usize,
+    options: *const fsspec_write_options,
+    out: *mut fsspec_write_result,
+) -> fsspec_operation_status {
+    guard_operation(|| {
+        if out.is_null() {
+            return Err(invalid("write result pointer is null").into());
+        }
+        if bytes.is_null() && bytes_len != 0 {
+            return Err(invalid("bytes pointer is null").into());
+        }
+        let options = write_options(options)?;
+        let bytes = if bytes_len == 0 {
+            &[]
+        } else {
+            std::slice::from_raw_parts(bytes, bytes_len)
+        };
+        let result = fs_data(data).write(str_arg(path, path_len)?, bytes, options)?;
+        out.write(fsspec_write_result::from_result(result));
+        Ok(())
+    })
+}
+
+unsafe extern "C" fn fs_io_capabilities(
+    data: *mut c_void,
+    out: *mut fsspec_io_capabilities,
+) -> fsspec_status {
+    guard(|| write_out(out, fs_data(data).io_capabilities().into()))
 }

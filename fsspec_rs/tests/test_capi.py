@@ -1,6 +1,22 @@
 """Smoke test of libfsspec through ctypes, the way a non-Python consumer sees it."""
 
-from ctypes import CDLL, POINTER, Structure, byref, c_bool, c_char_p, c_int32, c_int64, c_size_t, c_uint32, c_uint64, c_void_p, sizeof, string_at
+from ctypes import (
+    CDLL,
+    POINTER,
+    Structure,
+    byref,
+    c_bool,
+    c_char_p,
+    c_int32,
+    c_int64,
+    c_size_t,
+    c_uint32,
+    c_uint64,
+    c_void_p,
+    pointer,
+    sizeof,
+    string_at,
+)
 from pathlib import Path
 from shutil import which
 from subprocess import run
@@ -171,6 +187,9 @@ PROGRAM = """
 #include <stdio.h>
 #include <string.h>
 #include <fsspec/fsspec.h>
+#if FSSPEC_CONFLICT != 10 || FSSPEC_CONDITION_MATCH != 1 || FSSPEC_CONDITION_MISSING != 2
+#error missing object operation constants
+#endif
 
 int main(int argc, char **argv) {
     if (argc != 2 || fsspec_abi_version() != FSSPEC_ABI_VERSION) return 2;
@@ -260,3 +279,51 @@ def test_native_memory_is_the_memory_rs_store(lib):
     memory = MemoryFileSystem()
     assert memory.cat_file(path) == b"from c"
     memory.rm_file(path)
+
+
+class Validator(Structure):
+    _fields_ = [("scope", String), ("value", String)]
+
+
+class Condition(Structure):
+    _fields_ = [("kind", c_uint32), ("validator", POINTER(Validator))]
+
+
+class WriteOptions(Structure):
+    _fields_ = [("struct_size", c_size_t), ("condition", POINTER(Condition))]
+
+
+class ReadOptions(Structure):
+    _fields_ = [("struct_size", c_size_t), ("start", POINTER(c_int64)), ("end", POINTER(c_int64)), ("condition", POINTER(Condition))]
+
+
+class ReadResult(Structure):
+    _fields_ = [("data", Bytes), ("validator", Validator)]
+
+
+class WriteResult(Structure):
+    _fields_ = [("validator", Validator)]
+
+
+def test_conditional_object_io_through_c_api(lib, tmp_path):
+    lib.fsspec_fs_read.argtypes = [c_void_p, c_char_p, c_size_t, POINTER(ReadOptions), POINTER(ReadResult)]
+    lib.fsspec_fs_write.argtypes = [c_void_p, c_char_p, c_size_t, c_char_p, c_size_t, POINTER(WriteOptions), POINTER(WriteResult)]
+    lib.fsspec_read_result_free.argtypes = [ReadResult]
+    lib.fsspec_write_result_free.argtypes = [WriteResult]
+    fs, _ = _url_to_fs(lib, f"file://{tmp_path}")
+    try:
+        path = str(tmp_path / "exclusive").encode()
+        missing = Condition(2, None)
+        options = WriteOptions(sizeof(WriteOptions), pointer(missing))
+        written = WriteResult()
+        assert lib.fsspec_fs_write(fs, path, len(path), b"first", 5, byref(options), byref(written)) == 0
+        assert not written.validator.scope.data
+        lib.fsspec_write_result_free(written)
+        assert lib.fsspec_fs_write(fs, path, len(path), b"second", 6, byref(options), byref(written)) == 10
+        read = ReadResult()
+        assert lib.fsspec_fs_read(fs, path, len(path), None, byref(read)) == 0
+        assert string_at(read.data.data, read.data.len) == b"first"
+        assert not read.validator.value.data
+        lib.fsspec_read_result_free(read)
+    finally:
+        lib.fsspec_fs_release(fs)

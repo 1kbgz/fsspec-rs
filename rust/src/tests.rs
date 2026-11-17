@@ -756,17 +756,31 @@ fn test_file_seek() {
 // ---- Commit failures ----
 
 /// A file whose commit always fails, like an upload rejected by the server.
-struct FailingCommitFile(Cursor<Vec<u8>>);
+#[derive(Default)]
+struct CommitState {
+    attempts: usize,
+    discarded: bool,
+    published: bool,
+}
+
+struct FailingCommitFile {
+    buffer: Cursor<Vec<u8>>,
+    state: Option<Arc<Mutex<CommitState>>>,
+    fail_on_write: bool,
+}
 
 impl Read for FailingCommitFile {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.0.read(buf)
+        self.buffer.read(buf)
     }
 }
 
 impl Write for FailingCommitFile {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.write(buf)
+        if self.fail_on_write {
+            return Err(std::io::Error::other("write rejected"));
+        }
+        self.buffer.write(buf)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
@@ -776,7 +790,7 @@ impl Write for FailingCommitFile {
 
 impl Seek for FailingCommitFile {
     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        self.0.seek(pos)
+        self.buffer.seek(pos)
     }
 }
 
@@ -790,11 +804,42 @@ impl FsFile for FailingCommitFile {
     }
 
     fn commit(&mut self) -> FsResult<()> {
+        if let Some(state) = &self.state {
+            let mut state = state.lock().unwrap();
+            if state.discarded {
+                return Ok(());
+            }
+            state.attempts += 1;
+            if state.attempts > 1 {
+                state.published = true;
+                return Ok(());
+            }
+            return Err(FsError::AlreadyExists("competing write".into()));
+        }
         Err(FsError::Other("upload rejected".into()))
+    }
+
+    fn discard(&mut self) -> FsResult<()> {
+        if let Some(state) = &self.state {
+            state.lock().unwrap().discarded = true;
+        }
+        Ok(())
     }
 }
 
-struct FailingCommitFs;
+impl Drop for FailingCommitFile {
+    fn drop(&mut self) {
+        if self.state.is_some() {
+            let _ = self.commit();
+        }
+    }
+}
+
+#[derive(Default)]
+struct FailingCommitFs {
+    state: Option<Arc<Mutex<CommitState>>>,
+    fail_on_write: bool,
+}
 
 impl FileSystem for FailingCommitFs {
     fn protocol(&self) -> &[&str] {
@@ -819,7 +864,11 @@ impl FileSystem for FailingCommitFs {
         _mode: OpenMode,
         _opts: Option<OpenOptions>,
     ) -> FsResult<Box<dyn FsFile>> {
-        Ok(Box::new(FailingCommitFile(Cursor::new(Vec::new()))))
+        Ok(Box::new(FailingCommitFile {
+            buffer: Cursor::new(Vec::new()),
+            state: self.state.clone(),
+            fail_on_write: self.fail_on_write,
+        }))
     }
 
     fn info(&self, path: &str) -> FsResult<FileInfo> {
@@ -837,7 +886,9 @@ impl FileSystem for FailingCommitFs {
 
 #[test]
 fn pipe_file_returns_commit_errors() {
-    let error = FailingCommitFs.pipe_file("key", b"value").unwrap_err();
+    let error = FailingCommitFs::default()
+        .pipe_file("key", b"value")
+        .unwrap_err();
     assert!(error.to_string().contains("upload rejected"));
 }
 
@@ -845,31 +896,188 @@ fn pipe_file_returns_commit_errors() {
 fn put_file_returns_commit_errors() {
     let source = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(source.path(), b"value").unwrap();
-    let error = FailingCommitFs
+    let error = FailingCommitFs::default()
         .put_file(source.path().to_str().unwrap(), "key")
         .unwrap_err();
     assert!(error.to_string().contains("upload rejected"));
 }
 
 #[test]
-fn conditional_defaults_reject_operations_without_modifying_files() {
+fn byte_operation_defaults_reject_conditions_without_modifying_files() {
+    use crate::{Condition, OperationError, ReadOptions, Validator, WriteOptions};
+
     let fs = MockFs::new();
-    fs.pipe_file("/existing", b"original").unwrap();
     let fs: &dyn FileSystem = &fs;
+    assert_eq!(fs.io_capabilities(), crate::IoCapabilities::default());
+    assert_eq!(
+        fs.write("/existing", b"original", WriteOptions::default())
+            .unwrap()
+            .validator,
+        None
+    );
+    let read = fs.read("/existing", ReadOptions::default()).unwrap();
+    assert_eq!(read.data, b"original");
+    assert_eq!(read.validator, None);
+    let condition = Condition::Match(Validator {
+        scope: "object".into(),
+        value: "etag".into(),
+    });
     for path in ["/existing", "/missing"] {
         assert!(matches!(
-            fs.cat_file_if_match(path, "etag", None, None),
-            Err(crate::ConditionalIoError::FileSystem(
-                FsError::NotSupported(_)
-            ))
+            fs.read(
+                path,
+                ReadOptions {
+                    condition: Some(condition.clone()),
+                    ..Default::default()
+                }
+            ),
+            Err(OperationError::FileSystem(FsError::NotSupported(_)))
         ));
         assert!(matches!(
-            fs.pipe_file_if_match(path, b"replacement", "etag"),
-            Err(crate::ConditionalIoError::FileSystem(
-                FsError::NotSupported(_)
-            ))
+            fs.read(
+                path,
+                ReadOptions {
+                    condition: Some(Condition::Missing),
+                    ..Default::default()
+                }
+            ),
+            Err(OperationError::FileSystem(FsError::InvalidArgument(_)))
         ));
+        for condition in [condition.clone(), Condition::Missing] {
+            assert!(matches!(
+                fs.write(
+                    path,
+                    b"replacement",
+                    WriteOptions {
+                        condition: Some(condition)
+                    }
+                ),
+                Err(OperationError::FileSystem(FsError::NotSupported(_)))
+            ));
+        }
     }
     assert_eq!(fs.cat_file("/existing", None, None).unwrap(), b"original");
     assert!(!fs.exists("/missing").unwrap());
+}
+
+#[test]
+fn local_and_memory_byte_writes_support_exclusive_create_only() {
+    use crate::{Condition, IoCapabilities, OperationError, Validator, WriteOptions};
+
+    let dir = tempfile::tempdir().unwrap();
+    let local = crate::LocalFs::new();
+    let memory = crate::MemoryFs::new();
+    let path = dir.path().join("created").to_string_lossy().to_string();
+    for fs in [&local as &dyn FileSystem, &memory] {
+        assert_eq!(
+            fs.io_capabilities(),
+            IoCapabilities {
+                write_missing: true,
+                ..Default::default()
+            }
+        );
+        let options = WriteOptions {
+            condition: Some(Condition::Missing),
+        };
+        let result = fs.write(&path, b"first", options.clone()).unwrap();
+        assert_eq!(result.validator, None);
+        assert!(matches!(
+            fs.write(&path, b"second", options),
+            Err(OperationError::Conflict(_))
+        ));
+        let options = WriteOptions {
+            condition: Some(Condition::Match(Validator {
+                scope: path.clone(),
+                value: "value".into(),
+            })),
+        };
+        assert!(matches!(
+            fs.write(&path, b"second", options),
+            Err(OperationError::FileSystem(FsError::NotSupported(_)))
+        ));
+        assert_eq!(fs.cat_file(&path, None, None).unwrap(), b"first");
+    }
+}
+
+#[test]
+fn local_and_memory_missing_writes_allow_one_concurrent_writer() {
+    use crate::{Condition, OperationError, WriteOptions};
+
+    let dir = tempfile::tempdir().unwrap();
+    let local = crate::LocalFs::new();
+    let memory = crate::MemoryFs::new();
+    let path = dir.path().join("race").to_string_lossy().to_string();
+    for fs in [&local as &(dyn FileSystem + Sync), &memory] {
+        let barrier = std::sync::Barrier::new(2);
+        let results = std::thread::scope(|scope| {
+            let handles: Vec<_> = [b"first".as_slice(), b"second".as_slice()]
+                .into_iter()
+                .map(|data| {
+                    let path = &path;
+                    let barrier = &barrier;
+                    scope.spawn(move || {
+                        barrier.wait();
+                        (
+                            data,
+                            fs.write(
+                                path,
+                                data,
+                                WriteOptions {
+                                    condition: Some(Condition::Missing),
+                                },
+                            ),
+                        )
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|handle| handle.join().unwrap())
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(
+            results.iter().filter(|(_, result)| result.is_ok()).count(),
+            1
+        );
+        assert_eq!(
+            results
+                .iter()
+                .filter(|(_, result)| matches!(result, Err(OperationError::Conflict(_))))
+                .count(),
+            1
+        );
+        let winner = results.iter().find(|(_, result)| result.is_ok()).unwrap().0;
+        assert_eq!(fs.cat_file(&path, None, None).unwrap(), winner);
+    }
+}
+
+#[test]
+fn conditional_create_discards_files_after_write_or_commit_failure() {
+    for fail_on_write in [false, true] {
+        let state = Arc::new(Mutex::new(CommitState::default()));
+        let fs = FailingCommitFs {
+            state: Some(state.clone()),
+            fail_on_write,
+        };
+        let result = crate::fs::write_with_exclusive_create(
+            &fs,
+            "key",
+            b"value",
+            crate::WriteOptions {
+                condition: Some(crate::Condition::Missing),
+            },
+        );
+        if fail_on_write {
+            assert!(matches!(
+                result,
+                Err(crate::OperationError::FileSystem(FsError::IoError(_)))
+            ));
+        } else {
+            assert!(matches!(result, Err(crate::OperationError::Conflict(_))));
+        }
+        let state = state.lock().unwrap();
+        assert!(state.discarded);
+        assert!(!state.published);
+        assert_eq!(state.attempts, usize::from(!fail_on_write));
+    }
 }

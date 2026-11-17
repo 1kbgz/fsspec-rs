@@ -16,7 +16,22 @@
 #define FSSPEC_ABI_VERSION 1
 
 /**
- * Status returned by every entry point. Non-zero values mirror `FsError`.
+ * Failed condition, returned only by typed object operations.
+ */
+#define FSSPEC_CONFLICT 10
+
+/**
+ * Match the supplied object validator.
+ */
+#define FSSPEC_CONDITION_MATCH 1
+
+/**
+ * Create only when the object is absent.
+ */
+#define FSSPEC_CONDITION_MISSING 2
+
+/**
+ * Status for legacy operations. Non-zero values mirror `FsError`.
  */
 enum fsspec_status
 #if defined(__cplusplus) || __STDC_VERSION__ >= 202311L
@@ -127,6 +142,73 @@ typedef struct fsspec_bytes {
 } fsspec_bytes;
 
 /**
+ * Status for typed object operations. Existing status values retain their meaning.
+ * A raw integer permits new operation errors without extending `fsspec_status`.
+ */
+typedef int32_t fsspec_operation_status;
+
+/**
+ * Opaque object validator. Both strings null means no validator in a result.
+ * Input strings are borrowed; result strings are owned by the result.
+ */
+typedef struct fsspec_validator {
+  struct fsspec_string scope;
+  struct fsspec_string value;
+} fsspec_validator;
+
+/**
+ * A Match condition requires a validator; Missing requires a null validator.
+ * Unknown kinds are invalid. A null condition pointer means unconditional I/O.
+ */
+typedef struct fsspec_condition {
+  uint32_t kind;
+  const struct fsspec_validator *validator;
+} fsspec_condition;
+
+/**
+ * Read options. Initialize struct_size to sizeof(fsspec_read_options).
+ * Null start/end are unbounded; offsets follow cat_file slicing semantics.
+ */
+typedef struct fsspec_read_options {
+  size_t struct_size;
+  const int64_t *start;
+  const int64_t *end;
+  const struct fsspec_condition *condition;
+} fsspec_read_options;
+
+/**
+ * Owned bytes and their validator. Free with fsspec_read_result_free.
+ */
+typedef struct fsspec_read_result {
+  struct fsspec_bytes data;
+  struct fsspec_validator validator;
+} fsspec_read_result;
+
+/**
+ * Write options. Initialize struct_size to sizeof(fsspec_write_options).
+ */
+typedef struct fsspec_write_options {
+  size_t struct_size;
+  const struct fsspec_condition *condition;
+} fsspec_write_options;
+
+/**
+ * Committed object's validator. Free with fsspec_write_result_free.
+ */
+typedef struct fsspec_write_result {
+  struct fsspec_validator validator;
+} fsspec_write_result;
+
+/**
+ * Conditions enforced atomically by the backend.
+ */
+typedef struct fsspec_io_capabilities {
+  bool read_match;
+  bool write_match;
+  bool write_missing;
+} fsspec_io_capabilities;
+
+/**
  * Builds filesystems for one protocol. `struct_size` is
  * `sizeof(fsspec_fs_factory)` and `abi_version` is `FSSPEC_ABI_VERSION` as
  * seen by the caller; new members are appended, so older callers keep
@@ -207,6 +289,26 @@ typedef struct fsspec_fs_vtable {
                              size_t path_len,
                              const uint8_t *bytes,
                              size_t bytes_len);
+  /**
+   * Typed object I/O. Absent callbacks reject conditions and use legacy I/O
+   * only for unconditional requests. Inputs are borrowed for the call.
+   */
+  fsspec_operation_status (*read)(void *data,
+                                  const char *path,
+                                  size_t path_len,
+                                  const struct fsspec_read_options *options,
+                                  struct fsspec_read_result *out);
+  fsspec_operation_status (*write)(void *data,
+                                   const char *path,
+                                   size_t path_len,
+                                   const uint8_t *bytes,
+                                   size_t bytes_len,
+                                   const struct fsspec_write_options *options,
+                                   struct fsspec_write_result *out);
+  /**
+   * Absent means no conditional I/O support.
+   */
+  fsspec_status (*io_capabilities)(void *data, struct fsspec_io_capabilities *out);
 } fsspec_fs_vtable;
 
 /**
@@ -445,6 +547,23 @@ fsspec_status fsspec_fs_open_ex(const struct fsspec_fs *fs,
                                 const struct fsspec_options *options,
                                 struct fsspec_file **out);
 
+fsspec_operation_status fsspec_fs_read(const struct fsspec_fs *fs,
+                                       const char *path,
+                                       size_t path_len,
+                                       const struct fsspec_read_options *options,
+                                       struct fsspec_read_result *out);
+
+fsspec_operation_status fsspec_fs_write(const struct fsspec_fs *fs,
+                                        const char *path,
+                                        size_t path_len,
+                                        const uint8_t *bytes,
+                                        size_t bytes_len,
+                                        const struct fsspec_write_options *options,
+                                        struct fsspec_write_result *out);
+
+fsspec_status fsspec_fs_io_capabilities(const struct fsspec_fs *fs,
+                                        struct fsspec_io_capabilities *out);
+
 /**
  * Frees bytes returned by libfsspec.
  */
@@ -469,6 +588,16 @@ void fsspec_file_info_free(struct fsspec_file_info info);
  * Frees an entry list returned by libfsspec.
  */
 void fsspec_file_info_list_free(struct fsspec_file_info_list list);
+
+/**
+ * Frees all buffers in a successful read result.
+ */
+void fsspec_read_result_free(struct fsspec_read_result result);
+
+/**
+ * Frees all buffers in a successful write result.
+ */
+void fsspec_write_result_free(struct fsspec_write_result result);
 
 /**
  * Creates an empty option set. Free with `fsspec_options_free`.

@@ -78,6 +78,28 @@ extern "C" {
         path_len: usize,
         out: *mut bool,
     ) -> fsspec_status;
+    pub fn fsspec_fs_read(
+        fs: *const fsspec_fs,
+        path: *const c_char,
+        path_len: usize,
+        options: *const fsspec_read_options,
+        out: *mut fsspec_read_result,
+    ) -> fsspec_operation_status;
+    pub fn fsspec_fs_write(
+        fs: *const fsspec_fs,
+        path: *const c_char,
+        path_len: usize,
+        bytes: *const u8,
+        bytes_len: usize,
+        options: *const fsspec_write_options,
+        out: *mut fsspec_write_result,
+    ) -> fsspec_operation_status;
+    pub fn fsspec_fs_io_capabilities(
+        fs: *const fsspec_fs,
+        out: *mut fsspec_io_capabilities,
+    ) -> fsspec_status;
+    pub fn fsspec_read_result_free(result: fsspec_read_result);
+    pub fn fsspec_write_result_free(result: fsspec_write_result);
     pub fn fsspec_fs_cat_file(
         fs: *const fsspec_fs,
         path: *const c_char,

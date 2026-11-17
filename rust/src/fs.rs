@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 
-use crate::error::{ConditionalIoError, FsError, FsResult};
+use crate::error::{FsError, FsResult, OperationError};
 use crate::file::FsFile;
-use crate::types::{DuResult, FileInfo, FileType, OpenMode, OpenOptions, WalkEntry};
+use crate::types::{
+    Condition, DuResult, FileInfo, FileType, IoCapabilities, OpenMode, OpenOptions, ReadOptions,
+    ReadResult, WalkEntry, WriteOptions, WriteResult,
+};
 
 /// Core filesystem trait. Backends implement the primitive methods
 /// and get higher-level operations for free via default implementations.
@@ -88,6 +91,79 @@ pub fn pipe_file_default<F: FileSystem + ?Sized>(fs: &F, path: &str, data: &[u8]
     f.write_all(data)?;
     f.flush()?;
     f.commit()
+}
+
+/// The default [`FileSystem::read`]: unconditional bytes without a validator.
+pub fn read_default<F: FileSystem + ?Sized>(
+    fs: &F,
+    path: &str,
+    options: ReadOptions,
+) -> Result<ReadResult, OperationError> {
+    match options.condition {
+        Some(Condition::Missing) => {
+            return Err(FsError::InvalidArgument(
+                "the Missing condition is only valid for writes".into(),
+            )
+            .into())
+        }
+        Some(Condition::Match(_)) => {
+            return Err(FsError::NotSupported(format!("conditional read: {path}")).into())
+        }
+        None => {}
+    }
+    Ok(ReadResult {
+        data: fs.cat_file(path, options.start, options.end)?,
+        validator: None,
+    })
+}
+
+/// The default [`FileSystem::write`]: unconditional bytes without a validator.
+pub fn write_default<F: FileSystem + ?Sized>(
+    fs: &F,
+    path: &str,
+    data: &[u8],
+    options: WriteOptions,
+) -> Result<WriteResult, OperationError> {
+    if options.condition.is_some() {
+        return Err(FsError::NotSupported(format!("conditional write: {path}")).into());
+    }
+    fs.pipe_file(path, data)?;
+    Ok(WriteResult { validator: None })
+}
+
+/// Byte-write implementation for backends with atomic exclusive creation.
+pub(crate) fn write_with_exclusive_create<F: FileSystem + ?Sized>(
+    fs: &F,
+    path: &str,
+    data: &[u8],
+    options: WriteOptions,
+) -> Result<WriteResult, OperationError> {
+    match options.condition {
+        None => fs.pipe_file(path, data)?,
+        Some(Condition::Match(_)) => {
+            return Err(FsError::NotSupported(format!("conditional replacement: {path}")).into());
+        }
+        Some(Condition::Missing) => {
+            let write = || -> FsResult<()> {
+                use std::io::Write;
+                let mut file = fs.open(path, OpenMode::Exclusive, None)?;
+                let result = file
+                    .write_all(data)
+                    .map_err(FsError::from)
+                    .and_then(|()| file.commit());
+                if result.is_err() {
+                    // A failed condition must not be retried by commit-on-drop files.
+                    let _ = file.discard();
+                }
+                result
+            };
+            write().map_err(|error| match error {
+                FsError::AlreadyExists(message) => OperationError::Conflict(message),
+                other => other.into(),
+            })?;
+        }
+    }
+    Ok(WriteResult { validator: None })
 }
 
 pub trait FileSystem {
@@ -221,38 +297,31 @@ pub trait FileSystem {
         pipe_file_default(self, path, data)
     }
 
-    /// Read bytes only if the object matches `expected_etag`.
+    /// Read bytes with an optional condition, returning a validator when available.
     ///
-    /// `start` and `end` have the same semantics as [`Self::cat_file`]. Pass the
-    /// exact `FileInfo.extra["etag"]` value, including quotes if present. An empty
-    /// range still validates the condition. S3 supports this operation; other
-    /// backends, including C ABI and Python adapters, return `NotSupported` by
-    /// default. A backend must never silently ignore the condition.
-    fn cat_file_if_match(
-        &self,
-        path: &str,
-        expected_etag: &str,
-        start: Option<i64>,
-        end: Option<i64>,
-    ) -> Result<Vec<u8>, ConditionalIoError> {
-        let _ = (expected_etag, start, end);
-        Err(FsError::NotSupported(format!("conditional read: {path}")).into())
+    /// Bounds follow [`Self::cat_file`]. Empty ranges still check conditions.
+    /// The default supports only unconditional reads and returns no validator.
+    /// `Missing` is invalid for reads; other unsupported conditions are rejected.
+    fn read(&self, path: &str, options: ReadOptions) -> Result<ReadResult, OperationError> {
+        read_default(self, path, options)
     }
 
-    /// Atomically replace an existing object only if it matches `expected_etag`.
+    /// Write bytes with an optional atomic condition.
     ///
-    /// Pass the exact `FileInfo.extra["etag"]` value. A failed condition returns
-    /// [`ConditionalIoError::Conflict`] without writing. S3 supports this operation;
-    /// other backends return `NotSupported` by default. This operation does not
-    /// create a missing object or emulate compare-and-swap with a check then write.
-    fn pipe_file_if_match(
+    /// The default supports only unconditional writes and returns no validator.
+    /// Unsupported conditions are rejected before writing anything.
+    fn write(
         &self,
         path: &str,
         data: &[u8],
-        expected_etag: &str,
-    ) -> Result<(), ConditionalIoError> {
-        let _ = (data, expected_etag);
-        Err(FsError::NotSupported(format!("conditional write: {path}")).into())
+        options: WriteOptions,
+    ) -> Result<WriteResult, OperationError> {
+        write_default(self, path, data, options)
+    }
+
+    /// Conditions enforced by [`Self::read`] and [`Self::write`].
+    fn io_capabilities(&self) -> IoCapabilities {
+        IoCapabilities::default()
     }
 
     /// Read the first `size` bytes of a file.

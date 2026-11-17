@@ -20,7 +20,7 @@ use fsspec_rs::{FileInfo, FileType};
 /// different version must not use the library.
 pub const FSSPEC_ABI_VERSION: u32 = 1;
 
-/// Status returned by every entry point. Non-zero values mirror `FsError`.
+/// Status for legacy operations. Non-zero values mirror `FsError`.
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum fsspec_status {
@@ -37,6 +37,68 @@ pub enum fsspec_status {
 }
 
 pub use fsspec_status::*;
+
+/// Status for typed object operations. Existing status values retain their meaning.
+/// A raw integer permits new operation errors without extending `fsspec_status`.
+pub type fsspec_operation_status = i32;
+pub const FSSPEC_CONFLICT: fsspec_operation_status = 10;
+pub const FSSPEC_CONDITION_MATCH: u32 = 1;
+pub const FSSPEC_CONDITION_MISSING: u32 = 2;
+
+/// Opaque object validator. Both strings null means no validator in a result.
+/// Input strings are borrowed; result strings are owned by the result.
+#[repr(C)]
+pub struct fsspec_validator {
+    pub scope: fsspec_string,
+    pub value: fsspec_string,
+}
+
+/// A Match condition requires a validator; Missing requires a null validator.
+/// Unknown kinds are invalid. A null condition pointer means unconditional I/O.
+#[repr(C)]
+pub struct fsspec_condition {
+    pub kind: u32,
+    pub validator: *const fsspec_validator,
+}
+
+/// Read options. Initialize struct_size to sizeof(fsspec_read_options).
+/// Null start/end are unbounded; offsets follow cat_file slicing semantics.
+#[repr(C)]
+pub struct fsspec_read_options {
+    pub struct_size: usize,
+    pub start: *const i64,
+    pub end: *const i64,
+    pub condition: *const fsspec_condition,
+}
+
+/// Write options. Initialize struct_size to sizeof(fsspec_write_options).
+#[repr(C)]
+pub struct fsspec_write_options {
+    pub struct_size: usize,
+    pub condition: *const fsspec_condition,
+}
+
+/// Owned bytes and their validator. Free with fsspec_read_result_free.
+#[repr(C)]
+pub struct fsspec_read_result {
+    pub data: fsspec_bytes,
+    pub validator: fsspec_validator,
+}
+
+/// Committed object's validator. Free with fsspec_write_result_free.
+#[repr(C)]
+pub struct fsspec_write_result {
+    pub validator: fsspec_validator,
+}
+
+/// Conditions enforced atomically by the backend.
+#[repr(C)]
+#[derive(Default)]
+pub struct fsspec_io_capabilities {
+    pub read_match: bool,
+    pub write_match: bool,
+    pub write_missing: bool,
+}
 
 /// The kind of a filesystem entry.
 #[repr(i32)]
@@ -251,6 +313,32 @@ pub struct fsspec_fs_vtable {
             bytes: *const u8,
             bytes_len: usize,
         ) -> fsspec_status,
+    >,
+    /// Typed object I/O. Absent callbacks reject conditions and use legacy I/O
+    /// only for unconditional requests. Inputs are borrowed for the call.
+    pub read: Option<
+        unsafe extern "C" fn(
+            data: *mut c_void,
+            path: *const c_char,
+            path_len: usize,
+            options: *const fsspec_read_options,
+            out: *mut fsspec_read_result,
+        ) -> fsspec_operation_status,
+    >,
+    pub write: Option<
+        unsafe extern "C" fn(
+            data: *mut c_void,
+            path: *const c_char,
+            path_len: usize,
+            bytes: *const u8,
+            bytes_len: usize,
+            options: *const fsspec_write_options,
+            out: *mut fsspec_write_result,
+        ) -> fsspec_operation_status,
+    >,
+    /// Absent means no conditional I/O support.
+    pub io_capabilities: Option<
+        unsafe extern "C" fn(data: *mut c_void, out: *mut fsspec_io_capabilities) -> fsspec_status,
     >,
 }
 

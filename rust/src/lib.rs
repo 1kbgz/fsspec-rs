@@ -37,11 +37,11 @@ mod tests;
 pub use async_fs::AsyncFileSystem;
 pub use buffered::BufferedFile;
 pub use caching::CacheType;
-pub use error::{ConditionalIoError, FsError, FsResult};
+pub use error::{FsError, FsResult, OperationError};
 pub use file::FsFile;
 pub use fs::{
-    cat_file_default, pipe_file_default, strip_protocol_default, unstrip_protocol_default,
-    FileSystem,
+    cat_file_default, pipe_file_default, read_default, strip_protocol_default,
+    unstrip_protocol_default, write_default, FileSystem,
 };
 pub use local::{LocalFile, LocalFs};
 pub use memory::{MemoryFile, MemoryFs};
@@ -52,4 +52,7 @@ pub use registry::{
 };
 #[cfg(feature = "s3")]
 pub use s3::{S3Config, S3File, S3Fs};
-pub use types::{DuResult, FileInfo, FileType, OpenMode, OpenOptions, WalkEntry};
+pub use types::{
+    Condition, DuResult, FileInfo, FileType, IoCapabilities, OpenMode, OpenOptions, ReadOptions,
+    ReadResult, Validator, WalkEntry, WriteOptions, WriteResult,
+};

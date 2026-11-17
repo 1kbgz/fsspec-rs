@@ -421,6 +421,9 @@ fn local_vtable() -> fsspec_fs_vtable {
         unstrip_protocol: None,
         cat_file: None,
         pipe_file: None,
+        read: None,
+        write: None,
+        io_capabilities: None,
     }
 }
 
@@ -727,4 +730,225 @@ fn foreign_file_round_trip() {
     assert!(inner.info().is_err());
     drop(inner);
     assert!(released);
+}
+
+#[test]
+fn old_vtable_rejects_conditions_before_io() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("unchanged").to_string_lossy().into_owned();
+    let mut vtable = local_vtable();
+    // This is the size of the complete vtable before typed operations existed.
+    vtable.struct_size = std::mem::offset_of!(fsspec_fs_vtable, read);
+    let data = Box::into_raw(Box::new(LocalFs::new())).cast();
+    unsafe {
+        let fs = fsspec_fs_from_vtable(&vtable, data);
+        assert!(!fs.is_null());
+        let condition = fsspec_condition {
+            kind: FSSPEC_CONDITION_MISSING,
+            validator: ptr::null(),
+        };
+        let options = fsspec_write_options {
+            struct_size: size_of::<fsspec_write_options>(),
+            condition: &condition,
+        };
+        let mut out = std::mem::MaybeUninit::uninit();
+        assert_eq!(
+            fsspec_fs_write(
+                fs,
+                path.as_ptr().cast(),
+                path.len(),
+                b"x".as_ptr(),
+                1,
+                &options,
+                out.as_mut_ptr()
+            ),
+            FSSPEC_NOT_SUPPORTED as i32
+        );
+        assert!(!dir.path().join("unchanged").exists());
+        let mut caps = fsspec_io_capabilities::default();
+        assert_eq!(fsspec_fs_io_capabilities(fs, &mut caps), FSSPEC_OK);
+        assert!(!caps.read_match && !caps.write_match && !caps.write_missing);
+        assert_eq!(
+            fsspec_fs_write(
+                fs,
+                path.as_ptr().cast(),
+                path.len(),
+                b"x".as_ptr(),
+                1,
+                ptr::null(),
+                out.as_mut_ptr()
+            ),
+            0
+        );
+        fsspec_write_result_free(out.assume_init());
+        assert_eq!(std::fs::read(dir.path().join("unchanged")).unwrap(), b"x");
+        fsspec_fs_release(fs);
+    }
+}
+
+#[test]
+fn invalid_operation_arguments_do_not_mutate() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("untouched").to_string_lossy().into_owned();
+    unsafe {
+        let fs = FsData::into_raw(std::sync::Arc::new(LocalFs::new()));
+        let condition = fsspec_condition {
+            kind: u32::MAX,
+            validator: ptr::null(),
+        };
+        let mut options = fsspec_write_options {
+            struct_size: size_of::<fsspec_write_options>(),
+            condition: &condition,
+        };
+        let mut out = std::mem::MaybeUninit::uninit();
+        assert_eq!(
+            fsspec_fs_write(
+                fs,
+                path.as_ptr().cast(),
+                path.len(),
+                b"x".as_ptr(),
+                1,
+                &options,
+                out.as_mut_ptr()
+            ),
+            FSSPEC_INVALID_ARGUMENT as i32
+        );
+        options.struct_size = size_of::<usize>();
+        assert_eq!(
+            fsspec_fs_write(
+                fs,
+                path.as_ptr().cast(),
+                path.len(),
+                b"x".as_ptr(),
+                1,
+                &options,
+                out.as_mut_ptr()
+            ),
+            FSSPEC_INVALID_ARGUMENT as i32
+        );
+        assert_eq!(
+            fsspec_fs_write(
+                fs,
+                path.as_ptr().cast(),
+                path.len(),
+                b"x".as_ptr(),
+                1,
+                ptr::null(),
+                ptr::null_mut()
+            ),
+            FSSPEC_INVALID_ARGUMENT as i32
+        );
+        assert_eq!(
+            fsspec_fs_write(
+                fs,
+                path.as_ptr().cast(),
+                path.len(),
+                ptr::null(),
+                1,
+                ptr::null(),
+                out.as_mut_ptr()
+            ),
+            FSSPEC_INVALID_ARGUMENT as i32
+        );
+        assert!(!dir.path().join("untouched").exists());
+        fsspec_fs_release(fs);
+    }
+}
+
+#[test]
+fn validators_and_conflicts_round_trip_through_foreign_callbacks() {
+    use fsspec_rs::{Condition, OperationError, ReadResult, Validator, WriteResult};
+    unsafe extern "C" fn read(
+        _: *mut c_void,
+        _: *const c_char,
+        _: usize,
+        options: *const fsspec_read_options,
+        out: *mut fsspec_read_result,
+    ) -> fsspec_operation_status {
+        crate::status::guard_operation(|| {
+            let options = fsspec_sys::operations::read_options(options)?;
+            assert_eq!(options.start, Some(-3));
+            assert_eq!(options.end, Some(-1));
+            let validator = Validator {
+                scope: "test://object".into(),
+                value: "quoted-\"etag\"".into(),
+            };
+            match options.condition {
+                Some(Condition::Match(ref expected)) if expected == &validator => {}
+                _ => return Err(OperationError::Conflict("stale read".into())),
+            }
+            out.write(fsspec_read_result::from_result(ReadResult {
+                data: b"ab".to_vec(),
+                validator: Some(validator),
+            }));
+            Ok(())
+        })
+    }
+    unsafe extern "C" fn write(
+        _: *mut c_void,
+        _: *const c_char,
+        _: usize,
+        _: *const u8,
+        _: usize,
+        options: *const fsspec_write_options,
+        out: *mut fsspec_write_result,
+    ) -> fsspec_operation_status {
+        crate::status::guard_operation(|| {
+            let options = fsspec_sys::operations::write_options(options)?;
+            let Some(Condition::Match(validator)) = options.condition else {
+                return Err(OperationError::Conflict("stale write".into()));
+            };
+            out.write(fsspec_write_result::from_result(WriteResult {
+                validator: Some(validator),
+            }));
+            Ok(())
+        })
+    }
+    let mut vtable = local_vtable();
+    vtable.read = Some(read);
+    vtable.write = Some(write);
+    let data = Box::into_raw(Box::new(LocalFs::new())).cast();
+    unsafe {
+        let handle = fsspec_fs_from_vtable(&vtable, data);
+        let fs = fsspec_sys::ForeignFileSystem::from_raw(handle).unwrap();
+        let validator = Validator {
+            scope: "test://object".into(),
+            value: "quoted-\"etag\"".into(),
+        };
+        let result = fs
+            .read(
+                "object",
+                fsspec_rs::ReadOptions {
+                    start: Some(-3),
+                    end: Some(-1),
+                    condition: Some(Condition::Match(validator.clone())),
+                },
+            )
+            .unwrap();
+        assert_eq!(result.data, b"ab");
+        assert_eq!(result.validator, Some(validator.clone()));
+        let result = fs
+            .write(
+                "object",
+                b"ab",
+                fsspec_rs::WriteOptions {
+                    condition: Some(Condition::Match(validator.clone())),
+                },
+            )
+            .unwrap();
+        assert_eq!(result.validator, Some(validator));
+        assert!(
+            matches!(fs.write("object", b"ab", Default::default()), Err(OperationError::Conflict(message)) if message.contains("stale write"))
+        );
+    }
+}
+
+#[test]
+fn object_operation_constants_match_bindings() {
+    assert_eq!(FSSPEC_CONFLICT, fsspec_sys::FSSPEC_CONFLICT);
+    assert_eq!(FSSPEC_CONDITION_MATCH, fsspec_sys::FSSPEC_CONDITION_MATCH);
+    assert_eq!(
+        FSSPEC_CONDITION_MISSING,
+        fsspec_sys::FSSPEC_CONDITION_MISSING
+    );
 }

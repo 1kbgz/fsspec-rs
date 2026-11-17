@@ -365,3 +365,66 @@ pub unsafe extern "C" fn fsspec_fs_open_ex(
         write_out(out, FileData::into_raw(file))
     })
 }
+
+use crate::status::guard_operation;
+use fsspec_sys::operations::{read_options, write_options};
+use fsspec_sys::types::{
+    fsspec_io_capabilities, fsspec_operation_status, fsspec_read_options, fsspec_read_result,
+    fsspec_write_options, fsspec_write_result,
+};
+
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_fs_read(
+    fs: *const fsspec_fs,
+    path: *const c_char,
+    path_len: usize,
+    options: *const fsspec_read_options,
+    out: *mut fsspec_read_result,
+) -> fsspec_operation_status {
+    guard_operation(|| {
+        if out.is_null() {
+            return Err(invalid("read result pointer is null").into());
+        }
+        let options = read_options(options)?;
+        let result = fs_arg(fs)?.read(str_arg(path, path_len)?, options)?;
+        out.write(fsspec_read_result::from_result(result));
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_fs_write(
+    fs: *const fsspec_fs,
+    path: *const c_char,
+    path_len: usize,
+    bytes: *const u8,
+    bytes_len: usize,
+    options: *const fsspec_write_options,
+    out: *mut fsspec_write_result,
+) -> fsspec_operation_status {
+    guard_operation(|| {
+        if out.is_null() {
+            return Err(invalid("write result pointer is null").into());
+        }
+        if bytes.is_null() && bytes_len != 0 {
+            return Err(invalid("bytes pointer is null").into());
+        }
+        let options = write_options(options)?;
+        let bytes = if bytes_len == 0 {
+            &[]
+        } else {
+            std::slice::from_raw_parts(bytes, bytes_len)
+        };
+        let result = fs_arg(fs)?.write(str_arg(path, path_len)?, bytes, options)?;
+        out.write(fsspec_write_result::from_result(result));
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_fs_io_capabilities(
+    fs: *const fsspec_fs,
+    out: *mut fsspec_io_capabilities,
+) -> fsspec_status {
+    guard(|| write_out(out, fs_arg(fs)?.io_capabilities().into()))
+}

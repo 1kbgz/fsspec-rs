@@ -24,27 +24,28 @@ pub enum FsError {
     Other(String),
 }
 
-/// Failure from an operation conditional on an expected object version.
+/// Failure from a byte read or write, including a failed condition.
 ///
 /// Kept separate from [`FsError`] so existing backend error matches remain valid.
 #[derive(Debug)]
-pub enum ConditionalIoError {
-    /// The expected version no longer matches the object.
+#[non_exhaustive]
+pub enum OperationError {
+    /// A read or write condition was not satisfied.
     Conflict(String),
     /// A filesystem failure, including unsupported conditional operations.
     FileSystem(FsError),
 }
 
-impl fmt::Display for ConditionalIoError {
+impl fmt::Display for OperationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Conflict(message) => write!(f, "version conflict: {message}"),
+            Self::Conflict(message) => write!(f, "condition conflict: {message}"),
             Self::FileSystem(error) => error.fmt(f),
         }
     }
 }
 
-impl std::error::Error for ConditionalIoError {
+impl std::error::Error for OperationError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Conflict(_) => None,
@@ -53,7 +54,7 @@ impl std::error::Error for ConditionalIoError {
     }
 }
 
-impl From<FsError> for ConditionalIoError {
+impl From<FsError> for OperationError {
     fn from(error: FsError) -> Self {
         Self::FileSystem(error)
     }

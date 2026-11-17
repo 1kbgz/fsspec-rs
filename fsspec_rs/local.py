@@ -5,7 +5,8 @@ import os
 import fsspec
 from fsspec.spec import AbstractBufferedFile
 
-from fsspec_rs.fsspec_rs import RustLocalFs
+from fsspec_rs._conditions import reject_unsupported_conditions
+from fsspec_rs.fsspec_rs import IoCapabilities, Match, Missing, ReadResult, RustLocalFs, WriteResult
 
 _WINDOWS = os.sep == "\\"
 
@@ -20,6 +21,7 @@ def _posix_info(info: dict) -> dict:
     return info
 
 
+@reject_unsupported_conditions
 class LocalFileSystem(fsspec.AbstractFileSystem):
     """Local filesystem backed by the Rust ``LocalFs`` implementation.
 
@@ -69,6 +71,8 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
         **kwargs,
     ):
         """Return a Rust-backed file object."""
+        if "condition" in kwargs:
+            raise NotImplementedError("conditions are supported by read/write, not open")
         return LocalFile(
             self,
             self._strip_protocol(path),
@@ -118,10 +122,24 @@ class LocalFileSystem(fsspec.AbstractFileSystem):
     def size(self, path: str) -> int:
         return self._rust.size(self._strip_protocol(path))
 
-    def cat_file(self, path: str, start=None, end=None, **kwargs) -> bytes:
+    def read(self, path: str, start=None, end=None, condition: Match | Missing | None = None) -> ReadResult:
+        return self._rust.read(self._strip_protocol(path), start=start, end=end, condition=condition)
+
+    def write(self, path: str, data: bytes, condition: Match | Missing | None = None) -> WriteResult:
+        return self._rust.write(self._strip_protocol(path), data, condition=condition)
+
+    def io_capabilities(self) -> IoCapabilities:
+        return self._rust.io_capabilities()
+
+    def cat_file(self, path: str, start=None, end=None, condition: Match | Missing | None = None, **kwargs) -> bytes:
+        if condition is not None:
+            return self.read(path, start=start, end=end, condition=condition).data
         return bytes(self._rust.cat_file(self._strip_protocol(path), start=start, end=end))
 
-    def pipe_file(self, path: str, value: bytes, **kwargs):
+    def pipe_file(self, path: str, value: bytes, condition: Match | Missing | None = None, **kwargs):
+        if condition is not None:
+            self.write(path, value, condition=condition)
+            return None
         return self._rust.pipe_file(self._strip_protocol(path), value)
 
     def head(self, path: str, size: int = 1024) -> bytes:
@@ -164,6 +182,8 @@ class LocalFile(AbstractBufferedFile):
     def __init__(self, fs: LocalFileSystem, path: str, mode: str = "rb", cache_type=None, block_size=None, **kwargs):
         # Open the Rust file handle right away
         self._rust_file = None  # set early so __del__/closed don't blow up
+        if "condition" in kwargs:
+            raise NotImplementedError("conditions are supported by read/write, not open")
         open_kwargs = {}
         if cache_type is not None:
             open_kwargs["cache_type"] = cache_type
