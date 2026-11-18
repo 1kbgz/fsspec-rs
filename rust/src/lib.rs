@@ -21,6 +21,8 @@ mod memory;
 mod ranges;
 #[cfg(feature = "s3")]
 mod s3;
+#[cfg(feature = "s3")]
+mod s3_http;
 
 #[cfg(test)]
 mod cache_tests;
@@ -40,7 +42,7 @@ mod tests;
 pub use async_fs::AsyncFileSystem;
 pub use buffered::BufferedFile;
 pub use caching::CacheType;
-pub use error::{FsError, FsResult, OperationError};
+pub use error::{ErrorKind, FsError, FsResult, OperationError};
 pub use file::FsFile;
 pub use fs::{
     cat_file_default, pipe_file_default, read_default, read_ranges_default, strip_protocol_default,

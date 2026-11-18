@@ -156,7 +156,14 @@ and `fsspec_write_result_free`. On error, output storage is unchanged and must
 not be freed as a result.
 
 These two functions return `fsspec_operation_status`, an `int32_t`. Values 0–9
-retain the meanings above; `FSSPEC_CONFLICT` (10) means a failed condition.
+retain the meanings above. `status & FSSPEC_ERROR_KIND_MASK` extracts the category:
+`FSSPEC_CONFLICT` (10), `FSSPEC_GAP` (11), `FSSPEC_UNAVAILABLE` (12),
+`FSSPEC_TIMEOUT` (13), `FSSPEC_CORRUPT` (14), `FSSPEC_CANCELLED` (15), and
+`FSSPEC_UNKNOWN_OUTCOME` (16) extend the legacy categories. A nonzero typed status
+may include `FSSPEC_RETRY_SAFE`; this bit means repeating the operation is safe.
+Unknown outcomes are never retry-safe. Zero still means success. Rust foreign
+adapters preserve category and retry metadata in both directions; old callbacks
+and legacy `fsspec_status` functions retain their existing contract.
 Existing functions and callbacks continue to return the original `fsspec_status`
 enum. Do not return conflict through a legacy callback.
 
@@ -219,17 +226,17 @@ Range ordering, consistency and request limits follow the
 
 `fsspec_file *` is an open file, closed with `fsspec_file_close`.
 
-| Function                                                | Description                                                                                   |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `fsspec_file_read(file, buf, len, out_read)`            | Reads up to `len` bytes; `*out_read` is zero at end of file.                                  |
-| `fsspec_file_write(file, data, len, out_written)`       | Writes bytes; `out_written` may be null.                                                      |
-| `fsspec_file_seek(file, offset, whence, out_position)`  | `whence` is 0 (start), 1 (current), or 2 (end).                                               |
-| `fsspec_file_tell(file, out_position)`                  | Current offset.                                                                               |
-| `fsspec_file_flush(file)`                               | Flushes buffered writes.                                                                      |
-| `fsspec_file_size(file, out_size)`                      | Size, or `-1` when unknown.                                                                   |
-| `fsspec_file_get_info(file, out)`                       | Metadata for the open file.                                                                   |
-| `fsspec_file_commit(file)`, `fsspec_file_discard(file)` | Commits or discards a transactional write.                                                    |
-| `fsspec_file_close(file)`                               | Flushes and frees the handle. The handle is freed even when the flush fails. Null is ignored. |
+| Function                                                | Description                                                                                                                                      |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `fsspec_file_read(file, buf, len, out_read)`            | Reads up to `len` bytes; `*out_read` is zero at end of file.                                                                                     |
+| `fsspec_file_write(file, data, len, out_written)`       | Writes bytes; `out_written` may be null.                                                                                                         |
+| `fsspec_file_seek(file, offset, whence, out_position)`  | `whence` is 0 (start), 1 (current), or 2 (end).                                                                                                  |
+| `fsspec_file_tell(file, out_position)`                  | Current offset.                                                                                                                                  |
+| `fsspec_file_flush(file)`                               | Flushes buffered writes.                                                                                                                         |
+| `fsspec_file_size(file, out_size)`                      | Size, or `-1` when unknown.                                                                                                                      |
+| `fsspec_file_get_info(file, out)`                       | Metadata for the open file.                                                                                                                      |
+| `fsspec_file_commit(file)`, `fsspec_file_discard(file)` | Commits or discards a transactional write.                                                                                                       |
+| `fsspec_file_close(file)`                               | Flushes, commits, and frees the handle. After commit or discard, it only frees. Failures discard pending writes before freeing. Null is ignored. |
 
 ## Foreign backends
 

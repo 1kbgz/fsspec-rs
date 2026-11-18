@@ -495,6 +495,9 @@ impl FsFile for ForeignFile {
 
 impl Drop for ForeignFile {
     fn drop(&mut self) {
-        unsafe { ffi::fsspec_file_close(self.handle) };
+        unsafe {
+            ffi::fsspec_file_discard(self.handle);
+            ffi::fsspec_file_close(self.handle);
+        }
     }
 }

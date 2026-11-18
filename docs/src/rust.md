@@ -130,6 +130,21 @@ deleted object. `OperationError::FileSystem` wraps existing filesystem errors;
 unconditional reads of missing objects return `FsError::NotFound`. Unsupported
 conditions return `FsError::NotSupported` before I/O. `FsError` itself is unchanged.
 
+`OperationError::kind()` returns a stable `ErrorKind` category and
+`retry_safe()` reports whether the operation can safely be repeated.
+`OperationError::Detailed { kind, message, retry_safe }` lets backends preserve
+these fields. `UnknownOutcome` always reports false for retry safety. The
+existing exhaustive `FsError` variants remain unchanged; `FsError::kind()` also
+classifies underlying timeout, connection and corrupt-data I/O errors.
+
+S3 typed writes disable automatic PUT retries. Uncertain Missing writes resolve
+by reading and comparing SHA-256 content checksums; local exclusive writes also
+verify content after I/O errors. Matching content acknowledges publication,
+different content is a conflict, and failed verification is `UnknownOutcome`.
+This acknowledgement does not prove writer ownership. Definitive precondition
+failures stay conflicts. Other uncertain S3 typed writes return `UnknownOutcome`
+without automatic recovery.
+
 `io_capabilities()` reports `read_match`, `write_match`, and `write_missing`:
 
 | Backend                                               | Match read | Match write | Missing write | Result validator                                                 |
@@ -143,10 +158,12 @@ bucket or path are invalid arguments, as are empty ETags, wildcards and ETag lis
 ETags are equality tokens: writing identical content can retain an ETag, so Match
 does not promise detection of every intervening write.
 
-Local and memory Missing writes use exclusive creation. Local creation reserves
-the name atomically, but readers can observe bytes while the file is being written;
-a failed write can leave a partial file. These are the existing exclusive-file
-semantics, not transactional publication.
+Local and memory Missing writes use exclusive creation. Local writes stage and
+sync a sibling temporary file, then publish it with a hard link that fails when
+the destination exists. Readers see the complete file. Filesystems must support
+hard links and the required synchronization operations; NFS guarantees depend
+on the server and mount configuration. Deployment checks are described in the
+[create-if-absent guide](how-to.md#create-conformance).
 
 The Rust bindings, C ABI and Python wrappers expose the same operations. Older C
 backends reject conditions and retain unconditional I/O through their existing
@@ -219,6 +236,12 @@ using an explicit stack. Method semantics otherwise match `FileSystem`.
 `FileSystem::open()` returns a file implementing `FsFile`, which requires
 `Read + Write + Seek + Send`. `commit()` and `discard()` default to no-ops and
 are available for buffered writes or future transaction support.
+
+S3 writes require explicit `commit()`. Dropping an unfinished S3 writer discards
+its buffer and attempts to abort any multipart upload. This includes exclusive
+and append handles; Drop never publishes S3 content. Foreign handles reached
+through the C ABI also discard on Drop. Direct local append writes remain
+immediate, and generic `BufferedFile` retains its configured autocommit behavior.
 
 ## Metadata and open options
 

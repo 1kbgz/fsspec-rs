@@ -1,7 +1,7 @@
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::slice;
 
-use fsspec_rs::FsFile;
+use fsspec_rs::{FsError, FsFile};
 use fsspec_sys::types::{fsspec_file, fsspec_file_info, fsspec_status};
 
 use crate::status::{guard, handle_arg_mut, invalid, write_out};
@@ -9,11 +9,15 @@ use crate::status::{guard, handle_arg_mut, invalid, write_out};
 /// The data behind an `fsspec_file` handle.
 pub(crate) struct FileData {
     pub(crate) inner: Box<dyn FsFile>,
+    finalized: bool,
 }
 
 impl FileData {
     pub(crate) fn into_raw(inner: Box<dyn FsFile>) -> *mut fsspec_file {
-        Box::into_raw(Box::new(Self { inner })) as *mut fsspec_file
+        Box::into_raw(Box::new(Self {
+            inner,
+            finalized: false,
+        })) as *mut fsspec_file
     }
 
     pub(crate) unsafe fn from_raw(handle: *mut fsspec_file) -> Box<Self> {
@@ -152,17 +156,31 @@ pub unsafe extern "C" fn fsspec_file_get_info(
 /// Commits a transactional write.
 #[no_mangle]
 pub unsafe extern "C" fn fsspec_file_commit(file: *mut fsspec_file) -> fsspec_status {
-    guard(|| file_arg(file)?.commit())
+    guard(|| {
+        let file: &mut FileData = handle_arg_mut(file, "file")?;
+        if !file.finalized {
+            file.inner.commit()?;
+            file.finalized = true;
+        }
+        Ok(())
+    })
 }
 
 /// Discards a transactional write.
 #[no_mangle]
 pub unsafe extern "C" fn fsspec_file_discard(file: *mut fsspec_file) -> fsspec_status {
-    guard(|| file_arg(file)?.discard())
+    guard(|| {
+        let file: &mut FileData = handle_arg_mut(file, "file")?;
+        if file.finalized {
+            return Ok(());
+        }
+        file.finalized = true;
+        file.inner.discard()
+    })
 }
 
-/// Flushes and closes the file. The handle is freed even when the flush
-/// fails. Null is ignored.
+/// Flushes, commits, and closes the file. The handle is freed even on error.
+/// Call discard first to abandon pending writes. Null is ignored.
 #[no_mangle]
 pub unsafe extern "C" fn fsspec_file_close(file: *mut fsspec_file) -> fsspec_status {
     guard(|| {
@@ -170,8 +188,17 @@ pub unsafe extern "C" fn fsspec_file_close(file: *mut fsspec_file) -> fsspec_sta
             return Ok(());
         }
         let mut file = FileData::from_raw(file);
-        let flushed = file.inner.flush();
-        drop(file);
-        Ok(flushed?)
+        if file.finalized {
+            return Ok(());
+        }
+        let result = file
+            .inner
+            .flush()
+            .map_err(FsError::from)
+            .and_then(|()| file.inner.commit());
+        if result.is_err() {
+            let _ = file.inner.discard();
+        }
+        result
     })
 }

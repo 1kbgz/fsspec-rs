@@ -26,6 +26,14 @@ fn fsspec_rs(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<io::PyWriteResult>()?;
     m.add_class::<io::PyIoCapabilities>()?;
     m.add("ConflictError", py.get_type::<io::ConflictError>())?;
+    m.add("GapError", py.get_type::<io::GapError>())?;
+    m.add("UnavailableError", py.get_type::<io::UnavailableError>())?;
+    m.add("CorruptError", py.get_type::<io::CorruptError>())?;
+    m.add("CancelledError", py.get_type::<io::CancelledError>())?;
+    m.add(
+        "UnknownOutcomeError",
+        py.get_type::<io::UnknownOutcomeError>(),
+    )?;
 
     // Core types
     m.add_class::<PyFileType>()?;

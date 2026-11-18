@@ -14,6 +14,17 @@ pub const FSSPEC_ABI_VERSION: u32 = 1;
 
 /// Failed condition, returned only by typed object operations.
 pub const FSSPEC_CONFLICT: i32 = 10;
+pub const FSSPEC_GAP: i32 = 11;
+pub const FSSPEC_UNAVAILABLE: i32 = 12;
+pub const FSSPEC_TIMEOUT: i32 = 13;
+pub const FSSPEC_CORRUPT: i32 = 14;
+pub const FSSPEC_CANCELLED: i32 = 15;
+pub const FSSPEC_UNKNOWN_OUTCOME: i32 = 16;
+/// Mask a typed operation status with this value to obtain its error kind.
+pub const FSSPEC_ERROR_KIND_MASK: i32 = 0xffff;
+/// A typed operation status may include this bit when repeating the operation is safe.
+pub const FSSPEC_RETRY_SAFE: i32 = 0x10000;
+
 /// Match the supplied object validator.
 pub const FSSPEC_CONDITION_MATCH: u32 = 1;
 /// Create only when the object is absent.

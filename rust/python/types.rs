@@ -193,7 +193,8 @@ impl PyFileInfo {
 
 /// Convert an FsError into a Python exception.
 pub fn fs_error_to_pyerr(err: FsError) -> PyErr {
-    match err {
+    let kind = err.kind();
+    let exception = match err {
         FsError::NotFound(msg) => PyFileNotFoundError::new_err(msg),
         FsError::PermissionDenied(msg) => PyPermissionError::new_err(msg),
         FsError::AlreadyExists(msg) => PyFileExistsError::new_err(msg),
@@ -206,5 +207,6 @@ pub fn fs_error_to_pyerr(err: FsError) -> PyErr {
         FsError::InvalidArgument(msg) => PyValueError::new_err(msg),
         FsError::NotSupported(msg) => PyNotImplementedError::new_err(msg),
         FsError::Other(msg) => PyOSError::new_err(msg),
-    }
+    };
+    crate::io::error_metadata(exception, kind, false)
 }

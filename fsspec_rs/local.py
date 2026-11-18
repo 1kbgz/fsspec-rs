@@ -3,10 +3,10 @@ from __future__ import annotations
 import os
 from collections.abc import Sequence
 
-import fsspec
 from fsspec.spec import AbstractBufferedFile
 
 from fsspec_rs._conditions import reject_unsupported_conditions
+from fsspec_rs._files import FileSystem
 from fsspec_rs._ranges import cat_ranges as _cat_ranges
 from fsspec_rs.fsspec_rs import IoCapabilities, Match, Missing, RangeReadResult, ReadResult, RustLocalFs, WriteResult
 
@@ -24,7 +24,7 @@ def _posix_info(info: dict) -> dict:
 
 
 @reject_unsupported_conditions
-class LocalFileSystem(fsspec.AbstractFileSystem):
+class LocalFileSystem(FileSystem):
     """Local filesystem backed by the Rust ``LocalFs`` implementation.
 
     The protocol is registered as ``("file-rs", "local-rs")`` so it can
@@ -250,6 +250,14 @@ class LocalFile(AbstractBufferedFile):
     def close(self):
         self._rust_file.close()
 
+    def discard(self):
+        """Discard pending writes and close; direct local writes cannot be undone."""
+        self._rust_file.discard()
+
+    def __del__(self):
+        if not self.closed:
+            self.discard()
+
     @property
     def closed(self) -> bool:
         return self._rust_file is None or self._rust_file.closed
@@ -266,8 +274,11 @@ class LocalFile(AbstractBufferedFile):
     def __enter__(self):
         return self
 
-    def __exit__(self, *args):
-        self.close()
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is None:
+            self.close()
+        else:
+            self.discard()
 
     def __repr__(self) -> str:
         status = "closed" if self.closed else "open"
