@@ -267,6 +267,7 @@ class RustS3Fs:
         token: str | None = None,
         anon: bool = False,
         client_kwargs: dict[str, Any] | None = None,
+        client_options: dict[str, float | int] | None = None,
     ) -> None: ...
     @property
     def bucket(self) -> str: ...

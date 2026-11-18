@@ -18,11 +18,15 @@ class S3FileSystem(FileSystem):
     The protocol is registered as ``"s3-rs"`` so it can coexist with the
     pure-Python ``s3fs.S3FileSystem`` which owns the ``"s3"`` protocol.
 
-    Credential resolution (matching s3fs conventions):
+    Credential resolution:
       1. Explicit keyword arguments (``key``, ``secret``, ``endpoint_url``, …)
       2. Values from ``fsspec.config.conf["s3"]`` (populated from ``FSSPEC_S3_*``
          environment variables)
-      3. Falls through to object_store's own credential chain (IAM roles, etc.)
+      3. AWS environment credentials, then the instance-metadata provider.
+
+    Key, secret and optional token are selected together from one source.
+    ``client_options`` accepts ``connect_timeout`` and ``request_timeout`` in
+    seconds, and ``max_retries``. Typed writes always disable automatic retries.
     """
 
     protocol = ("s3-rs",)
@@ -68,6 +72,7 @@ class S3FileSystem(FileSystem):
         token: str | None = None,
         anon: bool = False,
         client_kwargs: dict | None = None,
+        client_options: dict | None = None,
         **storage_options,
     ):
         super().__init__(**storage_options)
@@ -76,11 +81,12 @@ class S3FileSystem(FileSystem):
 
         # Merge from fsspec.config.conf (populated by FSSPEC_S3_* env vars)
         s3_conf = conf.get("s3", {})
-        key = key or s3_conf.get("key")
-        secret = secret or s3_conf.get("secret")
+        if key is None and secret is None and token is None:
+            key = s3_conf.get("key")
+            secret = s3_conf.get("secret")
+            token = s3_conf.get("token")
         endpoint_url = endpoint_url or s3_conf.get("endpoint_url")
         region = region or s3_conf.get("region")
-        token = token or s3_conf.get("token")
 
         # Also honour client_kwargs.endpoint_url (s3fs convention)
         if client_kwargs and not endpoint_url:
@@ -94,6 +100,7 @@ class S3FileSystem(FileSystem):
             region=region,
             token=token,
             anon=anon,
+            client_options=client_options,
         )
         self.bucket = bucket
 
