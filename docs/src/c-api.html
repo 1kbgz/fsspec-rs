@@ -533,7 +533,14 @@ validator in <code class="docutils literal notranslate"><span class="pre">fsspec
 and <code class="docutils literal notranslate"><span class="pre">fsspec_write_result_free</span></code>. On error, output storage is unchanged and must
 not be freed as a result.</p>
 <p>These two functions return <code class="docutils literal notranslate"><span class="pre">fsspec_operation_status</span></code>, an <code class="docutils literal notranslate"><span class="pre">int32_t</span></code>. Values 0–9
-retain the meanings above; <code class="docutils literal notranslate"><span class="pre">FSSPEC_CONFLICT</span></code> (10) means a failed condition.
+retain the meanings above. <code class="docutils literal notranslate"><span class="pre">status</span> <span class="pre">&amp;</span> <span class="pre">FSSPEC_ERROR_KIND_MASK</span></code> extracts the category:
+<code class="docutils literal notranslate"><span class="pre">FSSPEC_CONFLICT</span></code> (10), <code class="docutils literal notranslate"><span class="pre">FSSPEC_GAP</span></code> (11), <code class="docutils literal notranslate"><span class="pre">FSSPEC_UNAVAILABLE</span></code> (12),
+<code class="docutils literal notranslate"><span class="pre">FSSPEC_TIMEOUT</span></code> (13), <code class="docutils literal notranslate"><span class="pre">FSSPEC_CORRUPT</span></code> (14), <code class="docutils literal notranslate"><span class="pre">FSSPEC_CANCELLED</span></code> (15), and
+<code class="docutils literal notranslate"><span class="pre">FSSPEC_UNKNOWN_OUTCOME</span></code> (16) extend the legacy categories. A nonzero typed status
+may include <code class="docutils literal notranslate"><span class="pre">FSSPEC_RETRY_SAFE</span></code>; this bit means repeating the operation is safe.
+Unknown outcomes are never retry-safe. Zero still means success. Rust foreign
+adapters preserve category and retry metadata in both directions; old callbacks
+and legacy <code class="docutils literal notranslate"><span class="pre">fsspec_status</span></code> functions retain their existing contract.
 Existing functions and callbacks continue to return the original <code class="docutils literal notranslate"><span class="pre">fsspec_status</span></code>
 enum. Do not return conflict through a legacy callback.</p>
 <p>Read and write option structs begin with <code class="docutils literal notranslate"><span class="pre">struct_size</span></code>; initialize it to the
@@ -632,7 +639,7 @@ the new symbols require an updated library.</p>
 <td><p>Commits or discards a transactional write.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_file_close(file)</span></code></p></td>
-<td><p>Flushes and frees the handle. The handle is freed even when the flush fails. Null is ignored.</p></td>
+<td><p>Flushes, commits, and frees the handle. After commit or discard, it only frees. Failures discard pending writes before freeing. Null is ignored.</p></td>
 </tr>
 </tbody>
 </table>

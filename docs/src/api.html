@@ -473,6 +473,15 @@
   <li class="fd-toc-item" data-depth="1">
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
   </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#operation-errors">Operation errors</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#uncertain-creates">Uncertain creates</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#file-write-lifecycle">File write lifecycle</a>
+  </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#range-reads">Range reads</a>
   </li>
@@ -499,6 +508,9 @@
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.LocalFile.close">LocalFile.close()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#fsspec_rs.LocalFile.discard">LocalFile.discard()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.LocalFile.closed">LocalFile.closed</a>
@@ -532,6 +544,9 @@
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.S3File.close">S3File.close()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#fsspec_rs.S3File.discard">S3File.discard()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.S3File.closed">S3File.closed</a>
@@ -620,7 +635,7 @@
 <dl class="py class">
 <dt class="sig sig-object py" id="fsspec_rs.LocalFileSystem">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fsspec_rs.</span></span><span class="sig-name descname"><span class="pre">LocalFileSystem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFileSystem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFileSystem" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractFileSystem</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">FileSystem</span></code></p>
 <p>Local filesystem backed by the Rust <code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> implementation.</p>
 <p>The protocol is registered as <code class="docutils literal notranslate"><span class="pre">(&quot;file-rs&quot;,</span> <span class="pre">&quot;local-rs&quot;)</span></code> so it can
 coexist with the pure-Python <code class="docutils literal notranslate"><span class="pre">fsspec.implementations.local.LocalFileSystem</span></code>
@@ -1263,7 +1278,7 @@ way of delegating credentials.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="fsspec_rs.S3FileSystem">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fsspec_rs.</span></span><span class="sig-name descname"><span class="pre">S3FileSystem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3FileSystem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3FileSystem" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractFileSystem</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">FileSystem</span></code></p>
 <p>S3 filesystem backed by the Rust <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> implementation.</p>
 <p>The protocol is registered as <code class="docutils literal notranslate"><span class="pre">&quot;s3-rs&quot;</span></code> so it can coexist with the
 pure-Python <code class="docutils literal notranslate"><span class="pre">s3fs.S3FileSystem</span></code> which owns the <code class="docutils literal notranslate"><span class="pre">&quot;s3&quot;</span></code> protocol.</p>
@@ -1921,6 +1936,55 @@ unsupported conditions raise <code class="docutils literal notranslate"><span cl
 Python exception types. Passing <code class="docutils literal notranslate"><span class="pre">condition=</span></code> to open handles is unsupported.</p>
 <p>See <a class="reference internal" href="rust.html"><span class="std std-doc">Rust object I/O</span></a> for capability flags,
 range consistency and local exclusive-creation semantics.</p>
+<section id="operation-errors">
+<h3>Operation errors<a class="headerlink" href="#operation-errors" title="Link to this heading">¶</a></h3>
+<p>Errors returned by typed <code class="docutils literal notranslate"><span class="pre">read</span></code>, <code class="docutils literal notranslate"><span class="pre">write</span></code> and <code class="docutils literal notranslate"><span class="pre">read_ranges</span></code> expose <code class="docutils literal notranslate"><span class="pre">.kind</span></code> and
+<code class="docutils literal notranslate"><span class="pre">.retry_safe</span></code>. The kind is one of <code class="docutils literal notranslate"><span class="pre">not_found</span></code>, <code class="docutils literal notranslate"><span class="pre">already_exists</span></code>, <code class="docutils literal notranslate"><span class="pre">conflict</span></code>,
+<code class="docutils literal notranslate"><span class="pre">gap</span></code>, <code class="docutils literal notranslate"><span class="pre">permission_denied</span></code>, <code class="docutils literal notranslate"><span class="pre">unavailable</span></code>, <code class="docutils literal notranslate"><span class="pre">timeout</span></code>, <code class="docutils literal notranslate"><span class="pre">corrupt</span></code>, <code class="docutils literal notranslate"><span class="pre">invalid</span></code>,
+<code class="docutils literal notranslate"><span class="pre">cancelled</span></code>, <code class="docutils literal notranslate"><span class="pre">unknown_outcome</span></code>, or the compatibility categories <code class="docutils literal notranslate"><span class="pre">not_a_directory</span></code>,
+<code class="docutils literal notranslate"><span class="pre">is_a_directory</span></code>, <code class="docutils literal notranslate"><span class="pre">io</span></code>, <code class="docutils literal notranslate"><span class="pre">not_supported</span></code> and <code class="docutils literal notranslate"><span class="pre">other</span></code>.</p>
+<p>Standard Python exceptions remain available: <code class="docutils literal notranslate"><span class="pre">FileNotFoundError</span></code>,
+<code class="docutils literal notranslate"><span class="pre">FileExistsError</span></code>, <code class="docutils literal notranslate"><span class="pre">PermissionError</span></code>, <code class="docutils literal notranslate"><span class="pre">TimeoutError</span></code>, <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> and
+<code class="docutils literal notranslate"><span class="pre">NotImplementedError</span></code>. Additional <code class="docutils literal notranslate"><span class="pre">OSError</span></code> subclasses are <code class="docutils literal notranslate"><span class="pre">ConflictError</span></code>,
+<code class="docutils literal notranslate"><span class="pre">GapError</span></code>, <code class="docutils literal notranslate"><span class="pre">UnavailableError</span></code>, <code class="docutils literal notranslate"><span class="pre">CorruptError</span></code>, <code class="docutils literal notranslate"><span class="pre">CancelledError</span></code> and
+<code class="docutils literal notranslate"><span class="pre">UnknownOutcomeError</span></code>. <code class="docutils literal notranslate"><span class="pre">GapError</span></code> is available for backends with positioned
+writes; byte writes do not produce it themselves. Argument errors raised before
+backend dispatch do not necessarily have operation metadata.</p>
+<p><code class="docutils literal notranslate"><span class="pre">retry_safe=True</span></code> means repeating the operation is safe. False includes cases
+where safety cannot be established. Transient S3 read failures are safe to retry;
+an uncertain write is not. Legacy file-handle operations retain their existing
+error contract.</p>
+</section>
+<section id="uncertain-creates">
+<h3>Uncertain creates<a class="headerlink" href="#uncertain-creates" title="Link to this heading">¶</a></h3>
+<p>S3 typed writes send one PUT attempt. Following an uncertain response to
+<code class="docutils literal notranslate"><span class="pre">write(...,</span> <span class="pre">condition=Missing())</span></code>, the backend reads the object and compares its
+SHA-256 checksum with the supplied bytes. Matching content acknowledges success;
+different content returns <code class="docutils literal notranslate"><span class="pre">ConflictError</span></code>. An absent object or failed verification
+returns <code class="docutils literal notranslate"><span class="pre">UnknownOutcomeError</span></code> with <code class="docutils literal notranslate"><span class="pre">retry_safe=False</span></code>. Local exclusive writes
+use the same content check after an I/O failure. An ETag is never treated as a
+content checksum.</p>
+<p>Recovered success acknowledges matching content for immutable publication; it
+does not establish ownership of a lock or prove which writer created the object.
+A definitive precondition failure remains a conflict, including when existing
+content matches. Ordinary overwrites and Match writes with uncertain outcomes
+return <code class="docutils literal notranslate"><span class="pre">UnknownOutcomeError</span></code> without content-based recovery.</p>
+</section>
+</section>
+<section id="file-write-lifecycle">
+<h2>File write lifecycle<a class="headerlink" href="#file-write-lifecycle" title="Link to this heading">¶</a></h2>
+<p>Native Python handles and the filesystem wrappers publish buffered writes on
+explicit <code class="docutils literal notranslate"><span class="pre">close()</span></code> or clean context-manager exit. <code class="docutils literal notranslate"><span class="pre">discard()</span></code> closes the handle
+without publishing pending data. Exceptional exits and finalizers discard.
+Uncompressed text handles returned by <code class="docutils literal notranslate"><span class="pre">fs.open</span></code> follow the same rules.</p>
+<p>Direct local append writes are immediately visible and cannot be rolled back.
+Explicit flushes can pass text to the underlying handle. External wrappers,
+including compression and <code class="docutils literal notranslate"><span class="pre">fsspec.open</span></code>’s <code class="docutils literal notranslate"><span class="pre">OpenFile</span></code>, control their own close
+behavior; their exception handling is outside this lifecycle contract.</p>
+<p>S3 exclusive handles still buffer the complete object. Ordinary S3 writers use
+multipart uploads for large objects; abandoned uploads are aborted on a
+best-effort basis. A process crash can leave multipart uploads requiring the
+store’s retention policy.</p>
 </section>
 <section id="range-reads">
 <h2>Range reads<a class="headerlink" href="#range-reads" title="Link to this heading">¶</a></h2>
@@ -2027,6 +2091,12 @@ blocks are allowed to be. Disallows further writing to this file.</p>
 <p>Finalizes writes, discards cache</p>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.LocalFile.discard">
+<span class="sig-name descname"><span class="pre">discard</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/local.html#LocalFile.discard"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.LocalFile.discard" title="Link to this definition">¶</a></dt>
+<dd><p>Discard pending writes and close; direct local writes cannot be undone.</p>
+</dd></dl>
+
 <dl class="py property">
 <dt class="sig sig-object py" id="fsspec_rs.LocalFile.closed">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">closed</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#fsspec_rs.LocalFile.closed" title="Link to this definition">¶</a></dt>
@@ -2120,6 +2190,12 @@ blocks are allowed to be. Disallows further writing to this file.</p>
 <span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.close"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.close" title="Link to this definition">¶</a></dt>
 <dd><p>Close file</p>
 <p>Finalizes writes, discards cache</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fsspec_rs.S3File.discard">
+<span class="sig-name descname"><span class="pre">discard</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/fsspec_rs/s3.html#S3File.discard"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#fsspec_rs.S3File.discard" title="Link to this definition">¶</a></dt>
+<dd><p>Discard pending writes and close; direct local writes cannot be undone.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -2590,6 +2666,15 @@ blocks are allowed to be. Disallows further writing to this file.</p>
   <li class="fd-toc-item" data-depth="1">
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
   </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#operation-errors">Operation errors</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#uncertain-creates">Uncertain creates</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#file-write-lifecycle">File write lifecycle</a>
+  </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#range-reads">Range reads</a>
   </li>
@@ -2616,6 +2701,9 @@ blocks are allowed to be. Disallows further writing to this file.</p>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.LocalFile.close">LocalFile.close()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#fsspec_rs.LocalFile.discard">LocalFile.discard()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.LocalFile.closed">LocalFile.closed</a>
@@ -2649,6 +2737,9 @@ blocks are allowed to be. Disallows further writing to this file.</p>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.S3File.close">S3File.close()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#fsspec_rs.S3File.discard">S3File.discard()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.S3File.closed">S3File.closed</a>

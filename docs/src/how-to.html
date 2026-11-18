@@ -158,6 +158,9 @@
   <li class="fd-toc-item" data-depth="1">
     <a href="#check-a-filesystem-as-a-records-store">Check a filesystem as a records store</a>
   </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#create-conformance">Check create-if-absent on a storage deployment</a>
+  </li>
 </ul>
 </div>
   </div>
@@ -270,6 +273,33 @@ define a unique empty root and its storage options:</p>
 in a separate process. <code class="docutils literal notranslate"><span class="pre">file-rs</span></code>, <code class="docutils literal notranslate"><span class="pre">s3-rs</span></code>, and <code class="docutils literal notranslate"><span class="pre">s3fs</span></code> pass. fsspec’s <code class="docutils literal notranslate"><span class="pre">file</span></code>
 protocol fails the replacement test because it writes directly to the target.</p>
 </section>
+<section id="create-conformance">
+<span id="check-create-if-absent-on-a-storage-deployment"></span><h2>Check create-if-absent on a storage deployment<a class="headerlink" href="#create-conformance" title="Link to this heading">¶</a></h2>
+<p>Choose a scratch prefix where the test may create and delete manifest objects.
+Run the reusable suite against each AWS bucket configuration, S3-compatible
+server, and NFS mount used for publication:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">FSSPEC_CREATE_TEST_URL</span><span class="o">=</span><span class="s1">'s3-rs://test-bucket/create-checks'</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">FSSPEC_CREATE_TEST_OPTIONS</span><span class="o">=</span><span class="s1">'{"region": "us-east-1"}'</span>
+pytest<span class="w"> </span>fsspec_rs/tests/test_create_conformance.py<span class="w"> </span>-k<span class="w"> </span>deployment
+</pre></div>
+</div>
+<p>For an on-prem store, add <code class="docutils literal notranslate"><span class="pre">endpoint_url</span></code> and the required credential settings to
+<code class="docutils literal notranslate"><span class="pre">FSSPEC_CREATE_TEST_OPTIONS</span></code>, or use your existing credential configuration.
+For NFS, use a <code class="docutils literal notranslate"><span class="pre">file-rs:///mount/create-checks</span></code> URL and
+<code class="docutils literal notranslate"><span class="pre">FSSPEC_CREATE_TEST_OPTIONS='{&quot;auto_mkdir&quot;:</span> <span class="pre">true}'</span></code>.</p>
+<p>The suite creates a unique subdirectory, checks competing creates, verifies
+complete binary and empty objects through a second client, and removes its test
+files. Local directories may remain empty. To reuse it in another repository,
+import <code class="docutils literal notranslate"><span class="pre">fsspec_rs.testing.create</span></code> tests and supply <code class="docutils literal notranslate"><span class="pre">create_url</span></code> and
+<code class="docutils literal notranslate"><span class="pre">create_storage_options</span></code> fixtures with a unique scratch prefix.</p>
+<p>Record the package version, store version, endpoint configuration and mount
+options with the results. Run failure-injection checks in your deployment for
+lost acknowledgements and interrupted writes; the local protocol tests in
+<code class="docutils literal notranslate"><span class="pre">test_create_recovery.py</span></code> exercise those client paths without certifying a real
+store. For NFS, also verify visibility and competing publication from separate
+hosts. The in-process local, memory and simulated S3 results are not AWS,
+on-prem or NFS certification.</p>
+</section>
 </section>
 
 
@@ -319,6 +349,9 @@ protocol fails the replacement test because it writes directly to the target.</p
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#check-a-filesystem-as-a-records-store">Check a filesystem as a records store</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#create-conformance">Check create-if-absent on a storage deployment</a>
   </li>
 </ul>
 

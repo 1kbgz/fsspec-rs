@@ -347,6 +347,19 @@ A concurrent replacement between metadata and data requests returns a conflict.<
 deleted object. <code class="docutils literal notranslate"><span class="pre">OperationError::FileSystem</span></code> wraps existing filesystem errors;
 unconditional reads of missing objects return <code class="docutils literal notranslate"><span class="pre">FsError::NotFound</span></code>. Unsupported
 conditions return <code class="docutils literal notranslate"><span class="pre">FsError::NotSupported</span></code> before I/O. <code class="docutils literal notranslate"><span class="pre">FsError</span></code> itself is unchanged.</p>
+<p><code class="docutils literal notranslate"><span class="pre">OperationError::kind()</span></code> returns a stable <code class="docutils literal notranslate"><span class="pre">ErrorKind</span></code> category and
+<code class="docutils literal notranslate"><span class="pre">retry_safe()</span></code> reports whether the operation can safely be repeated.
+<code class="docutils literal notranslate"><span class="pre">OperationError::Detailed</span> <span class="pre">{</span> <span class="pre">kind,</span> <span class="pre">message,</span> <span class="pre">retry_safe</span> <span class="pre">}</span></code> lets backends preserve
+these fields. <code class="docutils literal notranslate"><span class="pre">UnknownOutcome</span></code> always reports false for retry safety. The
+existing exhaustive <code class="docutils literal notranslate"><span class="pre">FsError</span></code> variants remain unchanged; <code class="docutils literal notranslate"><span class="pre">FsError::kind()</span></code> also
+classifies underlying timeout, connection and corrupt-data I/O errors.</p>
+<p>S3 typed writes disable automatic PUT retries. Uncertain Missing writes resolve
+by reading and comparing SHA-256 content checksums; local exclusive writes also
+verify content after I/O errors. Matching content acknowledges publication,
+different content is a conflict, and failed verification is <code class="docutils literal notranslate"><span class="pre">UnknownOutcome</span></code>.
+This acknowledgement does not prove writer ownership. Definitive precondition
+failures stay conflicts. Other uncertain S3 typed writes return <code class="docutils literal notranslate"><span class="pre">UnknownOutcome</span></code>
+without automatic recovery.</p>
 <p><code class="docutils literal notranslate"><span class="pre">io_capabilities()</span></code> reports <code class="docutils literal notranslate"><span class="pre">read_match</span></code>, <code class="docutils literal notranslate"><span class="pre">write_match</span></code>, and <code class="docutils literal notranslate"><span class="pre">write_missing</span></code>:</p>
 <table class="docutils align-default">
 <thead>
@@ -382,10 +395,12 @@ conditions return <code class="docutils literal notranslate"><span class="pre">F
 bucket or path are invalid arguments, as are empty ETags, wildcards and ETag lists.
 ETags are equality tokens: writing identical content can retain an ETag, so Match
 does not promise detection of every intervening write.</p>
-<p>Local and memory Missing writes use exclusive creation. Local creation reserves
-the name atomically, but readers can observe bytes while the file is being written;
-a failed write can leave a partial file. These are the existing exclusive-file
-semantics, not transactional publication.</p>
+<p>Local and memory Missing writes use exclusive creation. Local writes stage and
+sync a sibling temporary file, then publish it with a hard link that fails when
+the destination exists. Readers see the complete file. Filesystems must support
+hard links and the required synchronization operations; NFS guarantees depend
+on the server and mount configuration. Deployment checks are described in the
+<a class="reference internal" href="how-to.html#create-conformance"><span class="std std-ref">create-if-absent guide</span></a>.</p>
 <p>The Rust bindings, C ABI and Python wrappers expose the same operations. Older C
 backends reject conditions and retain unconditional I/O through their existing
 callbacks. Conditions currently apply to whole-object writes and whole-object or
@@ -470,6 +485,11 @@ using an explicit stack. Method semantics otherwise match <code class="docutils 
 <p><code class="docutils literal notranslate"><span class="pre">FileSystem::open()</span></code> returns a file implementing <code class="docutils literal notranslate"><span class="pre">FsFile</span></code>, which requires
 <code class="docutils literal notranslate"><span class="pre">Read</span> <span class="pre">+</span> <span class="pre">Write</span> <span class="pre">+</span> <span class="pre">Seek</span> <span class="pre">+</span> <span class="pre">Send</span></code>. <code class="docutils literal notranslate"><span class="pre">commit()</span></code> and <code class="docutils literal notranslate"><span class="pre">discard()</span></code> default to no-ops and
 are available for buffered writes or future transaction support.</p>
+<p>S3 writes require explicit <code class="docutils literal notranslate"><span class="pre">commit()</span></code>. Dropping an unfinished S3 writer discards
+its buffer and attempts to abort any multipart upload. This includes exclusive
+and append handles; Drop never publishes S3 content. Foreign handles reached
+through the C ABI also discard on Drop. Direct local append writes remain
+immediate, and generic <code class="docutils literal notranslate"><span class="pre">BufferedFile</span></code> retains its configured autocommit behavior.</p>
 </section>
 <section id="metadata-and-open-options">
 <h2>Metadata and open options<a class="headerlink" href="#metadata-and-open-options" title="Link to this heading">¶</a></h2>
