@@ -8,7 +8,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use fsspec_rs::{FilesystemFactory, FsOptions, FsResult, S3Config, SharedFileSystem};
+use fsspec_rs::{
+    FilesystemFactory, FsOptions, FsResult, S3ClientOptions, S3Config, SharedFileSystem,
+};
 
 /// Whether this extension talks to a shared `libfsspec` rather than its own
 /// copy of the backends.
@@ -16,7 +18,7 @@ pub const LINKED_TO_LIBFSSPEC: bool = cfg!(feature = "capi");
 
 #[cfg(feature = "capi")]
 mod route {
-    use fsspec_rs::{FsOptions, FsResult, S3Config, SharedFileSystem};
+    use fsspec_rs::{FsOptions, FsResult, S3ClientOptions, S3Config, SharedFileSystem};
 
     pub fn local(auto_mkdir: bool) -> FsResult<SharedFileSystem> {
         let mut options = FsOptions::new();
@@ -28,7 +30,7 @@ mod route {
         Ok(fsspec_sys::url_to_fs("memory://", &FsOptions::new())?.0)
     }
 
-    pub fn s3(config: S3Config) -> FsResult<SharedFileSystem> {
+    pub fn s3(config: S3Config, client: S3ClientOptions) -> FsResult<SharedFileSystem> {
         let mut options = FsOptions::new();
         let strings = [
             ("key", config.access_key_id),
@@ -41,6 +43,17 @@ mod route {
             if let Some(value) = value {
                 options.insert(key.to_string(), value);
             }
+        }
+        for (name, timeout) in [
+            ("connect_timeout", client.connect_timeout),
+            ("request_timeout", client.request_timeout),
+        ] {
+            if let Some(timeout) = timeout {
+                options.insert(name.into(), timeout.as_secs_f64().to_string());
+            }
+        }
+        if let Some(max_retries) = client.max_retries {
+            options.insert("max_retries".into(), max_retries.to_string());
         }
         options.insert("anon".to_string(), config.anon.to_string());
         options.insert(
@@ -59,7 +72,9 @@ mod route {
 mod route {
     use std::sync::{Arc, PoisonError};
 
-    use fsspec_rs::{FsResult, LocalFs, S3Config, S3Fs, SharedFileSystem, DEFAULT_FILESYSTEMS};
+    use fsspec_rs::{
+        FsResult, LocalFs, S3ClientOptions, S3Config, S3Fs, SharedFileSystem, DEFAULT_FILESYSTEMS,
+    };
 
     pub fn local(auto_mkdir: bool) -> FsResult<SharedFileSystem> {
         Ok(Arc::new(LocalFs::with_auto_mkdir(auto_mkdir)))
@@ -69,8 +84,8 @@ mod route {
         Ok(fsspec_rs::url_to_fs("memory://", &fsspec_rs::FsOptions::new())?.0)
     }
 
-    pub fn s3(config: S3Config) -> FsResult<SharedFileSystem> {
-        Ok(Arc::new(S3Fs::new(config)?))
+    pub fn s3(config: S3Config, client: S3ClientOptions) -> FsResult<SharedFileSystem> {
+        Ok(Arc::new(S3Fs::with_client_options(config, client)?))
     }
 
     pub fn protocols() -> FsResult<Vec<String>> {
@@ -90,8 +105,8 @@ pub fn memory() -> FsResult<SharedFileSystem> {
     route::memory()
 }
 
-pub fn s3(config: S3Config) -> FsResult<SharedFileSystem> {
-    route::s3(config)
+pub fn s3(config: S3Config, client: S3ClientOptions) -> FsResult<SharedFileSystem> {
+    route::s3(config, client)
 }
 
 pub fn protocols() -> FsResult<Vec<String>> {

@@ -299,6 +299,36 @@ fsspec_rs = { version = "0.2", default-features = false }
 Plain HTTP is allowed automatically when `endpoint_url` starts with
 `http://`, which is useful for MinIO and LocalStack.
 
+Region precedence is explicit `region`, `AWS_REGION`, then `AWS_DEFAULT_REGION`;
+without any value the backend uses `us-east-1`. When no explicit credential field
+is supplied, static credentials come from `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN`. Key and secret are
+required together. Explicit credentials never inherit an environment token.
+Anonymous access ignores credential fields. Without static credentials, the
+existing instance-metadata provider remains available. Profiles, SSO and
+`credential_process` are not implemented. AWS endpoint environment variables
+are not imported; custom endpoints require `endpoint_url`.
+
+`S3Fs::with_client_options(config, S3ClientOptions)` accepts transport overrides;
+`S3Fs::new(config)` retains defaults. `S3Config` fields are unchanged.
+
+| Field             | Rust type          | Default    | Meaning                                                                            |
+| ----------------- | ------------------ | ---------- | ---------------------------------------------------------------------------------- |
+| `connect_timeout` | `Option<Duration>` | 5 seconds  | Connection timeout.                                                                |
+| `request_timeout` | `Option<Duration>` | 30 seconds | Timeout for one HTTP request, including its body.                                  |
+| `max_retries`     | `Option<usize>`    | 10         | Additional attempts for the general client, including reads and legacy operations. |
+
+Omitted values use `object_store` defaults. Durations must be positive. Retries
+retain the backend's existing backoff and retry-time budget; request timeout is
+not a deadline for an operation containing several requests. Typed `write`
+requests always use zero retries, including when `max_retries` is set. Uncertain
+creates retain checksum recovery.
+
+Environment defaults are captured when an instance is constructed. Registry
+caches include explicit options, but not subsequent environment changes. Use
+explicit credentials and region for independently configured clients, or
+`FilesystemRegistry::url_to_fs_uncached` to capture updated environment values.
+
 ## Filesystem registry
 
 `FilesystemRegistry` maps URL protocols to `FilesystemFactory` implementations,
@@ -319,13 +349,14 @@ replaces its factory and drops its cached instances.
 
 `FilesystemRegistry::default()` registers:
 
-| Protocol        | Filesystem                      | Options                                                                                    |
-| --------------- | ------------------------------- | ------------------------------------------------------------------------------------------ |
-| `file`, `local` | `LocalFs`                       | `auto_mkdir`                                                                               |
-| `memory`        | `MemoryFs`, one per process     | none                                                                                       |
-| `s3`            | `S3Fs`, one instance per bucket | `key`, `secret`, `token`, `endpoint_url`, `region`, `anon`, `virtual_hosted_style_request` |
+| Protocol        | Filesystem                      | Options                                                                                                                                         |
+| --------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `file`, `local` | `LocalFs`                       | `auto_mkdir`                                                                                                                                    |
+| `memory`        | `MemoryFs`, one per process     | none                                                                                                                                            |
+| `s3`            | `S3Fs`, one instance per bucket | `key`, `secret`, `token`, `endpoint_url`, `region`, `anon`, `virtual_hosted_style_request`, `connect_timeout`, `request_timeout`, `max_retries` |
 
-Unknown options are rejected. Boolean options accept `true`, `false`, `1`, and `0`.
+Registry and C options encode timeouts as finite positive seconds and `max_retries`
+as a nonnegative integer, all supplied as strings. Unknown options are rejected. Boolean options accept `true`, `false`, `1`, and `0`.
 `FilesystemRegistry::empty()` starts with no protocols.
 
 `DEFAULT_FILESYSTEMS` is a process-wide registry. The `register_filesystem` and

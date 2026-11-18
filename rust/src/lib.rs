@@ -56,7 +56,7 @@ pub use registry::{
     DEFAULT_FILESYSTEMS,
 };
 #[cfg(feature = "s3")]
-pub use s3::{S3Config, S3File, S3Fs};
+pub use s3::{S3ClientOptions, S3Config, S3File, S3Fs};
 pub use types::{
     ByteRange, Condition, DuResult, FileInfo, FileType, IoCapabilities, OpenMode, OpenOptions,
     RangeReadOptions, RangeReadResult, ReadOptions, ReadResult, Validator, WalkEntry, WriteOptions,

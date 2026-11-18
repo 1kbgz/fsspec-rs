@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
+use std::time::Duration;
 
 use bytes::Bytes;
 use object_store::aws::AmazonS3Builder;
@@ -208,6 +209,47 @@ impl S3Config {
     }
 }
 
+/// Transport settings for S3. Omitted values retain object_store defaults.
+#[derive(Clone, Debug, Default)]
+pub struct S3ClientOptions {
+    pub connect_timeout: Option<Duration>,
+    pub request_timeout: Option<Duration>,
+    /// Retry count for the general client, including reads and legacy operations.
+    /// Typed writes always use zero retries.
+    pub max_retries: Option<usize>,
+}
+
+impl S3Config {
+    fn resolve_environment(mut self, env: impl Fn(&str) -> Option<String>) -> FsResult<Self> {
+        self.region = self
+            .region
+            .or_else(|| env("AWS_REGION"))
+            .or_else(|| env("AWS_DEFAULT_REGION"));
+        if self.anon {
+            self.access_key_id = None;
+            self.secret_access_key = None;
+            self.session_token = None;
+        } else {
+            if self.access_key_id.is_none()
+                && self.secret_access_key.is_none()
+                && self.session_token.is_none()
+            {
+                self.access_key_id = env("AWS_ACCESS_KEY_ID");
+                self.secret_access_key = env("AWS_SECRET_ACCESS_KEY");
+                self.session_token = env("AWS_SESSION_TOKEN");
+            }
+            if self.access_key_id.is_some() != self.secret_access_key.is_some()
+                || (self.session_token.is_some() && self.access_key_id.is_none())
+            {
+                return Err(FsError::InvalidArgument(
+                    "S3 credentials require both key and secret; token is optional".into(),
+                ));
+            }
+        }
+        Ok(self)
+    }
+}
+
 /// Sync S3 filesystem backed by an `object_store` S3 store.
 ///
 /// All async `object_store` calls are executed via an embedded tokio runtime.
@@ -224,8 +266,39 @@ pub struct S3Fs {
 impl S3Fs {
     /// Build from an [`S3Config`].
     pub fn new(cfg: S3Config) -> FsResult<Self> {
+        Self::with_client_options(cfg, S3ClientOptions::default())
+    }
+
+    /// Build with explicit transport options. Environment defaults are captured
+    /// at construction; existing clients do not reload them.
+    pub fn with_client_options(cfg: S3Config, options: S3ClientOptions) -> FsResult<Self> {
+        let cfg =
+            cfg.resolve_environment(|key| std::env::var(key).ok().filter(|v| !v.is_empty()))?;
+        let mut client = object_store::ClientOptions::new();
+        if let Some(timeout) = options.connect_timeout {
+            if timeout.is_zero() {
+                return Err(FsError::InvalidArgument(
+                    "connect_timeout must be positive".into(),
+                ));
+            }
+            client = client.with_connect_timeout(timeout);
+        }
+        if let Some(timeout) = options.request_timeout {
+            if timeout.is_zero() {
+                return Err(FsError::InvalidArgument(
+                    "request_timeout must be positive".into(),
+                ));
+            }
+            client = client.with_timeout(timeout);
+        }
+        let mut retry = object_store::RetryConfig::default();
+        if let Some(max_retries) = options.max_retries {
+            retry.max_retries = max_retries;
+        }
         let mut builder = AmazonS3Builder::new()
             .with_bucket_name(&cfg.bucket)
+            .with_client_options(client)
+            .with_retry(retry)
             .with_http_connector(crate::s3_http::Connector);
 
         if let Some(ref region) = cfg.region {
@@ -1463,6 +1536,52 @@ mod tests {
     use super::*;
     use object_store::memory::InMemory;
     use std::io::{Read, Write};
+
+    #[test]
+    fn environment_defaults_keep_explicit_credentials_together() {
+        let env = |key: &str| match key {
+            "AWS_ACCESS_KEY_ID" => Some("env-key".into()),
+            "AWS_SECRET_ACCESS_KEY" => Some("env-secret".into()),
+            "AWS_SESSION_TOKEN" => Some("env-token".into()),
+            "AWS_REGION" => Some("env-region".into()),
+            "AWS_DEFAULT_REGION" => Some("fallback-region".into()),
+            _ => None,
+        };
+        let defaults = S3Config::new("bucket").resolve_environment(env).unwrap();
+        assert_eq!(defaults.access_key_id.as_deref(), Some("env-key"));
+        assert_eq!(defaults.session_token.as_deref(), Some("env-token"));
+        assert_eq!(defaults.region.as_deref(), Some("env-region"));
+        let mut explicit = S3Config::new("bucket");
+        explicit.access_key_id = Some("own-key".into());
+        assert!(explicit.clone().resolve_environment(env).is_err());
+        explicit.secret_access_key = Some("own-secret".into());
+        explicit.region = Some("own-region".into());
+        let resolved = explicit.resolve_environment(env).unwrap();
+        assert_eq!(resolved.access_key_id.as_deref(), Some("own-key"));
+        assert!(resolved.session_token.is_none());
+        assert_eq!(resolved.region.as_deref(), Some("own-region"));
+        let mut anonymous = S3Config::new("bucket");
+        anonymous.anon = true;
+        anonymous.access_key_id = Some("partial".into());
+        let anonymous = anonymous.resolve_environment(env).unwrap();
+        assert!(anonymous.access_key_id.is_none());
+        assert!(anonymous.secret_access_key.is_none());
+        assert!(anonymous.session_token.is_none());
+    }
+
+    #[test]
+    fn resolved_region_sets_validator_scope_and_endpoint() {
+        let mut cfg = S3Config::new("bucket");
+        cfg.anon = true;
+        let cfg = cfg
+            .resolve_environment(|key| (key == "AWS_DEFAULT_REGION").then(|| "eu-west-1".into()))
+            .unwrap();
+        let fs = S3Fs::new(cfg).unwrap();
+        assert_eq!(fs.endpoint, "https://s3.eu-west-1.amazonaws.com");
+        assert!(fs
+            .validator_scope(&ObjectPath::from("key"))
+            .contains("eu-west-1"));
+    }
 
     #[test]
     fn object_paths_round_trip_keys_that_object_store_encodes() {

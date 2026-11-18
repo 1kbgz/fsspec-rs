@@ -30,6 +30,30 @@
    :member-order: bysource
 ```
 
+## S3 configuration
+
+`S3FileSystem` and `RustS3Fs` accept `client_options`, a dictionary with
+`connect_timeout` and `request_timeout` in finite positive seconds, and
+`max_retries` as a nonnegative integer. Unknown keys and invalid values are
+rejected. Omitted settings retain the backend defaults: 5 seconds to connect,
+30 seconds per request, and 10 retries. Typed writes always use zero retries;
+the setting applies to the general client used by reads and legacy operations.
+Request timeout is not an overall operation deadline.
+
+For `S3FileSystem`, explicit credentials take precedence over
+`fsspec.config.conf["s3"]`, then AWS environment credentials. Each source supplies
+key, secret and optional token together; partial explicit credentials are errors.
+`RustS3Fs` uses explicit credentials or AWS environment values directly.
+`anon=True` ignores credentials. Region precedence is explicit, Python fsspec
+configuration where applicable, `AWS_REGION`, then `AWS_DEFAULT_REGION`.
+Custom endpoints are explicit; AWS endpoint environment variables are ignored.
+Profiles, SSO and `credential_process` are not supported.
+
+Instance caches retain construction-time environment defaults. Explicit endpoint,
+credentials and client options distinguish configured instances. To select a
+new credential context in Python, pass the new credentials explicitly; bypassing
+only fsspec's Python cache does not bypass the shared C registry cache.
+
 ## Object I/O and conditions
 
 Local, memory and S3 filesystems expose `read(path, start=None, end=None, condition=None)`, `write(path, data, condition=None)` and `io_capabilities()`.

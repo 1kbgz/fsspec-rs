@@ -4,7 +4,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::Mutex;
 
 use fsspec_rs::types::{OpenMode, OpenOptions};
-use fsspec_rs::{CacheType, S3Config, SharedFileSystem};
+use fsspec_rs::{CacheType, S3ClientOptions, S3Config, SharedFileSystem};
 
 use crate::backend;
 use crate::types::{fs_error_to_pyerr, PyFileInfo};
@@ -40,6 +40,7 @@ impl RustS3Fs {
     /// * `token` — session token
     /// * `anon` — anonymous access (no signing)
     /// * `client_kwargs` — optional dict; `endpoint_url` is extracted if present
+    /// * `client_options` — connect_timeout/request_timeout in seconds and max_retries
     #[new]
     #[pyo3(signature = (
         bucket,
@@ -50,6 +51,7 @@ impl RustS3Fs {
         token = None,
         anon = false,
         client_kwargs = None,
+        client_options = None,
     ))]
     fn py_new(
         bucket: &str,
@@ -60,6 +62,7 @@ impl RustS3Fs {
         token: Option<&str>,
         anon: bool,
         client_kwargs: Option<&Bound<'_, PyDict>>,
+        client_options: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         // Allow endpoint_url to be overridden via client_kwargs (matching s3fs convention)
         let effective_endpoint = if endpoint_url.is_some() {
@@ -85,8 +88,46 @@ impl RustS3Fs {
             virtual_hosted_style_request: false,
         };
 
+        let mut client = S3ClientOptions::default();
+        if let Some(options) = client_options {
+            for (key, value) in options.iter() {
+                let key: String = key.extract()?;
+                if value.is_instance_of::<pyo3::types::PyBool>() {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                        "{key} must be numeric, not bool"
+                    )));
+                }
+                match key.as_str() {
+                    "connect_timeout" | "request_timeout" => {
+                        let seconds: f64 = value.extract()?;
+                        let timeout =
+                            std::time::Duration::try_from_secs_f64(seconds).map_err(|_| {
+                                pyo3::exceptions::PyValueError::new_err(format!(
+                                    "{key} must be finite positive seconds"
+                                ))
+                            })?;
+                        if timeout.is_zero() {
+                            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                                "{key} must be positive"
+                            )));
+                        }
+                        if key == "connect_timeout" {
+                            client.connect_timeout = Some(timeout);
+                        } else {
+                            client.request_timeout = Some(timeout);
+                        }
+                    }
+                    "max_retries" => client.max_retries = Some(value.extract()?),
+                    _ => {
+                        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                            "unknown S3 client option: {key}"
+                        )))
+                    }
+                }
+            }
+        }
         let bucket = cfg.bucket.clone();
-        let inner = backend::s3(cfg).map_err(fs_error_to_pyerr)?;
+        let inner = backend::s3(cfg, client).map_err(fs_error_to_pyerr)?;
         Ok(RustS3Fs { inner, bucket })
     }
 

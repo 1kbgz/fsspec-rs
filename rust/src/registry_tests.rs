@@ -234,3 +234,44 @@ fn factories_may_register_while_a_shared_registry_resolves() {
     assert!(!Arc::ptr_eq(&first, &second));
     assert!(Arc::ptr_eq(&second, &third));
 }
+
+#[cfg(feature = "s3")]
+#[test]
+fn s3_transport_and_credentials_scope_cached_instances() {
+    let registry = FilesystemRegistry::default();
+    let base = options(&[
+        ("endpoint_url", "http://localhost:9000"),
+        ("key", "first"),
+        ("secret", "secret"),
+        ("connect_timeout", "0.5"),
+        ("request_timeout", "2"),
+        ("max_retries", "0"),
+    ]);
+    let (first, _) = registry.url_to_fs("s3://bucket/key", &base).unwrap();
+    let (same, _) = registry.url_to_fs("s3://bucket/other", &base).unwrap();
+    assert!(Arc::ptr_eq(&first, &same));
+    for (key, value) in [
+        ("endpoint_url", "http://localhost:9001"),
+        ("key", "second"),
+        ("max_retries", "1"),
+    ] {
+        let mut changed = base.clone();
+        changed.insert(key.into(), value.into());
+        let (other, _) = registry.url_to_fs("s3://bucket/key", &changed).unwrap();
+        assert!(!Arc::ptr_eq(&first, &other));
+    }
+    for (key, value) in [
+        ("connect_timeout", "0"),
+        ("request_timeout", "NaN"),
+        ("request_timeout", "-1"),
+        ("max_retries", "-1"),
+        ("max_retries", "1.5"),
+    ] {
+        let mut invalid = base.clone();
+        invalid.insert(key.into(), value.into());
+        assert!(matches!(
+            registry.url_to_fs("s3://bucket/key", &invalid),
+            Err(FsError::InvalidArgument(_))
+        ));
+    }
+}

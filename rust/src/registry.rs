@@ -10,7 +10,7 @@ use crate::fs::FileSystem;
 use crate::local::LocalFs;
 use crate::memory::MemoryFs;
 #[cfg(feature = "s3")]
-use crate::s3::{S3Config, S3Fs};
+use crate::s3::{S3ClientOptions, S3Config, S3Fs};
 
 /// A filesystem shared between callers.
 pub type SharedFileSystem = Arc<dyn FileSystem + Send + Sync>;
@@ -339,7 +339,7 @@ fn memory_filesystem(_path: &str, options: &FsOptions) -> FsResult<SharedFileSys
 
 /// Builds one [`S3Fs`] per bucket from the same option names as the Python `S3Fs`:
 /// `key`, `secret`, `token`, `endpoint_url`, `region`, and `anon`, plus
-/// `virtual_hosted_style_request`.
+/// `virtual_hosted_style_request`, `connect_timeout`, `request_timeout`, and `max_retries`.
 #[cfg(feature = "s3")]
 struct S3Factory;
 
@@ -353,8 +353,16 @@ impl FilesystemFactory for S3Factory {
             ));
         }
         let mut config = S3Config::new(bucket);
+        let mut client = S3ClientOptions::default();
         for (key, value) in options {
             match key.as_str() {
+                "connect_timeout" => client.connect_timeout = Some(parse_timeout(key, value)?),
+                "request_timeout" => client.request_timeout = Some(parse_timeout(key, value)?),
+                "max_retries" => {
+                    client.max_retries = Some(value.parse().map_err(|_| {
+                        FsError::InvalidArgument("max_retries must be a nonnegative integer".into())
+                    })?)
+                }
                 "key" => config.access_key_id = Some(value.clone()),
                 "secret" => config.secret_access_key = Some(value.clone()),
                 "token" => config.session_token = Some(value.clone()),
@@ -367,12 +375,23 @@ impl FilesystemFactory for S3Factory {
                 _ => return Err(unknown_option("s3", key)),
             }
         }
-        Ok(Arc::new(S3Fs::new(config)?))
+        Ok(Arc::new(S3Fs::with_client_options(config, client)?))
     }
 
     fn instance_scope(&self, path: &str) -> String {
         path.split('/').next().unwrap_or_default().to_string()
     }
+}
+
+#[cfg(feature = "s3")]
+fn parse_timeout(key: &str, value: &str) -> FsResult<std::time::Duration> {
+    let invalid = || FsError::InvalidArgument(format!("{key} must be finite positive seconds"));
+    let seconds: f64 = value.parse().map_err(|_| invalid())?;
+    let duration = std::time::Duration::try_from_secs_f64(seconds).map_err(|_| invalid())?;
+    if duration.is_zero() {
+        return Err(invalid());
+    }
+    Ok(duration)
 }
 
 fn parse_bool(key: &str, value: &str) -> FsResult<bool> {
