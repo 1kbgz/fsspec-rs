@@ -346,7 +346,7 @@ checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
 
 [[package]]
 name = "fsspec_capi"
-version = "0.2.5"
+version = "0.3.0"
 dependencies = [
  "cbindgen",
  "fsspec_rs",
@@ -356,7 +356,7 @@ dependencies = [
 
 [[package]]
 name = "fsspec_rs"
-version = "0.2.5"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -372,7 +372,7 @@ dependencies = [
 
 [[package]]
 name = "fsspec_rs_bridge"
-version = "0.2.5"
+version = "0.3.0"
 dependencies = [
  "fsspec_rs",
  "pyo3",
@@ -381,7 +381,7 @@ dependencies = [
 
 [[package]]
 name = "fsspec_sys"
-version = "0.2.5"
+version = "0.3.0"
 dependencies = [
  "fsspec_capi",
  "fsspec_rs",
