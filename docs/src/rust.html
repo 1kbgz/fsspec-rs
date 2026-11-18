@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Rust traits and types &#8212; fsspec-rs v0.2.5</title>
+    <title>Rust traits and types &#8212; fsspec-rs v0.3.0</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/fuma.css?v=ca04d621" />
     <link rel="stylesheet" type="text/css" href="../../_static/fuma-code.css?v=a950e949" />
@@ -16,7 +16,7 @@
     <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=6a604523" />
     <link rel="stylesheet" type="text/css" href="../../_static/fonts/fuma-fonts.css?v=c2892c73" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/custom.css?v=88c24c6a" />
-    <script src="../../_static/documentation_options.js?v=cb850272"></script>
+    <script src="../../_static/documentation_options.js?v=e259d695"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
@@ -49,7 +49,7 @@
   <div class="fd-subnav-inner">
     <button type="button" class="fd-icon-button fd-sidebar-toggle" aria-controls="fd-sidebar" aria-expanded="false" aria-label="Toggle navigation" title="Toggle navigation">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
-    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.2.5</span>
+    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.3.0</span>
 </a>
 
     <div class="fd-nav-actions">
@@ -64,7 +64,7 @@
 
 <aside id="fd-sidebar" aria-label="Documentation">
   <div class="fd-sidebar-header">
-    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.2.5</span>
+    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.3.0</span>
 </a>
       <button type="button" class="fd-icon-button fd-sidebar-collapse" aria-label="Collapse sidebar" title="Collapse sidebar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
     </div>
@@ -540,6 +540,52 @@ Tokio and builds for <code class="docutils literal notranslate"><span class="pre
 </ul>
 <p>Plain HTTP is allowed automatically when <code class="docutils literal notranslate"><span class="pre">endpoint_url</span></code> starts with
 <code class="docutils literal notranslate"><span class="pre">http://</span></code>, which is useful for MinIO and LocalStack.</p>
+<p>Region precedence is explicit <code class="docutils literal notranslate"><span class="pre">region</span></code>, <code class="docutils literal notranslate"><span class="pre">AWS_REGION</span></code>, then <code class="docutils literal notranslate"><span class="pre">AWS_DEFAULT_REGION</span></code>;
+without any value the backend uses <code class="docutils literal notranslate"><span class="pre">us-east-1</span></code>. When no explicit credential field
+is supplied, static credentials come from <code class="docutils literal notranslate"><span class="pre">AWS_ACCESS_KEY_ID</span></code>,
+<code class="docutils literal notranslate"><span class="pre">AWS_SECRET_ACCESS_KEY</span></code>, and optional <code class="docutils literal notranslate"><span class="pre">AWS_SESSION_TOKEN</span></code>. Key and secret are
+required together. Explicit credentials never inherit an environment token.
+Anonymous access ignores credential fields. Without static credentials, the
+existing instance-metadata provider remains available. Profiles, SSO and
+<code class="docutils literal notranslate"><span class="pre">credential_process</span></code> are not implemented. AWS endpoint environment variables
+are not imported; custom endpoints require <code class="docutils literal notranslate"><span class="pre">endpoint_url</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">S3Fs::with_client_options(config,</span> <span class="pre">S3ClientOptions)</span></code> accepts transport overrides;
+<code class="docutils literal notranslate"><span class="pre">S3Fs::new(config)</span></code> retains defaults. <code class="docutils literal notranslate"><span class="pre">S3Config</span></code> fields are unchanged.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Rust type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">connect_timeout</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Option&lt;Duration&gt;</span></code></p></td>
+<td><p>5 seconds</p></td>
+<td><p>Connection timeout.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">request_timeout</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Option&lt;Duration&gt;</span></code></p></td>
+<td><p>30 seconds</p></td>
+<td><p>Timeout for one HTTP request, including its body.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">max_retries</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Option&lt;usize&gt;</span></code></p></td>
+<td><p>10</p></td>
+<td><p>Additional attempts for the general client, including reads and legacy operations.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Omitted values use <code class="docutils literal notranslate"><span class="pre">object_store</span></code> defaults. Durations must be positive. Retries
+retain the backend’s existing backoff and retry-time budget; request timeout is
+not a deadline for an operation containing several requests. Typed <code class="docutils literal notranslate"><span class="pre">write</span></code>
+requests always use zero retries, including when <code class="docutils literal notranslate"><span class="pre">max_retries</span></code> is set. Uncertain
+creates retain checksum recovery.</p>
+<p>Environment defaults are captured when an instance is constructed. Registry
+caches include explicit options, but not subsequent environment changes. Use
+explicit credentials and region for independently configured clients, or
+<code class="docutils literal notranslate"><span class="pre">FilesystemRegistry::url_to_fs_uncached</span></code> to capture updated environment values.</p>
 </section>
 <section id="filesystem-registry">
 <h2>Filesystem registry<a class="headerlink" href="#filesystem-registry" title="Link to this heading">¶</a></h2>
@@ -575,11 +621,12 @@ replaces its factory and drops its cached instances.</p>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s3</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">S3Fs</span></code>, one instance per bucket</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">key</span></code>, <code class="docutils literal notranslate"><span class="pre">secret</span></code>, <code class="docutils literal notranslate"><span class="pre">token</span></code>, <code class="docutils literal notranslate"><span class="pre">endpoint_url</span></code>, <code class="docutils literal notranslate"><span class="pre">region</span></code>, <code class="docutils literal notranslate"><span class="pre">anon</span></code>, <code class="docutils literal notranslate"><span class="pre">virtual_hosted_style_request</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">key</span></code>, <code class="docutils literal notranslate"><span class="pre">secret</span></code>, <code class="docutils literal notranslate"><span class="pre">token</span></code>, <code class="docutils literal notranslate"><span class="pre">endpoint_url</span></code>, <code class="docutils literal notranslate"><span class="pre">region</span></code>, <code class="docutils literal notranslate"><span class="pre">anon</span></code>, <code class="docutils literal notranslate"><span class="pre">virtual_hosted_style_request</span></code>, <code class="docutils literal notranslate"><span class="pre">connect_timeout</span></code>, <code class="docutils literal notranslate"><span class="pre">request_timeout</span></code>, <code class="docutils literal notranslate"><span class="pre">max_retries</span></code></p></td>
 </tr>
 </tbody>
 </table>
-<p>Unknown options are rejected. Boolean options accept <code class="docutils literal notranslate"><span class="pre">true</span></code>, <code class="docutils literal notranslate"><span class="pre">false</span></code>, <code class="docutils literal notranslate"><span class="pre">1</span></code>, and <code class="docutils literal notranslate"><span class="pre">0</span></code>.
+<p>Registry and C options encode timeouts as finite positive seconds and <code class="docutils literal notranslate"><span class="pre">max_retries</span></code>
+as a nonnegative integer, all supplied as strings. Unknown options are rejected. Boolean options accept <code class="docutils literal notranslate"><span class="pre">true</span></code>, <code class="docutils literal notranslate"><span class="pre">false</span></code>, <code class="docutils literal notranslate"><span class="pre">1</span></code>, and <code class="docutils literal notranslate"><span class="pre">0</span></code>.
 <code class="docutils literal notranslate"><span class="pre">FilesystemRegistry::empty()</span></code> starts with no protocols.</p>
 <p><code class="docutils literal notranslate"><span class="pre">DEFAULT_FILESYSTEMS</span></code> is a process-wide registry. The <code class="docutils literal notranslate"><span class="pre">register_filesystem</span></code> and
 <code class="docutils literal notranslate"><span class="pre">url_to_fs</span></code> functions use it.</p>

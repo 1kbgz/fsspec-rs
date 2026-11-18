@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>API reference &#8212; fsspec-rs v0.2.5</title>
+    <title>API reference &#8212; fsspec-rs v0.3.0</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/fuma.css?v=ca04d621" />
     <link rel="stylesheet" type="text/css" href="../../_static/fuma-code.css?v=a950e949" />
@@ -16,7 +16,7 @@
     <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=6a604523" />
     <link rel="stylesheet" type="text/css" href="../../_static/fonts/fuma-fonts.css?v=c2892c73" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/custom.css?v=88c24c6a" />
-    <script src="../../_static/documentation_options.js?v=cb850272"></script>
+    <script src="../../_static/documentation_options.js?v=e259d695"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
@@ -49,7 +49,7 @@
   <div class="fd-subnav-inner">
     <button type="button" class="fd-icon-button fd-sidebar-toggle" aria-controls="fd-sidebar" aria-expanded="false" aria-label="Toggle navigation" title="Toggle navigation">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
-    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.2.5</span>
+    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.3.0</span>
 </a>
 
     <div class="fd-nav-actions">
@@ -64,7 +64,7 @@
 
 <aside id="fd-sidebar" aria-label="Documentation">
   <div class="fd-sidebar-header">
-    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.2.5</span>
+    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.3.0</span>
 </a>
       <button type="button" class="fd-icon-button fd-sidebar-collapse" aria-label="Collapse sidebar" title="Collapse sidebar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
     </div>
@@ -469,6 +469,9 @@
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.S3FileSystem.write_text">S3FileSystem.write_text()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#s3-configuration">S3 configuration</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
@@ -1283,14 +1286,17 @@ way of delegating credentials.</p>
 <p>The protocol is registered as <code class="docutils literal notranslate"><span class="pre">&quot;s3-rs&quot;</span></code> so it can coexist with the
 pure-Python <code class="docutils literal notranslate"><span class="pre">s3fs.S3FileSystem</span></code> which owns the <code class="docutils literal notranslate"><span class="pre">&quot;s3&quot;</span></code> protocol.</p>
 <dl class="simple">
-<dt>Credential resolution (matching s3fs conventions):</dt><dd><ol class="arabic simple">
+<dt>Credential resolution:</dt><dd><ol class="arabic simple">
 <li><p>Explicit keyword arguments (<code class="docutils literal notranslate"><span class="pre">key</span></code>, <code class="docutils literal notranslate"><span class="pre">secret</span></code>, <code class="docutils literal notranslate"><span class="pre">endpoint_url</span></code>, …)</p></li>
 <li><p>Values from <code class="docutils literal notranslate"><span class="pre">fsspec.config.conf[&quot;s3&quot;]</span></code> (populated from <code class="docutils literal notranslate"><span class="pre">FSSPEC_S3_*</span></code>
 environment variables)</p></li>
-<li><p>Falls through to object_store’s own credential chain (IAM roles, etc.)</p></li>
+<li><p>AWS environment credentials, then the instance-metadata provider.</p></li>
 </ol>
 </dd>
 </dl>
+<p>Key, secret and optional token are selected together from one source.
+<code class="docutils literal notranslate"><span class="pre">client_options</span></code> accepts <code class="docutils literal notranslate"><span class="pre">connect_timeout</span></code> and <code class="docutils literal notranslate"><span class="pre">request_timeout</span></code> in
+seconds, and <code class="docutils literal notranslate"><span class="pre">max_retries</span></code>. Typed writes always disable automatic retries.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="fsspec_rs.S3FileSystem.protocol">
 <span class="sig-name descname"><span class="pre">protocol</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">('s3-rs',)</span></em><a class="headerlink" href="#fsspec_rs.S3FileSystem.protocol" title="Link to this definition">¶</a></dt>
@@ -1904,6 +1910,28 @@ leave file unchanged, if backend allows this</p></li>
 
 </dd></dl>
 
+</section>
+<section id="s3-configuration">
+<h2>S3 configuration<a class="headerlink" href="#s3-configuration" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">S3FileSystem</span></code> and <code class="docutils literal notranslate"><span class="pre">RustS3Fs</span></code> accept <code class="docutils literal notranslate"><span class="pre">client_options</span></code>, a dictionary with
+<code class="docutils literal notranslate"><span class="pre">connect_timeout</span></code> and <code class="docutils literal notranslate"><span class="pre">request_timeout</span></code> in finite positive seconds, and
+<code class="docutils literal notranslate"><span class="pre">max_retries</span></code> as a nonnegative integer. Unknown keys and invalid values are
+rejected. Omitted settings retain the backend defaults: 5 seconds to connect,
+30 seconds per request, and 10 retries. Typed writes always use zero retries;
+the setting applies to the general client used by reads and legacy operations.
+Request timeout is not an overall operation deadline.</p>
+<p>For <code class="docutils literal notranslate"><span class="pre">S3FileSystem</span></code>, explicit credentials take precedence over
+<code class="docutils literal notranslate"><span class="pre">fsspec.config.conf[&quot;s3&quot;]</span></code>, then AWS environment credentials. Each source supplies
+key, secret and optional token together; partial explicit credentials are errors.
+<code class="docutils literal notranslate"><span class="pre">RustS3Fs</span></code> uses explicit credentials or AWS environment values directly.
+<code class="docutils literal notranslate"><span class="pre">anon=True</span></code> ignores credentials. Region precedence is explicit, Python fsspec
+configuration where applicable, <code class="docutils literal notranslate"><span class="pre">AWS_REGION</span></code>, then <code class="docutils literal notranslate"><span class="pre">AWS_DEFAULT_REGION</span></code>.
+Custom endpoints are explicit; AWS endpoint environment variables are ignored.
+Profiles, SSO and <code class="docutils literal notranslate"><span class="pre">credential_process</span></code> are not supported.</p>
+<p>Instance caches retain construction-time environment defaults. Explicit endpoint,
+credentials and client options distinguish configured instances. To select a
+new credential context in Python, pass the new credentials explicitly; bypassing
+only fsspec’s Python cache does not bypass the shared C registry cache.</p>
 </section>
 <section id="object-i-o-and-conditions">
 <h2>Object I/O and conditions<a class="headerlink" href="#object-i-o-and-conditions" title="Link to this heading">¶</a></h2>
@@ -2662,6 +2690,9 @@ blocks are allowed to be. Disallows further writing to this file.</p>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#fsspec_rs.S3FileSystem.write_text">S3FileSystem.write_text()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#s3-configuration">S3 configuration</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>

@@ -63,8 +63,21 @@ fs = S3FileSystem(
 )
 ```
 
-Use `anon=True` for anonymous access. For AWS, omit explicit credentials to use the
-`object_store` credential chain.
+Use `anon=True` for anonymous access. For AWS, omit explicit credentials to use
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN`.
+Without static credentials, the backend uses its instance-metadata provider.
+
+Set transport limits through `client_options`:
+
+```python
+fs = S3FileSystem(
+    bucket="reports",
+    client_options={"connect_timeout": 2, "request_timeout": 15, "max_retries": 3},
+)
+```
+
+Pass explicit key/secret pairs when accessing multiple credential contexts.
+See [S3 configuration](api.md) for precedence, cache behavior and retry limits.
 
 ## Limit memory use for S3 reads
 
