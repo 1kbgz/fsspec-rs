@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-import fsspec
 from fsspec.config import conf
 from fsspec.spec import AbstractBufferedFile
 
 from fsspec_rs._conditions import reject_unsupported_conditions
+from fsspec_rs._files import FileSystem
 from fsspec_rs._ranges import cat_ranges as _cat_ranges
 from fsspec_rs.fsspec_rs import IoCapabilities, Match, Missing, RangeReadResult, ReadResult, RustS3Fs, WriteResult
 
 
 @reject_unsupported_conditions
-class S3FileSystem(fsspec.AbstractFileSystem):
+class S3FileSystem(FileSystem):
     """S3 filesystem backed by the Rust ``S3Fs`` implementation.
 
     The protocol is registered as ``"s3-rs"`` so it can coexist with the
@@ -266,6 +266,14 @@ class S3File(AbstractBufferedFile):
     def close(self):
         self._rust_file.close()
 
+    def discard(self):
+        """Discard pending writes and close; direct local writes cannot be undone."""
+        self._rust_file.discard()
+
+    def __del__(self):
+        if not self.closed:
+            self.discard()
+
     @property
     def closed(self) -> bool:
         return self._rust_file is None or self._rust_file.closed
@@ -282,8 +290,11 @@ class S3File(AbstractBufferedFile):
     def __enter__(self):
         return self
 
-    def __exit__(self, *args):
-        self.close()
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is None:
+            self.close()
+        else:
+            self.discard()
 
     def __repr__(self) -> str:
         state = "closed" if self.closed else "open"

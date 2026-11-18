@@ -66,6 +66,60 @@ Python exception types. Passing `condition=` to open handles is unsupported.
 See [Rust object I/O](rust.md) for capability flags,
 range consistency and local exclusive-creation semantics.
 
+### Operation errors
+
+Errors returned by typed `read`, `write` and `read_ranges` expose `.kind` and
+`.retry_safe`. The kind is one of `not_found`, `already_exists`, `conflict`,
+`gap`, `permission_denied`, `unavailable`, `timeout`, `corrupt`, `invalid`,
+`cancelled`, `unknown_outcome`, or the compatibility categories `not_a_directory`,
+`is_a_directory`, `io`, `not_supported` and `other`.
+
+Standard Python exceptions remain available: `FileNotFoundError`,
+`FileExistsError`, `PermissionError`, `TimeoutError`, `ValueError` and
+`NotImplementedError`. Additional `OSError` subclasses are `ConflictError`,
+`GapError`, `UnavailableError`, `CorruptError`, `CancelledError` and
+`UnknownOutcomeError`. `GapError` is available for backends with positioned
+writes; byte writes do not produce it themselves. Argument errors raised before
+backend dispatch do not necessarily have operation metadata.
+
+`retry_safe=True` means repeating the operation is safe. False includes cases
+where safety cannot be established. Transient S3 read failures are safe to retry;
+an uncertain write is not. Legacy file-handle operations retain their existing
+error contract.
+
+### Uncertain creates
+
+S3 typed writes send one PUT attempt. Following an uncertain response to
+`write(..., condition=Missing())`, the backend reads the object and compares its
+SHA-256 checksum with the supplied bytes. Matching content acknowledges success;
+different content returns `ConflictError`. An absent object or failed verification
+returns `UnknownOutcomeError` with `retry_safe=False`. Local exclusive writes
+use the same content check after an I/O failure. An ETag is never treated as a
+content checksum.
+
+Recovered success acknowledges matching content for immutable publication; it
+does not establish ownership of a lock or prove which writer created the object.
+A definitive precondition failure remains a conflict, including when existing
+content matches. Ordinary overwrites and Match writes with uncertain outcomes
+return `UnknownOutcomeError` without content-based recovery.
+
+## File write lifecycle
+
+Native Python handles and the filesystem wrappers publish buffered writes on
+explicit `close()` or clean context-manager exit. `discard()` closes the handle
+without publishing pending data. Exceptional exits and finalizers discard.
+Uncompressed text handles returned by `fs.open` follow the same rules.
+
+Direct local append writes are immediately visible and cannot be rolled back.
+Explicit flushes can pass text to the underlying handle. External wrappers,
+including compression and `fsspec.open`'s `OpenFile`, control their own close
+behavior; their exception handling is outside this lifecycle contract.
+
+S3 exclusive handles still buffer the complete object. Ordinary S3 writers use
+multipart uploads for large objects; abandoned uploads are aborted on a
+best-effort basis. A process crash can leave multipart uploads requiring the
+store's retention policy.
+
 ## Range reads
 
 `read_ranges(path, ranges, *, condition=None, max_gap=65536, max_request_size=8388608, max_concurrency=8)` returns a frozen `RangeReadResult`.

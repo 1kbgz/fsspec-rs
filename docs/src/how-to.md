@@ -114,3 +114,36 @@ def records_storage_options():
 Storage options must be JSON-serializable, because one test reopens the store
 in a separate process. `file-rs`, `s3-rs`, and `s3fs` pass. fsspec's `file`
 protocol fails the replacement test because it writes directly to the target.
+
+(create-conformance)=
+
+## Check create-if-absent on a storage deployment
+
+Choose a scratch prefix where the test may create and delete manifest objects.
+Run the reusable suite against each AWS bucket configuration, S3-compatible
+server, and NFS mount used for publication:
+
+```bash
+export FSSPEC_CREATE_TEST_URL='s3-rs://test-bucket/create-checks'
+export FSSPEC_CREATE_TEST_OPTIONS='{"region": "us-east-1"}'
+pytest fsspec_rs/tests/test_create_conformance.py -k deployment
+```
+
+For an on-prem store, add `endpoint_url` and the required credential settings to
+`FSSPEC_CREATE_TEST_OPTIONS`, or use your existing credential configuration.
+For NFS, use a `file-rs:///mount/create-checks` URL and
+`FSSPEC_CREATE_TEST_OPTIONS='{"auto_mkdir": true}'`.
+
+The suite creates a unique subdirectory, checks competing creates, verifies
+complete binary and empty objects through a second client, and removes its test
+files. Local directories may remain empty. To reuse it in another repository,
+import `fsspec_rs.testing.create` tests and supply `create_url` and
+`create_storage_options` fixtures with a unique scratch prefix.
+
+Record the package version, store version, endpoint configuration and mount
+options with the results. Run failure-injection checks in your deployment for
+lost acknowledgements and interrupted writes; the local protocol tests in
+`test_create_recovery.py` exercise those client paths without certifying a real
+store. For NFS, also verify visibility and competing publication from separate
+hosts. The in-process local, memory and simulated S3 results are not AWS,
+on-prem or NFS certification.

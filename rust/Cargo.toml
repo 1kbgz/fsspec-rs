@@ -17,14 +17,16 @@ crate-type = ["rlib"]
 object_store = { version = "0.14", features = ["aws"], optional = true }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "sync"], optional = true }
 futures-util = { version = "0.3", optional = true }
+async-trait = { version = "0.1", optional = true }
 bytes = "1"
+sha2 = "0.10"
 url = "2"
 percent-encoding = "2"
 
 [features]
 default = ["s3"]
 # S3Fs and the `s3` registry protocol. Without it the crate builds for wasm32-unknown-unknown.
-s3 = ["dep:object_store", "dep:tokio", "dep:futures-util"]
+s3 = ["dep:object_store", "dep:tokio", "dep:futures-util", "dep:async-trait"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tempfile = "3"

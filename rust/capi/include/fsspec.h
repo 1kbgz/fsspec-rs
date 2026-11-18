@@ -20,6 +20,28 @@
  */
 #define FSSPEC_CONFLICT 10
 
+#define FSSPEC_GAP 11
+
+#define FSSPEC_UNAVAILABLE 12
+
+#define FSSPEC_TIMEOUT 13
+
+#define FSSPEC_CORRUPT 14
+
+#define FSSPEC_CANCELLED 15
+
+#define FSSPEC_UNKNOWN_OUTCOME 16
+
+/**
+ * Mask a typed operation status with this value to obtain its error kind.
+ */
+#define FSSPEC_ERROR_KIND_MASK 65535
+
+/**
+ * A typed operation status may include this bit when repeating the operation is safe.
+ */
+#define FSSPEC_RETRY_SAFE 65536
+
 /**
  * Match the supplied object validator.
  */
@@ -434,8 +456,8 @@ fsspec_status fsspec_file_commit(struct fsspec_file *file);
 fsspec_status fsspec_file_discard(struct fsspec_file *file);
 
 /**
- * Flushes and closes the file. The handle is freed even when the flush
- * fails. Null is ignored.
+ * Flushes, commits, and closes the file. The handle is freed even on error.
+ * Call discard first to abandon pending writes. Null is ignored.
  */
 fsspec_status fsspec_file_close(struct fsspec_file *file);
 

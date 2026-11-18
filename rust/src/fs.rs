@@ -205,13 +205,60 @@ pub(crate) fn write_with_exclusive_create<F: FileSystem + ?Sized>(
                 }
                 result
             };
-            write().map_err(|error| match error {
-                FsError::AlreadyExists(message) => OperationError::Conflict(message),
-                other => other.into(),
-            })?;
+            match write() {
+                Ok(()) => (),
+                Err(FsError::AlreadyExists(message)) => {
+                    return Err(OperationError::Conflict(message))
+                }
+                Err(FsError::IoError(error)) => {
+                    return resolve_exclusive_create(fs, path, data, error)
+                }
+                Err(error) => return Err(error.into()),
+            }
         }
     }
     Ok(WriteResult { validator: None })
+}
+
+fn resolve_exclusive_create<F: FileSystem + ?Sized>(
+    fs: &F,
+    path: &str,
+    expected: &[u8],
+    cause: std::io::Error,
+) -> Result<WriteResult, OperationError> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let verify = || -> FsResult<bool> {
+        let mut file = fs.open(path, OpenMode::Read, None)?;
+        let mut digest = Sha256::new();
+        let mut count = 0;
+        let mut buffer = [0; 32768];
+        loop {
+            let read = file.read(&mut buffer)?;
+            if read == 0 {
+                break;
+            }
+            count += read;
+            if count > expected.len() {
+                return Ok(false);
+            }
+            digest.update(&buffer[..read]);
+        }
+        Ok(count == expected.len() && digest.finalize() == Sha256::digest(expected))
+    };
+    match verify() {
+        Ok(true) => Ok(WriteResult { validator: None }),
+        Ok(false) => Err(OperationError::Conflict(format!(
+            "{path}: existing object differs from uncertain create"
+        ))),
+        Err(verification) => Err(OperationError::Detailed {
+            kind: crate::ErrorKind::UnknownOutcome,
+            message: format!(
+                "{path}: create outcome unknown: {cause}; verification failed: {verification}"
+            ),
+            retry_safe: false,
+        }),
+    }
 }
 
 pub trait FileSystem {
@@ -652,5 +699,27 @@ pub trait FileSystem {
         }
         dst.flush()?;
         dst.commit()
+    }
+}
+
+#[cfg(test)]
+mod create_recovery_tests {
+    use super::*;
+    use crate::{ErrorKind, MemoryFs};
+
+    #[test]
+    fn uncertain_create_resolves_only_verified_content() {
+        let fs = MemoryFs::new();
+        let cause = || std::io::Error::new(std::io::ErrorKind::TimedOut, "lost acknowledgement");
+        let missing = resolve_exclusive_create(&fs, "/manifest", b"expected", cause()).unwrap_err();
+        assert_eq!(missing.kind(), ErrorKind::UnknownOutcome);
+        assert!(!missing.retry_safe());
+        fs.pipe_file("/manifest", b"expected").unwrap();
+        assert!(resolve_exclusive_create(&fs, "/manifest", b"expected", cause()).is_ok());
+        fs.pipe_file("/manifest", b"replaced").unwrap();
+        let conflict =
+            resolve_exclusive_create(&fs, "/manifest", b"expected", cause()).unwrap_err();
+        assert_eq!(conflict.kind(), ErrorKind::Conflict);
+        assert!(!conflict.retry_safe());
     }
 }

@@ -1132,3 +1132,104 @@ fn range_entry_rejects_invalid_pointers_and_options() {
         fsspec_fs_release(fs);
     }
 }
+
+#[derive(Default)]
+struct FinalizationCounts {
+    commits: AtomicUsize,
+    discards: AtomicUsize,
+    releases: AtomicUsize,
+}
+
+struct TransactionFile {
+    counts: std::sync::Arc<FinalizationCounts>,
+    fail_commit: bool,
+    fail_discard: bool,
+}
+
+impl Read for TransactionFile {
+    fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+        Ok(0)
+    }
+}
+impl Write for TransactionFile {
+    fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+        Ok(data.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+impl Seek for TransactionFile {
+    fn seek(&mut self, _: SeekFrom) -> std::io::Result<u64> {
+        Ok(0)
+    }
+}
+impl FsFile for TransactionFile {
+    fn info(&self) -> fsspec_rs::FsResult<fsspec_rs::FileInfo> {
+        Ok(fsspec_rs::FileInfo::file("transaction", 0))
+    }
+    fn size(&self) -> fsspec_rs::FsResult<Option<u64>> {
+        Ok(Some(0))
+    }
+    fn commit(&mut self) -> fsspec_rs::FsResult<()> {
+        self.counts.commits.fetch_add(1, Ordering::Relaxed);
+        if self.fail_commit {
+            Err(FsError::Other("commit failed".into()))
+        } else {
+            Ok(())
+        }
+    }
+    fn discard(&mut self) -> fsspec_rs::FsResult<()> {
+        self.counts.discards.fetch_add(1, Ordering::Relaxed);
+        if self.fail_discard {
+            Err(FsError::Other("discard failed".into()))
+        } else {
+            Ok(())
+        }
+    }
+}
+impl Drop for TransactionFile {
+    fn drop(&mut self) {
+        self.counts.releases.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+#[test]
+fn closing_files_finalizes_once_even_after_errors() {
+    for (operation, fail_commit, fail_discard, commits, discards) in [
+        ("close", false, false, 1, 0),
+        ("commit", false, false, 1, 0),
+        ("discard", false, false, 0, 1),
+        ("discard", false, true, 0, 1),
+        ("close", true, false, 1, 1),
+    ] {
+        let counts = std::sync::Arc::new(FinalizationCounts::default());
+        let handle = FileData::into_raw(Box::new(TransactionFile {
+            counts: counts.clone(),
+            fail_commit,
+            fail_discard,
+        }));
+        unsafe {
+            if operation == "commit" {
+                assert_eq!(fsspec_file_commit(handle), FSSPEC_OK);
+                assert_eq!(fsspec_file_discard(handle), FSSPEC_OK);
+            } else if operation == "discard" {
+                assert_eq!(
+                    fsspec_file_discard(handle),
+                    if fail_discard {
+                        FSSPEC_OTHER
+                    } else {
+                        FSSPEC_OK
+                    }
+                );
+            }
+            assert_eq!(
+                fsspec_file_close(handle),
+                if fail_commit { FSSPEC_OTHER } else { FSSPEC_OK }
+            );
+        }
+        assert_eq!(counts.commits.load(Ordering::Relaxed), commits);
+        assert_eq!(counts.discards.load(Ordering::Relaxed), discards);
+        assert_eq!(counts.releases.load(Ordering::Relaxed), 1);
+    }
+}

@@ -42,6 +42,16 @@ pub use fsspec_status::*;
 /// A raw integer permits new operation errors without extending `fsspec_status`.
 pub type fsspec_operation_status = i32;
 pub const FSSPEC_CONFLICT: fsspec_operation_status = 10;
+pub const FSSPEC_GAP: fsspec_operation_status = 11;
+pub const FSSPEC_UNAVAILABLE: fsspec_operation_status = 12;
+pub const FSSPEC_TIMEOUT: fsspec_operation_status = 13;
+pub const FSSPEC_CORRUPT: fsspec_operation_status = 14;
+pub const FSSPEC_CANCELLED: fsspec_operation_status = 15;
+pub const FSSPEC_UNKNOWN_OUTCOME: fsspec_operation_status = 16;
+/// Mask a typed operation status with this value to obtain its error kind.
+pub const FSSPEC_ERROR_KIND_MASK: fsspec_operation_status = 0xffff;
+/// A typed operation status may include this bit when repeating the operation is safe.
+pub const FSSPEC_RETRY_SAFE: fsspec_operation_status = 0x10000;
 pub const FSSPEC_CONDITION_MATCH: u32 = 1;
 pub const FSSPEC_CONDITION_MISSING: u32 = 2;
 

@@ -15,9 +15,12 @@ if _os.name == "nt" and (_PREFIX / "lib").is_dir():
 from fsspec.registry import register_implementation as _register
 
 from fsspec_rs.fsspec_rs import (
+    CancelledError,
     ConflictError,
+    CorruptError,
     FileInfo,
     FileType,
+    GapError,
     IoCapabilities,
     Match,
     Missing,
@@ -29,6 +32,8 @@ from fsspec_rs.fsspec_rs import (
     RustMemoryFs,
     RustS3File,
     RustS3Fs,
+    UnavailableError,
+    UnknownOutcomeError,
     Validator,
     WriteResult,
 )

@@ -4,37 +4,64 @@ use std::mem::size_of;
 use std::ptr;
 
 use fsspec_rs::{
-    Condition, FsResult, IoCapabilities, OperationError, ReadOptions, ReadResult, Validator,
-    WriteOptions, WriteResult,
+    Condition, ErrorKind, FsResult, IoCapabilities, OperationError, ReadOptions, ReadResult,
+    Validator, WriteOptions, WriteResult,
 };
 
 use crate::types::*;
 use crate::util::{invalid, str_arg};
 
 pub fn operation_status(error: &OperationError) -> fsspec_operation_status {
-    match error {
-        OperationError::Conflict(_) => FSSPEC_CONFLICT,
-        OperationError::FileSystem(error) => crate::status_code(error) as i32,
-        _ => FSSPEC_OTHER as i32,
-    }
+    error.kind() as i32
+        | if error.retry_safe() {
+            FSSPEC_RETRY_SAFE
+        } else {
+            0
+        }
 }
 
 pub fn operation_error(status: fsspec_operation_status, message: String) -> OperationError {
+    let kind = match status & FSSPEC_ERROR_KIND_MASK {
+        1 => ErrorKind::NotFound,
+        2 => ErrorKind::PermissionDenied,
+        3 => ErrorKind::AlreadyExists,
+        4 => ErrorKind::NotADirectory,
+        5 => ErrorKind::IsADirectory,
+        6 => ErrorKind::Io,
+        7 => ErrorKind::Invalid,
+        8 => ErrorKind::NotSupported,
+        9 => ErrorKind::Other,
+        10 => ErrorKind::Conflict,
+        11 => ErrorKind::Gap,
+        12 => ErrorKind::Unavailable,
+        13 => ErrorKind::Timeout,
+        14 => ErrorKind::Corrupt,
+        15 => ErrorKind::Cancelled,
+        16 => ErrorKind::UnknownOutcome,
+        _ => ErrorKind::Other,
+    };
     if status == FSSPEC_CONFLICT {
         return OperationError::Conflict(message);
     }
-    let status = match status {
-        1 => FSSPEC_NOT_FOUND,
-        2 => FSSPEC_PERMISSION_DENIED,
-        3 => FSSPEC_ALREADY_EXISTS,
-        4 => FSSPEC_NOT_A_DIRECTORY,
-        5 => FSSPEC_IS_A_DIRECTORY,
-        6 => FSSPEC_IO,
-        7 => FSSPEC_INVALID_ARGUMENT,
-        8 => FSSPEC_NOT_SUPPORTED,
-        _ => FSSPEC_OTHER,
-    };
-    OperationError::FileSystem(crate::error_from_status(status, message))
+    if (1..=9).contains(&status) {
+        let legacy = match status {
+            1 => FSSPEC_NOT_FOUND,
+            2 => FSSPEC_PERMISSION_DENIED,
+            3 => FSSPEC_ALREADY_EXISTS,
+            4 => FSSPEC_NOT_A_DIRECTORY,
+            5 => FSSPEC_IS_A_DIRECTORY,
+            6 => FSSPEC_IO,
+            7 => FSSPEC_INVALID_ARGUMENT,
+            8 => FSSPEC_NOT_SUPPORTED,
+            _ => FSSPEC_OTHER,
+        };
+        return OperationError::FileSystem(crate::error_from_status(legacy, message));
+    }
+    OperationError::Detailed {
+        kind,
+        message,
+        retry_safe: status & FSSPEC_RETRY_SAFE != 0 && kind != ErrorKind::UnknownOutcome,
+    }
 }
 
 impl fsspec_validator {

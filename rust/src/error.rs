@@ -24,6 +24,77 @@ pub enum FsError {
     Other(String),
 }
 
+/// Stable error categories shared by typed Rust, Python, and C operations.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(i32)]
+#[non_exhaustive]
+pub enum ErrorKind {
+    NotFound = 1,
+    PermissionDenied = 2,
+    AlreadyExists = 3,
+    NotADirectory = 4,
+    IsADirectory = 5,
+    Io = 6,
+    Invalid = 7,
+    NotSupported = 8,
+    Other = 9,
+    Conflict = 10,
+    Gap = 11,
+    Unavailable = 12,
+    Timeout = 13,
+    Corrupt = 14,
+    Cancelled = 15,
+    UnknownOutcome = 16,
+}
+
+impl ErrorKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NotFound => "not_found",
+            Self::PermissionDenied => "permission_denied",
+            Self::AlreadyExists => "already_exists",
+            Self::NotADirectory => "not_a_directory",
+            Self::IsADirectory => "is_a_directory",
+            Self::Io => "io",
+            Self::Invalid => "invalid",
+            Self::NotSupported => "not_supported",
+            Self::Other => "other",
+            Self::Conflict => "conflict",
+            Self::Gap => "gap",
+            Self::Unavailable => "unavailable",
+            Self::Timeout => "timeout",
+            Self::Corrupt => "corrupt",
+            Self::Cancelled => "cancelled",
+            Self::UnknownOutcome => "unknown_outcome",
+        }
+    }
+}
+
+impl FsError {
+    pub fn kind(&self) -> ErrorKind {
+        match self {
+            Self::NotFound(_) => ErrorKind::NotFound,
+            Self::PermissionDenied(_) => ErrorKind::PermissionDenied,
+            Self::AlreadyExists(_) => ErrorKind::AlreadyExists,
+            Self::NotADirectory(_) => ErrorKind::NotADirectory,
+            Self::IsADirectory(_) => ErrorKind::IsADirectory,
+            Self::InvalidArgument(_) => ErrorKind::Invalid,
+            Self::NotSupported(_) => ErrorKind::NotSupported,
+            Self::Other(_) => ErrorKind::Other,
+            Self::IoError(error) => match error.kind() {
+                io::ErrorKind::TimedOut => ErrorKind::Timeout,
+                io::ErrorKind::InvalidData => ErrorKind::Corrupt,
+                io::ErrorKind::ConnectionRefused
+                | io::ErrorKind::ConnectionReset
+                | io::ErrorKind::ConnectionAborted
+                | io::ErrorKind::NotConnected
+                | io::ErrorKind::BrokenPipe => ErrorKind::Unavailable,
+                _ => ErrorKind::Io,
+            },
+        }
+    }
+}
+
 /// Failure from a byte read or write, including a failed condition.
 ///
 /// Kept separate from [`FsError`] so existing backend error matches remain valid.
@@ -32,8 +103,31 @@ pub enum FsError {
 pub enum OperationError {
     /// A read or write condition was not satisfied.
     Conflict(String),
+    /// An operation failure with explicit retry safety. Unknown outcomes must
+    /// be resolved before retrying a write.
+    Detailed {
+        kind: ErrorKind,
+        message: String,
+        retry_safe: bool,
+    },
     /// A filesystem failure, including unsupported conditional operations.
     FileSystem(FsError),
+}
+
+impl OperationError {
+    pub fn kind(&self) -> ErrorKind {
+        match self {
+            Self::Conflict(_) => ErrorKind::Conflict,
+            Self::Detailed { kind, .. } => *kind,
+            Self::FileSystem(error) => error.kind(),
+        }
+    }
+
+    /// Whether repeating this operation is safe. False also covers cases
+    /// where the backend cannot establish retry safety.
+    pub fn retry_safe(&self) -> bool {
+        matches!(self, Self::Detailed { retry_safe: true, kind, .. } if *kind != ErrorKind::UnknownOutcome)
+    }
 }
 
 impl fmt::Display for OperationError {
@@ -41,6 +135,7 @@ impl fmt::Display for OperationError {
         match self {
             Self::Conflict(message) => write!(f, "condition conflict: {message}"),
             Self::FileSystem(error) => error.fmt(f),
+            Self::Detailed { message, .. } => f.write_str(message),
         }
     }
 }
@@ -48,7 +143,7 @@ impl fmt::Display for OperationError {
 impl std::error::Error for OperationError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Conflict(_) => None,
+            Self::Conflict(_) | Self::Detailed { .. } => None,
             Self::FileSystem(error) => Some(error),
         }
     }

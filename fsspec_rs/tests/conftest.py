@@ -56,6 +56,21 @@ def s3_endpoint():
                 return self.respond(206, body[start : end + 1], etag, f"bytes {start}-{end}/{len(body)}")
             return self.respond(200, body, etag)
 
+        def do_POST(self):
+            from xml.etree import ElementTree
+
+            if not self.path.endswith("?delete"):
+                return self.respond(400)
+            body = self.rfile.read(int(self.headers["Content-Length"]))
+            result = ElementTree.Element("DeleteResult", xmlns="http://s3.amazonaws.com/doc/2006-03-01/")
+            for element in ElementTree.fromstring(body).iter():
+                if element.tag.rsplit("}", 1)[-1] == "Key":
+                    bucket = self.path.split("?", 1)[0]
+                    objects.pop(bucket + "/" + element.text, None)
+                    deleted = ElementTree.SubElement(result, "Deleted")
+                    ElementTree.SubElement(deleted, "Key").text = element.text
+            return self.respond(200, ElementTree.tostring(result))
+
         do_HEAD = do_GET
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)

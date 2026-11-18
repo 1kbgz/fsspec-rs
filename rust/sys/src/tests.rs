@@ -97,6 +97,7 @@ fn foreign_file_round_trip() {
     let mut file = foreign.open(&path, OpenMode::Write, None).unwrap();
     file.write_all(b"abcdef").unwrap();
     file.flush().unwrap();
+    file.commit().unwrap();
     drop(file);
 
     let opts = fsspec_rs::OpenOptions {
@@ -497,4 +498,46 @@ fn range_reads_cross_both_abi_directions() {
         ),
         Err(OperationError::FileSystem(FsError::NotSupported(_)))
     ));
+}
+
+#[test]
+fn operation_error_metadata_round_trips() {
+    use fsspec_rs::{ErrorKind, OperationError};
+    for kind in [
+        ErrorKind::NotFound,
+        ErrorKind::AlreadyExists,
+        ErrorKind::Conflict,
+        ErrorKind::Gap,
+        ErrorKind::PermissionDenied,
+        ErrorKind::Unavailable,
+        ErrorKind::Timeout,
+        ErrorKind::Corrupt,
+        ErrorKind::Invalid,
+        ErrorKind::Cancelled,
+        ErrorKind::UnknownOutcome,
+    ] {
+        for retry_safe in [false, true] {
+            let error = OperationError::Detailed {
+                kind,
+                message: "backend detail".into(),
+                retry_safe,
+            };
+            let status = crate::operations::operation_status(&error);
+            let decoded = crate::operations::operation_error(status, error.to_string());
+            assert_eq!(decoded.kind(), kind);
+            assert_eq!(
+                decoded.retry_safe(),
+                retry_safe && kind != ErrorKind::UnknownOutcome
+            );
+            assert!(decoded.to_string().contains("backend detail"));
+        }
+    }
+    assert_eq!(
+        crate::operations::operation_status(&OperationError::Conflict("race".into())),
+        10
+    );
+    assert_eq!(
+        crate::operations::operation_status(&FsError::NotFound("missing".into()).into()),
+        1
+    );
 }

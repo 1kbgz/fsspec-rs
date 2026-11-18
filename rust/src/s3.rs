@@ -17,7 +17,7 @@ use tokio::sync::Semaphore;
 
 use crate::buffered::BufferedFile;
 use crate::caching::{CacheType, Fetcher};
-use crate::error::{FsError, FsResult, OperationError};
+use crate::error::{ErrorKind, FsError, FsResult, OperationError};
 use crate::file::FsFile;
 use crate::fs::{byte_range, FileSystem};
 use crate::types::{
@@ -38,7 +38,30 @@ fn operation_error(err: object_store::Error, conditional: bool) -> OperationErro
         {
             OperationError::Conflict(err.to_string())
         }
-        other => obj_err_to_fs(other).into(),
+        other => {
+            use object_store::client::{HttpError, HttpErrorKind};
+            use std::error::Error;
+            let mut source = other.source();
+            while let Some(error) = source {
+                if let Some(http) = error.downcast_ref::<HttpError>() {
+                    let kind = match http.kind() {
+                        HttpErrorKind::Timeout => ErrorKind::Timeout,
+                        HttpErrorKind::Connect
+                        | HttpErrorKind::Request
+                        | HttpErrorKind::Interrupted => ErrorKind::Unavailable,
+                        HttpErrorKind::Decode => ErrorKind::Corrupt,
+                        _ => ErrorKind::Other,
+                    };
+                    return OperationError::Detailed {
+                        kind,
+                        message: other.to_string(),
+                        retry_safe: matches!(kind, ErrorKind::Timeout | ErrorKind::Unavailable),
+                    };
+                }
+                source = error.source();
+            }
+            obj_err_to_fs(other).into()
+        }
     }
 }
 
@@ -56,7 +79,15 @@ fn obj_err_to_fs(err: object_store::Error) -> FsError {
         object_store::Error::NotFound { .. } => FsError::NotFound(err.to_string()),
         object_store::Error::AlreadyExists { .. } => FsError::AlreadyExists(err.to_string()),
         object_store::Error::Precondition { .. } => FsError::AlreadyExists(err.to_string()),
-        object_store::Error::PermissionDenied { .. } => FsError::PermissionDenied(err.to_string()),
+        object_store::Error::PermissionDenied { .. }
+        | object_store::Error::Unauthenticated { .. } => FsError::PermissionDenied(err.to_string()),
+        object_store::Error::NotSupported { .. } | object_store::Error::NotImplemented { .. } => {
+            FsError::NotSupported(err.to_string())
+        }
+        object_store::Error::InvalidPath { .. }
+        | object_store::Error::UnknownConfigurationKey { .. } => {
+            FsError::InvalidArgument(err.to_string())
+        }
         _ => FsError::Other(err.to_string()),
     }
 }
@@ -182,6 +213,7 @@ impl S3Config {
 /// All async `object_store` calls are executed via an embedded tokio runtime.
 pub struct S3Fs {
     store: Arc<dyn ObjectStore>,
+    write_store: Arc<dyn ObjectStore>,
     rt: Arc<Runtime>,
     pub bucket: String,
     endpoint: String,
@@ -192,7 +224,9 @@ pub struct S3Fs {
 impl S3Fs {
     /// Build from an [`S3Config`].
     pub fn new(cfg: S3Config) -> FsResult<Self> {
-        let mut builder = AmazonS3Builder::new().with_bucket_name(&cfg.bucket);
+        let mut builder = AmazonS3Builder::new()
+            .with_bucket_name(&cfg.bucket)
+            .with_http_connector(crate::s3_http::Connector);
 
         if let Some(ref region) = cfg.region {
             builder = builder.with_region(region);
@@ -220,6 +254,17 @@ impl S3Fs {
             builder = builder.with_virtual_hosted_style_request(true);
         }
 
+        // Retrying a PUT can hide a lost success response behind a later 412.
+        // Keep retries for reads; resolve uncertain typed writes ourselves.
+        let write_store = builder
+            .clone()
+            .with_retry(object_store::RetryConfig {
+                max_retries: 0,
+                ..Default::default()
+            })
+            .build()
+            .map_err(|e| FsError::InvalidArgument(e.to_string()))?;
+
         let store = builder
             .build()
             .map_err(|e| FsError::InvalidArgument(e.to_string()))?;
@@ -239,6 +284,7 @@ impl S3Fs {
 
         Ok(Self {
             store: Arc::new(store),
+            write_store: Arc::new(write_store),
             rt: Arc::new(rt),
             bucket: cfg.bucket,
             range_permits: endpoint_range_permits(&endpoint),
@@ -252,6 +298,7 @@ impl S3Fs {
         let rt = Runtime::new().map_err(|e| FsError::Other(e.to_string()))?;
         let endpoint = format!("memory://{:p}", Arc::as_ptr(&store));
         Ok(Self {
+            write_store: store.clone(),
             store,
             rt: Arc::new(rt),
             bucket: bucket.into(),
@@ -259,6 +306,42 @@ impl S3Fs {
             endpoint,
             virtual_hosted_style_request: false,
         })
+    }
+
+    fn resolve_create(
+        &self,
+        path: &ObjectPath,
+        expected: &[u8],
+        cause: &object_store::Error,
+    ) -> Result<WriteResult, OperationError> {
+        use futures_util::TryStreamExt;
+        use sha2::{Digest, Sha256};
+        let resolved = self.rt.block_on(async {
+            let result = self.store.get(path).await?;
+            let validator = self.validator(path, result.meta.e_tag.clone());
+            if result.meta.size != expected.len() as u64 {
+                return Ok((false, validator));
+            }
+            let mut digest = Sha256::new();
+            let mut stream = result.into_stream();
+            while let Some(bytes) = stream.try_next().await? {
+                digest.update(&bytes);
+            }
+            Ok::<_, object_store::Error>((digest.finalize() == Sha256::digest(expected), validator))
+        });
+        match resolved {
+            Ok((true, validator)) => Ok(WriteResult { validator }),
+            Ok((false, _)) => Err(OperationError::Conflict(format!(
+                "{path}: existing object differs from uncertain create"
+            ))),
+            Err(verification) => Err(OperationError::Detailed {
+                kind: ErrorKind::UnknownOutcome,
+                message: format!(
+                    "{path}: create outcome unknown: {cause}; verification failed: {verification}"
+                ),
+                retry_safe: false,
+            }),
+        }
     }
 
     fn validator_scope(&self, path: &ObjectPath) -> String {
@@ -410,6 +493,7 @@ impl FileSystem for S3Fs {
     ) -> Result<WriteResult, OperationError> {
         let path = to_object_path(&self.strip_protocol(path));
         let conditional = options.condition.is_some();
+        let create = matches!(options.condition, Some(Condition::Missing));
         let mode = match options.condition {
             None => PutMode::Overwrite,
             Some(Condition::Missing) => PutMode::Create,
@@ -419,10 +503,23 @@ impl FileSystem for S3Fs {
             }),
         };
         let payload = PutPayload::from(Bytes::from(data.to_vec()));
-        let result = self
+        let result = match self
             .rt
-            .block_on(self.store.put_opts(&path, payload, mode.into()))
-            .map_err(|error| operation_error(error, conditional))?;
+            .block_on(self.write_store.put_opts(&path, payload, mode.into()))
+        {
+            Ok(result) => result,
+            Err(error @ object_store::Error::Generic { .. }) => {
+                if create {
+                    return self.resolve_create(&path, data, &error);
+                }
+                return Err(OperationError::Detailed {
+                    kind: ErrorKind::UnknownOutcome,
+                    message: error.to_string(),
+                    retry_safe: false,
+                });
+            }
+            Err(error) => return Err(operation_error(error, conditional)),
+        };
         Ok(WriteResult {
             validator: self.validator(&path, result.e_tag),
         })
@@ -1064,16 +1161,6 @@ impl FsFile for S3BufferedWriteFile {
     }
 }
 
-impl Drop for S3BufferedWriteFile {
-    fn drop(&mut self) {
-        if !self.committed && !self.discarded {
-            // Auto-commit on drop (best-effort)
-            let _ = self.upload();
-            self.committed = true;
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum S3StreamingWriteMode {
     Write,
@@ -1367,14 +1454,6 @@ impl Drop for S3StreamingWriteFile {
             // unfinished parts instead; explicit close()/commit() is the
             // supported path for durable writes and surfaced upload errors.
             let _ = self.abort_upload();
-        } else if self.dirty && !self.buffer.is_empty() {
-            let _ = put_object(
-                &self.rt,
-                self.store.as_ref(),
-                &self.object_path(),
-                PutPayload::from(Bytes::from(self.buffer.clone())),
-                false,
-            );
         }
     }
 }
@@ -1869,6 +1948,102 @@ mod tests {
         let mut rest = Vec::new();
         file.read_to_end(&mut rest).unwrap();
         assert_eq!(rest, b"def");
+    }
+
+    #[test]
+    fn transient_http_read_errors_keep_kind_and_retry_safety() {
+        use std::net::TcpListener;
+        for (status, kind) in [
+            (503, ErrorKind::Unavailable),
+            (429, ErrorKind::Unavailable),
+            (408, ErrorKind::Timeout),
+            (504, ErrorKind::Timeout),
+        ] {
+            for ranges in [false, true] {
+                let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+                let endpoint = format!("http://{}", listener.local_addr().unwrap());
+                let server = std::thread::spawn(move || {
+                    let (mut socket, _) = listener.accept().unwrap();
+                    socket
+                        .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                        .unwrap();
+                    let mut request = Vec::new();
+                    while !request.ends_with(b"\r\n\r\n") {
+                        let mut byte = [0];
+                        socket.read_exact(&mut byte).unwrap();
+                        request.push(byte[0]);
+                    }
+                    write!(
+                        socket,
+                        "HTTP/1.1 {status} Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .unwrap();
+                });
+                let store = AmazonS3Builder::new()
+                    .with_bucket_name("bucket")
+                    .with_region("us-east-1")
+                    .with_endpoint(endpoint)
+                    .with_allow_http(true)
+                    .with_skip_signature(true)
+                    .with_http_connector(crate::s3_http::Connector)
+                    .with_retry(object_store::RetryConfig {
+                        max_retries: 0,
+                        ..Default::default()
+                    })
+                    .build()
+                    .unwrap();
+                let fs = S3Fs::from_object_store("bucket", Arc::new(store)).unwrap();
+                let error = if ranges {
+                    fs.read_ranges(
+                        "value",
+                        &[ByteRange {
+                            start: Some(0),
+                            end: Some(1),
+                        }],
+                        RangeReadOptions::default(),
+                    )
+                    .unwrap_err()
+                } else {
+                    fs.read("value", ReadOptions::default()).unwrap_err()
+                };
+                assert_eq!(error.kind(), kind);
+                assert!(error.retry_safe());
+                server.join().unwrap();
+            }
+        }
+    }
+
+    #[test]
+    fn unfinished_s3_writes_never_publish() {
+        let fs = memory_fs();
+        for mode in [OpenMode::Write, OpenMode::Exclusive, OpenMode::Append] {
+            for size in [3, S3_MIN_MULTIPART_PART_SIZE + 1] {
+                let mut file = fs.open("unfinished", mode.clone(), None).unwrap();
+                file.write_all(&vec![b'x'; size]).unwrap();
+                drop(file);
+                assert!(!fs.exists("unfinished").unwrap());
+            }
+        }
+        seed_object(&fs, "existing", b"original");
+        for mode in [OpenMode::Write, OpenMode::Append] {
+            let mut file = fs.open("existing", mode, None).unwrap();
+            file.write_all(b"abandoned").unwrap();
+            drop(file);
+            assert_eq!(fs.cat_file("existing", None, None).unwrap(), b"original");
+        }
+    }
+
+    #[test]
+    fn discarded_s3_writes_cannot_commit() {
+        let fs = memory_fs();
+        for mode in [OpenMode::Write, OpenMode::Exclusive, OpenMode::Append] {
+            let mut file = fs.open("discarded", mode, None).unwrap();
+            file.write_all(b"abandoned").unwrap();
+            file.discard().unwrap();
+            file.commit().unwrap();
+            drop(file);
+            assert!(!fs.exists("discarded").unwrap());
+        }
     }
 
     #[test]

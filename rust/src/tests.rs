@@ -864,6 +864,9 @@ impl FileSystem for FailingCommitFs {
         _mode: OpenMode,
         _opts: Option<OpenOptions>,
     ) -> FsResult<Box<dyn FsFile>> {
+        if _mode == OpenMode::Read {
+            return Err(FsError::NotFound(_path.into()));
+        }
         Ok(Box::new(FailingCommitFile {
             buffer: Cursor::new(Vec::new()),
             state: self.state.clone(),
@@ -1068,10 +1071,9 @@ fn conditional_create_discards_files_after_write_or_commit_failure() {
             },
         );
         if fail_on_write {
-            assert!(matches!(
-                result,
-                Err(crate::OperationError::FileSystem(FsError::IoError(_)))
-            ));
+            let error = result.unwrap_err();
+            assert_eq!(error.kind(), crate::ErrorKind::UnknownOutcome);
+            assert!(!error.retry_safe());
         } else {
             assert!(matches!(result, Err(crate::OperationError::Conflict(_))));
         }

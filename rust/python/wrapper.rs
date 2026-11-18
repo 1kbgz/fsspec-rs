@@ -11,6 +11,16 @@ macro_rules! file_class {
             path: String,
         }
 
+        impl Drop for $file {
+            fn drop(&mut self) {
+                if let Ok(inner) = self.inner.get_mut() {
+                    if let Some(mut file) = inner.take() {
+                        let _ = file.discard();
+                    }
+                }
+            }
+        }
+
         #[pymethods]
         impl $file {
             /// Read up to `size` bytes. If `size` is -1 or None, read to EOF.
@@ -103,6 +113,16 @@ macro_rules! file_class {
                 })
             }
 
+            /// Discard pending writes and close the file.
+            fn discard(&self, py: Python<'_>) -> PyResult<()> {
+                py.detach(|| {
+                    if let Some(mut file) = self.inner.lock().unwrap().take() {
+                        file.discard().map_err(fs_error_to_pyerr)?;
+                    }
+                    Ok(())
+                })
+            }
+
             /// Whether the file is closed.
             #[getter]
             fn closed(&self) -> bool {
@@ -128,11 +148,15 @@ macro_rules! file_class {
             fn __exit__(
                 &self,
                 py: Python<'_>,
-                _exc_type: Option<&Bound<'_, pyo3::types::PyAny>>,
+                exc_type: Option<&Bound<'_, pyo3::types::PyAny>>,
                 _exc_val: Option<&Bound<'_, pyo3::types::PyAny>>,
                 _exc_tb: Option<&Bound<'_, pyo3::types::PyAny>>,
             ) -> PyResult<bool> {
-                self.close(py)?;
+                if exc_type.is_some() {
+                    self.discard(py)?;
+                } else {
+                    self.close(py)?;
+                }
                 Ok(false)
             }
 
