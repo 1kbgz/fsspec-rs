@@ -352,30 +352,7 @@ impl FilesystemFactory for S3Factory {
                 "S3 URL must include a bucket".to_string(),
             ));
         }
-        let mut config = S3Config::new(bucket);
-        let mut client = S3ClientOptions::default();
-        for (key, value) in options {
-            match key.as_str() {
-                "connect_timeout" => client.connect_timeout = Some(parse_timeout(key, value)?),
-                "request_timeout" => client.request_timeout = Some(parse_timeout(key, value)?),
-                "max_retries" => {
-                    client.max_retries = Some(value.parse().map_err(|_| {
-                        FsError::InvalidArgument("max_retries must be a nonnegative integer".into())
-                    })?)
-                }
-                "key" => config.access_key_id = Some(value.clone()),
-                "secret" => config.secret_access_key = Some(value.clone()),
-                "token" => config.session_token = Some(value.clone()),
-                "endpoint_url" => config.endpoint_url = Some(value.clone()),
-                "region" => config.region = Some(value.clone()),
-                "anon" => config.anon = parse_bool(key, value)?,
-                "virtual_hosted_style_request" => {
-                    config.virtual_hosted_style_request = parse_bool(key, value)?
-                }
-                _ => return Err(unknown_option("s3", key)),
-            }
-        }
-        Ok(Arc::new(S3Fs::with_client_options(config, client)?))
+        Ok(Arc::new(S3Fs::from_options(&bucket, options)?))
     }
 
     fn instance_scope(&self, path: &str) -> String {
@@ -406,4 +383,41 @@ fn parse_bool(key: &str, value: &str) -> FsResult<bool> {
 
 fn unknown_option(protocol: &str, key: &str) -> FsError {
     FsError::InvalidArgument(format!("unknown {protocol} option: {key}"))
+}
+
+#[cfg(feature = "s3")]
+impl S3Fs {
+    /// Construct a built-in S3 client explicitly, without registry lookup or caching.
+    /// Uses the same option validation as the registered S3 factory.
+    pub fn from_options(bucket: &str, options: &FsOptions) -> FsResult<Self> {
+        if bucket.is_empty() || bucket.contains('/') {
+            return Err(FsError::InvalidArgument(
+                "expected one nonempty bucket name".into(),
+            ));
+        }
+        let mut config = S3Config::new(bucket);
+        let mut client = S3ClientOptions::default();
+        for (key, value) in options {
+            match key.as_str() {
+                "connect_timeout" => client.connect_timeout = Some(parse_timeout(key, value)?),
+                "request_timeout" => client.request_timeout = Some(parse_timeout(key, value)?),
+                "max_retries" => {
+                    client.max_retries = Some(value.parse().map_err(|_| {
+                        FsError::InvalidArgument("max_retries must be a nonnegative integer".into())
+                    })?)
+                }
+                "key" => config.access_key_id = Some(value.clone()),
+                "secret" => config.secret_access_key = Some(value.clone()),
+                "token" => config.session_token = Some(value.clone()),
+                "endpoint_url" => config.endpoint_url = Some(value.clone()),
+                "region" => config.region = Some(value.clone()),
+                "anon" => config.anon = parse_bool(key, value)?,
+                "virtual_hosted_style_request" => {
+                    config.virtual_hosted_style_request = parse_bool(key, value)?
+                }
+                _ => return Err(unknown_option("s3", key)),
+            }
+        }
+        S3Fs::with_client_options(config, client)
+    }
 }

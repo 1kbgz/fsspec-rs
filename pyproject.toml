@@ -47,6 +47,7 @@ develop = [
     "mdformat",
     "mdformat-myst",
     "mdformat-tables>=1",
+    "obspec==0.1.0",
     "pytest",
     "pytest-benchmark",
     "pytest-cov",

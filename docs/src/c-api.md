@@ -193,6 +193,46 @@ symbols require a library that exports them, even though the ABI version remains
 Backend support and consistency guarantees match the
 [Rust object I/O contract](rust.md).
 
+## Native S3 object reads
+
+`fsspec_s3_open(bucket, bucket_len, options, out_fs, out_objects)` constructs the
+built-in S3 backend and returns two owned handles sharing one client and runtime:
+a normal `fsspec_fs` and an opaque `fsspec_object_store`. Options use the registered
+S3 backend's names and validation. This constructor bypasses registry lookup,
+protocol overrides and instance caching. Both output pointers must be nonnull
+and distinct. Failure leaves both outputs unchanged.
+
+The object handle can be retained with `fsspec_object_store_retain` and released
+with `fsspec_object_store_release`; retain on null returns null and release on null
+is ignored. Each retained handle has its own release obligation. Filesystem and
+object handles may be released independently. Calls can run concurrently while
+their handles remain alive. These handles currently originate only from the
+built-in S3 constructor; no foreign object-store vtable is exposed.
+
+| Function                                                                        | Result                                                                                            | Free with                       |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `fsspec_object_store_head(store, key, key_len, out)`                            | `fsspec_file_info`, always a file, native modification time, optional `etag` and `version` extras | `fsspec_file_info_free`         |
+| `fsspec_object_store_read_ranges(store, key, key_len, ranges, ranges_len, out)` | `fsspec_range_read_result`, ordered byte buffers and validator                                    | `fsspec_range_read_result_free` |
+
+Both reads return `fsspec_operation_status` and preserve structured error and
+retry metadata. Failure leaves the output unchanged. Keys are canonical nonempty
+bucket-relative paths, without URL or bucket stripping, percent decoding or the
+filesystem's extra key escaping. Leading/trailing slashes,
+empty or dot segments, backslashes and control characters are invalid. HEAD never
+lists directories. `head` names its result with the supplied key. Modification
+times outside the nonnegative signed 64-bit nanosecond representation use the
+existing `modified_ns = -1` sentinel.
+
+Range reads reuse `fsspec_byte_range`, but require both bounds and
+`0 <= start < end` within signed 64-bit limits. Starts at or past EOF fail; ends
+past EOF are clipped. Empty arrays perform no I/O. Requests use the built-in S3
+coalescing and concurrency limits and verify an ETag across HEAD and all GETs.
+A missing ETag is unsupported. The complete output is retained in memory.
+
+These are additive symbols: existing vtables and ABI version 1 are unchanged.
+Clients using these functions require a library exporting them; checking ABI
+version 1 alone does not establish their availability.
+
 ## Range reads
 
 `fsspec_fs_read_ranges(fs, path, path_len, ranges, ranges_len, options, out)` returns

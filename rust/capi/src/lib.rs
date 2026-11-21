@@ -19,6 +19,7 @@
 mod file;
 mod filesystem;
 mod memory;
+mod objects;
 mod options;
 mod registry;
 mod status;
@@ -31,6 +32,7 @@ pub use fsspec_sys::types::*;
 pub use file::*;
 pub use filesystem::*;
 pub use memory::*;
+pub use objects::*;
 pub use options::*;
 pub use registry::*;
 pub use status::{

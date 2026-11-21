@@ -387,3 +387,57 @@ def test_coalesced_ranges_through_c_api(lib, tmp_path):
         assert lib.fsspec_fs_read_ranges(fs, path, len(path), ranges, len(ranges), byref(options), byref(result)) == 7
     finally:
         lib.fsspec_fs_release(fs)
+
+
+def test_native_object_handle_shares_s3_and_outlives_filesystem(lib, s3_endpoint):
+    lib.fsspec_options_new.restype = c_void_p
+    lib.fsspec_options_set.argtypes = [c_void_p, c_char_p, c_size_t, c_char_p, c_size_t]
+    lib.fsspec_options_free.argtypes = [c_void_p]
+    lib.fsspec_s3_open.argtypes = [c_char_p, c_size_t, c_void_p, POINTER(c_void_p), POINTER(c_void_p)]
+    lib.fsspec_object_store_retain.argtypes = [c_void_p]
+    lib.fsspec_object_store_retain.restype = c_void_p
+    lib.fsspec_object_store_release.argtypes = [c_void_p]
+    lib.fsspec_object_store_head.argtypes = [c_void_p, c_char_p, c_size_t, POINTER(FileInfo)]
+    lib.fsspec_object_store_read_ranges.argtypes = [c_void_p, c_char_p, c_size_t, POINTER(ByteRange), c_size_t, POINTER(RangeReadResult)]
+    lib.fsspec_file_info_free.argtypes = [FileInfo]
+    lib.fsspec_range_read_result_free.argtypes = [RangeReadResult]
+    options = lib.fsspec_options_new()
+    fs, objects = c_void_p(), c_void_p()
+    try:
+        for key, value in [(b"anon", b"true"), (b"endpoint_url", s3_endpoint.encode())]:
+            assert lib.fsspec_options_set(options, key, len(key), value, len(value)) == 0
+        assert lib.fsspec_s3_open(b"test", 4, options, byref(fs), byref(objects)) == 0
+    finally:
+        lib.fsspec_options_free(options)
+    try:
+        assert lib.fsspec_fs_pipe_file(fs, b"test/data", 9, b"shared", 6) == 0
+    finally:
+        lib.fsspec_fs_release(fs)
+    retained = lib.fsspec_object_store_retain(objects)
+    lib.fsspec_object_store_release(objects)
+    try:
+        info = FileInfo()
+        assert lib.fsspec_object_store_head(retained, b"data", 4, byref(info)) == 0
+        try:
+            assert info.name.value() == "data"
+            assert info.size == 6
+            assert info.file_type == 0
+            assert info.modified_ns > 0
+            extra = [info.extra.items[i].value() for i in range(info.extra.len)]
+            assert extra == ["etag", '"version-1"']
+        finally:
+            lib.fsspec_file_info_free(info)
+        ranges = (ByteRange * 2)(ByteRange(pointer(c_int64(3)), pointer(c_int64(99))), ByteRange(pointer(c_int64(0)), pointer(c_int64(2))))
+        result = RangeReadResult()
+        assert lib.fsspec_object_store_read_ranges(retained, b"data", 4, ranges, 2, byref(result)) == 0
+        try:
+            assert [string_at(result.data[i].data, result.data[i].len) for i in range(result.len)] == [b"red", b"sh"]
+        finally:
+            lib.fsspec_range_read_result_free(result)
+        for start, end in [(6, 7), (7, 8), (0, 0)]:
+            invalid = ByteRange(pointer(c_int64(start)), pointer(c_int64(end)))
+            result = RangeReadResult(len=42)
+            assert lib.fsspec_object_store_read_ranges(retained, b"data", 4, byref(invalid), 1, byref(result)) == 7
+            assert result.len == 42
+    finally:
+        lib.fsspec_object_store_release(retained)

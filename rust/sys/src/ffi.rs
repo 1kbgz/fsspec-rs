@@ -40,6 +40,31 @@ extern "C" {
         out_fs: *mut *mut fsspec_fs,
         out_path: *mut fsspec_string,
     ) -> fsspec_status;
+    pub fn fsspec_s3_open(
+        bucket: *const c_char,
+        bucket_len: usize,
+        options: *const fsspec_options,
+        out_fs: *mut *mut fsspec_fs,
+        out_objects: *mut *mut fsspec_object_store,
+    ) -> fsspec_status;
+    pub fn fsspec_object_store_retain(
+        store: *const fsspec_object_store,
+    ) -> *mut fsspec_object_store;
+    pub fn fsspec_object_store_release(store: *mut fsspec_object_store);
+    pub fn fsspec_object_store_head(
+        store: *const fsspec_object_store,
+        key: *const c_char,
+        key_len: usize,
+        out: *mut fsspec_file_info,
+    ) -> fsspec_operation_status;
+    pub fn fsspec_object_store_read_ranges(
+        store: *const fsspec_object_store,
+        key: *const c_char,
+        key_len: usize,
+        ranges: *const fsspec_byte_range,
+        ranges_len: usize,
+        out: *mut fsspec_range_read_result,
+    ) -> fsspec_operation_status;
     pub fn fsspec_fs_retain(fs: *const fsspec_fs) -> *mut fsspec_fs;
     pub fn fsspec_fs_release(fs: *mut fsspec_fs);
     pub fn fsspec_fs_protocols(fs: *const fsspec_fs, out: *mut fsspec_string_list)

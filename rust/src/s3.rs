@@ -16,6 +16,9 @@ use object_store::{MultipartUpload, ObjectStore, ObjectStoreExt, PutMode, PutPay
 use tokio::runtime::Runtime;
 use tokio::sync::Semaphore;
 
+mod objects;
+pub use objects::S3ObjectReader;
+
 use crate::buffered::BufferedFile;
 use crate::caching::{CacheType, Fetcher};
 use crate::error::{ErrorKind, FsError, FsResult, OperationError};
@@ -381,6 +384,132 @@ impl S3Fs {
         })
     }
 
+    /// A read-only native object view sharing this filesystem's client and runtime.
+    pub fn objects(self: &Arc<Self>) -> S3ObjectReader {
+        S3ObjectReader::new(self.clone())
+    }
+
+    fn read_ranges_at(
+        &self,
+        path: ObjectPath,
+        ranges: &[ByteRange],
+        options: RangeReadOptions,
+        strict: bool,
+    ) -> Result<RangeReadResult, OperationError> {
+        use futures_util::{stream, StreamExt, TryStreamExt};
+        use object_store::{GetOptions, GetRange};
+
+        crate::ranges::validate_options(&options)?;
+        let expected = match &options.condition {
+            None => None,
+            Some(Condition::Match(validator)) => Some(self.match_etag(&path, validator)?),
+            Some(Condition::Missing) => unreachable!("validated read condition"),
+        };
+        if ranges.is_empty() && expected.is_none() {
+            return Ok(RangeReadResult {
+                data: Vec::new(),
+                validator: None,
+            });
+        }
+        self.rt.block_on(async {
+            let head = {
+                let _permit = self
+                    .range_permits
+                    .acquire()
+                    .await
+                    .expect("endpoint semaphore remains open");
+                self.store
+                    .get_opts(
+                        &path,
+                        GetOptions {
+                            head: true,
+                            if_match: expected.clone(),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .map_err(|error| operation_error(error, expected.is_some()))?
+            };
+            let size = head.meta.size;
+            if strict
+                && ranges.iter().any(|r| {
+                    r.start.is_none_or(|v| v < 0 || v as u64 >= size)
+                        || r.end.is_none_or(|v| v <= r.start.unwrap_or(-1))
+                })
+            {
+                return Err(FsError::InvalidArgument(
+                    "object range must be nonempty and start before EOF".into(),
+                )
+                .into());
+            }
+            let validator = self.validator(&path, head.meta.e_tag);
+            if let Some(expected) = expected.as_ref() {
+                if validator.as_ref().map(|value| &value.value) != Some(expected) {
+                    return Err(OperationError::Conflict(
+                        "metadata validator did not match".into(),
+                    ));
+                }
+            }
+            let plan = crate::ranges::RangePlan::new(size, ranges, &options);
+            let mut data = plan.output()?;
+            if plan.requests.is_empty() {
+                return Ok(RangeReadResult { data, validator });
+            }
+            let validator = validator.ok_or_else(|| {
+                FsError::NotSupported("range reads require an object validator".into())
+            })?;
+            let etag = self.match_etag(&path, &validator)?;
+            let mut requests = stream::iter(plan.requests.iter().cloned())
+                .map(|range| {
+                    let path = &path;
+                    let etag = &etag;
+                    async move {
+                        let _permit = self
+                            .range_permits
+                            .acquire()
+                            .await
+                            .expect("endpoint semaphore remains open");
+                        let result = self
+                            .store
+                            .get_opts(
+                                path,
+                                GetOptions {
+                                    if_match: Some(etag.clone()),
+                                    range: Some(GetRange::Bounded(range.clone())),
+                                    ..Default::default()
+                                },
+                            )
+                            .await
+                            .map_err(|error| operation_error(error, true))?;
+                        if result.meta.e_tag.as_ref() != Some(etag) || result.meta.size != size {
+                            return Err(OperationError::Conflict(
+                                "range response validator did not match".into(),
+                            ));
+                        }
+                        if result.range != range {
+                            return Err(FsError::Other(
+                                "range response bounds did not match the request".into(),
+                            )
+                            .into());
+                        }
+                        let bytes = result
+                            .bytes()
+                            .await
+                            .map_err(|error| operation_error(error, true))?;
+                        Ok::<_, OperationError>((range, bytes))
+                    }
+                })
+                .buffer_unordered(options.max_concurrency);
+            while let Some((range, bytes)) = requests.try_next().await? {
+                plan.copy_response(&range, &bytes, &mut data)?;
+            }
+            Ok(RangeReadResult {
+                data,
+                validator: Some(validator),
+            })
+        })
+    }
+
     fn resolve_create(
         &self,
         path: &ObjectPath,
@@ -604,108 +733,12 @@ impl FileSystem for S3Fs {
         ranges: &[ByteRange],
         options: RangeReadOptions,
     ) -> Result<RangeReadResult, OperationError> {
-        use futures_util::{stream, StreamExt, TryStreamExt};
-        use object_store::{GetOptions, GetRange};
-
-        crate::ranges::validate_options(&options)?;
-        let path = to_object_path(&self.strip_protocol(path));
-        let expected = match &options.condition {
-            None => None,
-            Some(Condition::Match(validator)) => Some(self.match_etag(&path, validator)?),
-            Some(Condition::Missing) => unreachable!("validated read condition"),
-        };
-        if ranges.is_empty() && expected.is_none() {
-            return Ok(RangeReadResult {
-                data: Vec::new(),
-                validator: None,
-            });
-        }
-        self.rt.block_on(async {
-            let head = {
-                let _permit = self
-                    .range_permits
-                    .acquire()
-                    .await
-                    .expect("endpoint semaphore remains open");
-                self.store
-                    .get_opts(
-                        &path,
-                        GetOptions {
-                            head: true,
-                            if_match: expected.clone(),
-                            ..Default::default()
-                        },
-                    )
-                    .await
-                    .map_err(|error| operation_error(error, expected.is_some()))?
-            };
-            let size = head.meta.size;
-            let validator = self.validator(&path, head.meta.e_tag);
-            if let Some(expected) = expected.as_ref() {
-                if validator.as_ref().map(|value| &value.value) != Some(expected) {
-                    return Err(OperationError::Conflict(
-                        "metadata validator did not match".into(),
-                    ));
-                }
-            }
-            let plan = crate::ranges::RangePlan::new(size, ranges, &options);
-            let mut data = plan.output()?;
-            if plan.requests.is_empty() {
-                return Ok(RangeReadResult { data, validator });
-            }
-            let validator = validator.ok_or_else(|| {
-                FsError::NotSupported("range reads require an object validator".into())
-            })?;
-            let etag = self.match_etag(&path, &validator)?;
-            let mut requests = stream::iter(plan.requests.iter().cloned())
-                .map(|range| {
-                    let path = &path;
-                    let etag = &etag;
-                    async move {
-                        let _permit = self
-                            .range_permits
-                            .acquire()
-                            .await
-                            .expect("endpoint semaphore remains open");
-                        let result = self
-                            .store
-                            .get_opts(
-                                path,
-                                GetOptions {
-                                    if_match: Some(etag.clone()),
-                                    range: Some(GetRange::Bounded(range.clone())),
-                                    ..Default::default()
-                                },
-                            )
-                            .await
-                            .map_err(|error| operation_error(error, true))?;
-                        if result.meta.e_tag.as_ref() != Some(etag) || result.meta.size != size {
-                            return Err(OperationError::Conflict(
-                                "range response validator did not match".into(),
-                            ));
-                        }
-                        if result.range != range {
-                            return Err(FsError::Other(
-                                "range response bounds did not match the request".into(),
-                            )
-                            .into());
-                        }
-                        let bytes = result
-                            .bytes()
-                            .await
-                            .map_err(|error| operation_error(error, true))?;
-                        Ok::<_, OperationError>((range, bytes))
-                    }
-                })
-                .buffer_unordered(options.max_concurrency);
-            while let Some((range, bytes)) = requests.try_next().await? {
-                plan.copy_response(&range, &bytes, &mut data)?;
-            }
-            Ok(RangeReadResult {
-                data,
-                validator: Some(validator),
-            })
-        })
+        self.read_ranges_at(
+            to_object_path(&self.strip_protocol(path)),
+            ranges,
+            options,
+            false,
+        )
     }
 
     fn io_capabilities(&self) -> IoCapabilities {

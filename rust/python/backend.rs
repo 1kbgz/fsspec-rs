@@ -2,7 +2,9 @@
 //!
 //! With the `capi` feature (wheels and conda builds) every filesystem is a
 //! handle into `libfsspec`, so the registry and the backends exist once per
-//! process and are shared with other extensions. With `direct` (Pyodide and
+//! process and are shared with other extensions. S3 uses an explicit built-in
+//! constructor to pair filesystem and object handles, bypassing registry lookup
+//! and caching. With `direct` (Pyodide and
 //! debugging) the crate is compiled in.
 
 use std::collections::HashMap;
@@ -30,7 +32,12 @@ mod route {
         Ok(fsspec_sys::url_to_fs("memory://", &FsOptions::new())?.0)
     }
 
-    pub fn s3(config: S3Config, client: S3ClientOptions) -> FsResult<SharedFileSystem> {
+    pub type S3Objects = fsspec_sys::ForeignObjectStore;
+
+    pub fn s3(
+        config: S3Config,
+        client: S3ClientOptions,
+    ) -> FsResult<(SharedFileSystem, S3Objects)> {
         let mut options = FsOptions::new();
         let strings = [
             ("key", config.access_key_id),
@@ -60,7 +67,7 @@ mod route {
             "virtual_hosted_style_request".to_string(),
             config.virtual_hosted_style_request.to_string(),
         );
-        Ok(fsspec_sys::url_to_fs(&format!("s3://{}", config.bucket), &options)?.0)
+        fsspec_sys::s3_with_objects(&config.bucket, &options)
     }
 
     pub fn protocols() -> FsResult<Vec<String>> {
@@ -84,8 +91,15 @@ mod route {
         Ok(fsspec_rs::url_to_fs("memory://", &fsspec_rs::FsOptions::new())?.0)
     }
 
-    pub fn s3(config: S3Config, client: S3ClientOptions) -> FsResult<SharedFileSystem> {
-        Ok(Arc::new(S3Fs::with_client_options(config, client)?))
+    pub type S3Objects = fsspec_rs::S3ObjectReader;
+
+    pub fn s3(
+        config: S3Config,
+        client: S3ClientOptions,
+    ) -> FsResult<(SharedFileSystem, S3Objects)> {
+        let fs = Arc::new(S3Fs::with_client_options(config, client)?);
+        let objects = fs.objects();
+        Ok((fs, objects))
     }
 
     pub fn protocols() -> FsResult<Vec<String>> {
@@ -105,7 +119,9 @@ pub fn memory() -> FsResult<SharedFileSystem> {
     route::memory()
 }
 
-pub fn s3(config: S3Config, client: S3ClientOptions) -> FsResult<SharedFileSystem> {
+pub use route::S3Objects;
+
+pub fn s3(config: S3Config, client: S3ClientOptions) -> FsResult<(SharedFileSystem, S3Objects)> {
     route::s3(config, client)
 }
 
