@@ -474,6 +474,9 @@
     <a href="#s3-configuration">S3 configuration</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
+    <a href="#s3-object-store-adapter">S3 object-store adapter</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
   </li>
   <li class="fd-toc-item" data-depth="2">
@@ -1931,7 +1934,73 @@ Profiles, SSO and <code class="docutils literal notranslate"><span class="pre">c
 <p>Instance caches retain construction-time environment defaults. Explicit endpoint,
 credentials and client options distinguish configured instances. To select a
 new credential context in Python, pass the new credentials explicitly; bypassing
-only fsspec’s Python cache does not bypass the shared C registry cache.</p>
+fsspec’s Python cache with <code class="docutils literal notranslate"><span class="pre">skip_instance_cache=True</span></code> also creates a new native
+S3 client. <code class="docutils literal notranslate"><span class="pre">S3FileSystem</span></code> and <code class="docutils literal notranslate"><span class="pre">RustS3Fs</span></code> use the built-in S3 constructor, bypassing
+protocol overrides and the shared C registry cache. General <code class="docutils literal notranslate"><span class="pre">url_to_fs</span></code> calls
+continue to use that registry.</p>
+</section>
+<section id="s3-object-store-adapter">
+<h2>S3 object-store adapter<a class="headerlink" href="#s3-object-store-adapter" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">fsspec_rs.obspec.S3ObjectStore(fs,</span> <span class="pre">*,</span> <span class="pre">prefix=&quot;&quot;)</span></code> provides the synchronous
+<code class="docutils literal notranslate"><span class="pre">Head</span></code>, <code class="docutils literal notranslate"><span class="pre">GetRange</span></code> and <code class="docutils literal notranslate"><span class="pre">GetRanges</span></code> protocols from obspec 0.1.0. It requires a
+<code class="docutils literal notranslate"><span class="pre">fsspec_rs.S3FileSystem</span></code> and shares that filesystem’s native S3 client, credentials,
+runtime and range-request concurrency limit. It retains its own handle, so it
+remains usable after the filesystem is dropped. Construction performs no I/O.
+The adapter is included in both direct builds and wheels linked to <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>;
+<code class="docutils literal notranslate"><span class="pre">obspec</span></code> is not a runtime dependency.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs</span><span class="w"> </span><span class="kn">import</span> <span class="n">S3FileSystem</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fsspec_rs.obspec</span><span class="w"> </span><span class="kn">import</span> <span class="n">S3ObjectStore</span>
+
+<span class="n">fs</span> <span class="o">=</span> <span class="n">S3FileSystem</span><span class="p">(</span><span class="n">bucket</span><span class="o">=</span><span class="s2">"measurements"</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">"us-east-1"</span><span class="p">)</span>
+<span class="n">store</span> <span class="o">=</span> <span class="n">S3ObjectStore</span><span class="p">(</span><span class="n">fs</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">"daily"</span><span class="p">)</span>
+<span class="n">meta</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="s2">"data.parquet"</span><span class="p">)</span>
+<span class="n">footer</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">get_range</span><span class="p">(</span><span class="s2">"data.parquet"</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">meta</span><span class="p">[</span><span class="s2">"size"</span><span class="p">]</span> <span class="o">-</span> <span class="mi">8</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<span class="n">buffers</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">get_ranges</span><span class="p">(</span><span class="s2">"data.parquet"</span><span class="p">,</span> <span class="n">starts</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="n">ends</span><span class="o">=</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">12</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Keys are nonempty paths relative to the bucket or optional prefix. URLs, leading
+or trailing slashes, empty segments, <code class="docutils literal notranslate"><span class="pre">.</span></code> and <code class="docutils literal notranslate"><span class="pre">..</span></code> segments, backslashes and control
+characters are rejected. A bucket name inside a key is literal. Spaces, Unicode
+and percent signs are literal object-key characters; the adapter does not decode
+URL escapes. The filesystem currently escapes some characters in its logical
+paths before storage, while this native view uses the stored S3 key directly. Prefix follows the same rules, but may be empty.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Method</p></th>
+<th class="head"><p>Result</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">head(path)</span></code></p></td>
+<td><p>Metadata dictionary: <code class="docutils literal notranslate"><span class="pre">path</span></code>, <code class="docutils literal notranslate"><span class="pre">size</span></code>, UTC <code class="docutils literal notranslate"><span class="pre">last_modified</span></code> datetime, <code class="docutils literal notranslate"><span class="pre">e_tag</span></code>, <code class="docutils literal notranslate"><span class="pre">version</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_range(path,</span> <span class="pre">*,</span> <span class="pre">start,</span> <span class="pre">end=None,</span> <span class="pre">length=None)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bytes</span></code> for one range</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_ranges(path,</span> <span class="pre">*,</span> <span class="pre">starts,</span> <span class="pre">ends=None,</span> <span class="pre">lengths=None)</span></code></p></td>
+<td><p>List of <code class="docutils literal notranslate"><span class="pre">bytes</span></code>, in input order including duplicates</p></td>
+</tr>
+</tbody>
+</table>
+<p>Metadata uses native HEAD and never infers directories. <code class="docutils literal notranslate"><span class="pre">path</span></code> is relative to the
+adapter’s prefix; ETag and version are strings or <code class="docutils literal notranslate"><span class="pre">None</span></code>. Datetimes have Python’s
+microsecond precision. Modification times before the Unix epoch are unsupported
+and raise <code class="docutils literal notranslate"><span class="pre">NotSupportedError</span></code>. Each metadata call makes a fresh request. Filesystem
+<code class="docutils literal notranslate"><span class="pre">fs.head(path)</span></code> retains its existing meaning: read the first bytes of a file.</p>
+<p>Ranges require exactly one of end/length (or ends/lengths), nonnegative integer
+bounds through <code class="docutils literal notranslate"><span class="pre">2**63</span> <span class="pre">-</span> <span class="pre">1</span></code>, equal vector lengths, and a nonempty interval. Boolean
+bounds are rejected; integer-like bounds implementing <code class="docutils literal notranslate"><span class="pre">__index__</span></code> are accepted.
+Starts at or past EOF fail; ends past EOF are clipped. Empty
+vectors return <code class="docutils literal notranslate"><span class="pre">[]</span></code> without I/O. Reads use the native coalescing defaults and
+require an ETag; every GET is checked against the metadata request’s validator.
+No cached metadata, async methods, streaming, listing or writes are exposed.</p>
+<p>Exceptions named <code class="docutils literal notranslate"><span class="pre">NotFoundError</span></code>, <code class="docutils literal notranslate"><span class="pre">PermissionDeniedError</span></code>, <code class="docutils literal notranslate"><span class="pre">PreconditionError</span></code>,
+<code class="docutils literal notranslate"><span class="pre">NotSupportedError</span></code> and <code class="docutils literal notranslate"><span class="pre">InvalidPathError</span></code> support
+<code class="docutils literal notranslate"><span class="pre">obspec.exceptions.map_exception</span></code>. Native errors retain <code class="docutils literal notranslate"><span class="pre">.kind</span></code> and <code class="docutils literal notranslate"><span class="pre">.retry_safe</span></code>,
+with the original exception as their cause when mapped. Invalid range arguments
+raise <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> or <code class="docutils literal notranslate"><span class="pre">TypeError</span></code>; other backend errors retain the normal operation
+error contract. Range request sizes and concurrency are bounded, but the returned
+buffers occupy memory proportional to the requested output.</p>
 </section>
 <section id="object-i-o-and-conditions">
 <h2>Object I/O and conditions<a class="headerlink" href="#object-i-o-and-conditions" title="Link to this heading">¶</a></h2>
@@ -2693,6 +2762,9 @@ blocks are allowed to be. Disallows further writing to this file.</p>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#s3-configuration">S3 configuration</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#s3-object-store-adapter">S3 object-store adapter</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>

@@ -52,7 +52,66 @@ Profiles, SSO and `credential_process` are not supported.
 Instance caches retain construction-time environment defaults. Explicit endpoint,
 credentials and client options distinguish configured instances. To select a
 new credential context in Python, pass the new credentials explicitly; bypassing
-only fsspec's Python cache does not bypass the shared C registry cache.
+fsspec's Python cache with `skip_instance_cache=True` also creates a new native
+S3 client. `S3FileSystem` and `RustS3Fs` use the built-in S3 constructor, bypassing
+protocol overrides and the shared C registry cache. General `url_to_fs` calls
+continue to use that registry.
+
+## S3 object-store adapter
+
+`fsspec_rs.obspec.S3ObjectStore(fs, *, prefix="")` provides the synchronous
+`Head`, `GetRange` and `GetRanges` protocols from obspec 0.1.0. It requires a
+`fsspec_rs.S3FileSystem` and shares that filesystem's native S3 client, credentials,
+runtime and range-request concurrency limit. It retains its own handle, so it
+remains usable after the filesystem is dropped. Construction performs no I/O.
+The adapter is included in both direct builds and wheels linked to `libfsspec`;
+`obspec` is not a runtime dependency.
+
+```python
+from fsspec_rs import S3FileSystem
+from fsspec_rs.obspec import S3ObjectStore
+
+fs = S3FileSystem(bucket="measurements", region="us-east-1")
+store = S3ObjectStore(fs, prefix="daily")
+meta = store.head("data.parquet")
+footer = store.get_range("data.parquet", start=meta["size"] - 8, length=8)
+buffers = store.get_ranges("data.parquet", starts=[0, 4], ends=[4, 12])
+```
+
+Keys are nonempty paths relative to the bucket or optional prefix. URLs, leading
+or trailing slashes, empty segments, `.` and `..` segments, backslashes and control
+characters are rejected. A bucket name inside a key is literal. Spaces, Unicode
+and percent signs are literal object-key characters; the adapter does not decode
+URL escapes. The filesystem currently escapes some characters in its logical
+paths before storage, while this native view uses the stored S3 key directly. Prefix follows the same rules, but may be empty.
+
+| Method                                                 | Result                                                                                |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `head(path)`                                           | Metadata dictionary: `path`, `size`, UTC `last_modified` datetime, `e_tag`, `version` |
+| `get_range(path, *, start, end=None, length=None)`     | `bytes` for one range                                                                 |
+| `get_ranges(path, *, starts, ends=None, lengths=None)` | List of `bytes`, in input order including duplicates                                  |
+
+Metadata uses native HEAD and never infers directories. `path` is relative to the
+adapter's prefix; ETag and version are strings or `None`. Datetimes have Python's
+microsecond precision. Modification times before the Unix epoch are unsupported
+and raise `NotSupportedError`. Each metadata call makes a fresh request. Filesystem
+`fs.head(path)` retains its existing meaning: read the first bytes of a file.
+
+Ranges require exactly one of end/length (or ends/lengths), nonnegative integer
+bounds through `2**63 - 1`, equal vector lengths, and a nonempty interval. Boolean
+bounds are rejected; integer-like bounds implementing `__index__` are accepted.
+Starts at or past EOF fail; ends past EOF are clipped. Empty
+vectors return `[]` without I/O. Reads use the native coalescing defaults and
+require an ETag; every GET is checked against the metadata request's validator.
+No cached metadata, async methods, streaming, listing or writes are exposed.
+
+Exceptions named `NotFoundError`, `PermissionDeniedError`, `PreconditionError`,
+`NotSupportedError` and `InvalidPathError` support
+`obspec.exceptions.map_exception`. Native errors retain `.kind` and `.retry_safe`,
+with the original exception as their cause when mapped. Invalid range arguments
+raise `ValueError` or `TypeError`; other backend errors retain the normal operation
+error contract. Range request sizes and concurrency are bounded, but the returned
+buffers occupy memory proportional to the requested output.
 
 ## Object I/O and conditions
 

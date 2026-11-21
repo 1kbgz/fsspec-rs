@@ -168,6 +168,9 @@
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
+    <a href="#native-s3-object-reads">Native S3 object reads</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
     <a href="#range-reads">Range reads</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
@@ -579,6 +582,55 @@ symbols require a library that exports them, even though the ABI version remains
 <p>Backend support and consistency guarantees match the
 <a class="reference internal" href="rust.html"><span class="std std-doc">Rust object I/O contract</span></a>.</p>
 </section>
+<section id="native-s3-object-reads">
+<h2>Native S3 object reads<a class="headerlink" href="#native-s3-object-reads" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">fsspec_s3_open(bucket,</span> <span class="pre">bucket_len,</span> <span class="pre">options,</span> <span class="pre">out_fs,</span> <span class="pre">out_objects)</span></code> constructs the
+built-in S3 backend and returns two owned handles sharing one client and runtime:
+a normal <code class="docutils literal notranslate"><span class="pre">fsspec_fs</span></code> and an opaque <code class="docutils literal notranslate"><span class="pre">fsspec_object_store</span></code>. Options use the registered
+S3 backend’s names and validation. This constructor bypasses registry lookup,
+protocol overrides and instance caching. Both output pointers must be nonnull
+and distinct. Failure leaves both outputs unchanged.</p>
+<p>The object handle can be retained with <code class="docutils literal notranslate"><span class="pre">fsspec_object_store_retain</span></code> and released
+with <code class="docutils literal notranslate"><span class="pre">fsspec_object_store_release</span></code>; retain on null returns null and release on null
+is ignored. Each retained handle has its own release obligation. Filesystem and
+object handles may be released independently. Calls can run concurrently while
+their handles remain alive. These handles currently originate only from the
+built-in S3 constructor; no foreign object-store vtable is exposed.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Function</p></th>
+<th class="head"><p>Result</p></th>
+<th class="head"><p>Free with</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_object_store_head(store,</span> <span class="pre">key,</span> <span class="pre">key_len,</span> <span class="pre">out)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fsspec_file_info</span></code>, always a file, native modification time, optional <code class="docutils literal notranslate"><span class="pre">etag</span></code> and <code class="docutils literal notranslate"><span class="pre">version</span></code> extras</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fsspec_file_info_free</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_object_store_read_ranges(store,</span> <span class="pre">key,</span> <span class="pre">key_len,</span> <span class="pre">ranges,</span> <span class="pre">ranges_len,</span> <span class="pre">out)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fsspec_range_read_result</span></code>, ordered byte buffers and validator</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fsspec_range_read_result_free</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>Both reads return <code class="docutils literal notranslate"><span class="pre">fsspec_operation_status</span></code> and preserve structured error and
+retry metadata. Failure leaves the output unchanged. Keys are canonical nonempty
+bucket-relative paths, without URL or bucket stripping, percent decoding or the
+filesystem’s extra key escaping. Leading/trailing slashes,
+empty or dot segments, backslashes and control characters are invalid. HEAD never
+lists directories. <code class="docutils literal notranslate"><span class="pre">head</span></code> names its result with the supplied key. Modification
+times outside the nonnegative signed 64-bit nanosecond representation use the
+existing <code class="docutils literal notranslate"><span class="pre">modified_ns</span> <span class="pre">=</span> <span class="pre">-1</span></code> sentinel.</p>
+<p>Range reads reuse <code class="docutils literal notranslate"><span class="pre">fsspec_byte_range</span></code>, but require both bounds and
+<code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">&lt;=</span> <span class="pre">start</span> <span class="pre">&lt;</span> <span class="pre">end</span></code> within signed 64-bit limits. Starts at or past EOF fail; ends
+past EOF are clipped. Empty arrays perform no I/O. Requests use the built-in S3
+coalescing and concurrency limits and verify an ETag across HEAD and all GETs.
+A missing ETag is unsupported. The complete output is retained in memory.</p>
+<p>These are additive symbols: existing vtables and ABI version 1 are unchanged.
+Clients using these functions require a library exporting them; checking ABI
+version 1 alone does not establish their availability.</p>
+</section>
 <section id="range-reads">
 <h2>Range reads<a class="headerlink" href="#range-reads" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">fsspec_fs_read_ranges(fs,</span> <span class="pre">path,</span> <span class="pre">path_len,</span> <span class="pre">ranges,</span> <span class="pre">ranges_len,</span> <span class="pre">options,</span> <span class="pre">out)</span></code> returns
@@ -786,6 +838,9 @@ registry state.</p>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#object-i-o-and-conditions">Object I/O and conditions</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#native-s3-object-reads">Native S3 object reads</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#range-reads">Range reads</a>

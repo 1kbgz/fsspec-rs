@@ -170,6 +170,9 @@
   <li class="fd-toc-item" data-depth="1">
     <a href="#s3fs">S3Fs</a>
   </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#native-object-reader">Native object reader</a>
+  </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#filesystem-registry">Filesystem registry</a>
   </li>
@@ -595,6 +598,23 @@ creates retain checksum recovery.</p>
 caches include explicit options, but not subsequent environment changes. Use
 explicit credentials and region for independently configured clients, or
 <code class="docutils literal notranslate"><span class="pre">FilesystemRegistry::url_to_fs_uncached</span></code> to capture updated environment values.</p>
+<section id="native-object-reader">
+<h3>Native object reader<a class="headerlink" href="#native-object-reader" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">Arc&lt;S3Fs&gt;::objects()</span></code> returns a cloneable <code class="docutils literal notranslate"><span class="pre">S3ObjectReader</span></code> sharing the client’s
+credentials, runtime and range concurrency limit. <code class="docutils literal notranslate"><span class="pre">head(key)</span></code> returns native
+metadata as <code class="docutils literal notranslate"><span class="pre">FileInfo</span></code>, with <code class="docutils literal notranslate"><span class="pre">FileType::File</span></code>, modification time, and optional
+<code class="docutils literal notranslate"><span class="pre">etag</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code> extras. It never infers directories. <code class="docutils literal notranslate"><span class="pre">read_ranges(key,</span> <span class="pre">ranges)</span></code>
+returns ordered bytes with a validator, using the existing S3 coalescing defaults.
+Both methods return <code class="docutils literal notranslate"><span class="pre">OperationError</span></code>.</p>
+<p>Keys are literal canonical bucket-relative paths, without URL or bucket stripping
+or the filesystem’s extra key escaping. Ranges require both signed 64-bit bounds, <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">&lt;=</span> <span class="pre">start</span> <span class="pre">&lt;</span> <span class="pre">end</span></code>, and a start before
+EOF. Oversized ends are clipped; empty input performs no I/O. Ranged reads require
+an ETag and fail if the object changes. The reader keeps its client alive after
+the original filesystem handle is dropped.</p>
+<p><code class="docutils literal notranslate"><span class="pre">S3Fs::from_options(bucket,</span> <span class="pre">options)</span></code> constructs the built-in backend using the
+same option validation as the S3 registry factory, without registry lookup or
+caching. The C ABI uses it to create paired filesystem and object-reader handles.</p>
+</section>
 </section>
 <section id="filesystem-registry">
 <h2>Filesystem registry<a class="headerlink" href="#filesystem-registry" title="Link to this heading">¶</a></h2>
@@ -914,6 +934,9 @@ filesystem errors with these variants:</p>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#s3fs">S3Fs</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#native-object-reader">Native object reader</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#filesystem-registry">Filesystem registry</a>

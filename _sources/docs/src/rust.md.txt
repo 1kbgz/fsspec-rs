@@ -329,6 +329,25 @@ caches include explicit options, but not subsequent environment changes. Use
 explicit credentials and region for independently configured clients, or
 `FilesystemRegistry::url_to_fs_uncached` to capture updated environment values.
 
+### Native object reader
+
+`Arc<S3Fs>::objects()` returns a cloneable `S3ObjectReader` sharing the client's
+credentials, runtime and range concurrency limit. `head(key)` returns native
+metadata as `FileInfo`, with `FileType::File`, modification time, and optional
+`etag`/`version` extras. It never infers directories. `read_ranges(key, ranges)`
+returns ordered bytes with a validator, using the existing S3 coalescing defaults.
+Both methods return `OperationError`.
+
+Keys are literal canonical bucket-relative paths, without URL or bucket stripping
+or the filesystem's extra key escaping. Ranges require both signed 64-bit bounds, `0 <= start < end`, and a start before
+EOF. Oversized ends are clipped; empty input performs no I/O. Ranged reads require
+an ETag and fail if the object changes. The reader keeps its client alive after
+the original filesystem handle is dropped.
+
+`S3Fs::from_options(bucket, options)` constructs the built-in backend using the
+same option validation as the S3 registry factory, without registry lookup or
+caching. The C ABI uses it to create paired filesystem and object-reader handles.
+
 ## Filesystem registry
 
 `FilesystemRegistry` maps URL protocols to `FilesystemFactory` implementations,
