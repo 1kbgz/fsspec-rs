@@ -25,6 +25,7 @@ file_class!(
 pub struct RustS3Fs {
     inner: SharedFileSystem,
     bucket: String,
+    objects: backend::S3Objects,
 }
 
 #[pymethods]
@@ -127,8 +128,17 @@ impl RustS3Fs {
             }
         }
         let bucket = cfg.bucket.clone();
-        let inner = backend::s3(cfg, client).map_err(fs_error_to_pyerr)?;
-        Ok(RustS3Fs { inner, bucket })
+        let (inner, objects) = backend::s3(cfg, client).map_err(fs_error_to_pyerr)?;
+        Ok(RustS3Fs {
+            inner,
+            bucket,
+            objects,
+        })
+    }
+
+    /// Retain the paired native object view without constructing another client.
+    fn object_store(&self) -> crate::objects::RustS3ObjectStore {
+        crate::objects::RustS3ObjectStore::new(self.objects.clone())
     }
 
     /// Return the bucket name.

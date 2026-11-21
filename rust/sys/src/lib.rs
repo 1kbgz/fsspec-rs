@@ -17,6 +17,7 @@
 mod export;
 pub mod ffi;
 mod foreign;
+mod objects;
 pub mod operations;
 pub mod types;
 mod util;
@@ -31,6 +32,7 @@ use fsspec_rs::{FilesystemFactory, FsOptions, FsResult, RegistryHooks, SharedFil
 
 pub use export::{export_file, export_filesystem};
 pub use foreign::{open_options_map, ForeignFile, ForeignFileSystem};
+pub use objects::{s3_with_objects, ForeignObjectStore};
 pub use types::*;
 pub use util::{check, error_from_status, io_error, status_code, take_last_error};
 

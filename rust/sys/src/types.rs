@@ -164,6 +164,12 @@ pub struct fsspec_fs {
     _private: [u8; 0],
 }
 
+/// An owned native object view. Retain/release independently of its paired filesystem.
+/// Currently constructed by fsspec_s3_open; no foreign object-store vtable is defined.
+pub struct fsspec_object_store {
+    _private: [u8; 0],
+}
+
 /// An open file. Close with `fsspec_file_close`.
 pub struct fsspec_file {
     _private: [u8; 0],

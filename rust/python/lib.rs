@@ -7,6 +7,7 @@ mod backend;
 mod io;
 mod local;
 mod memory;
+mod objects;
 mod s3;
 mod types;
 mod wrapper;
@@ -49,6 +50,7 @@ fn fsspec_rs(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
 
     // S3 filesystem
     m.add_class::<RustS3Fs>()?;
+    m.add_class::<objects::RustS3ObjectStore>()?;
     m.add_class::<RustS3File>()?;
 
     // Add error types as module attributes

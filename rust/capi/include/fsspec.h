@@ -112,6 +112,12 @@ typedef struct fsspec_file fsspec_file;
 typedef struct fsspec_fs fsspec_fs;
 
 /**
+ * An owned native object view. Retain/release independently of its paired filesystem.
+ * Currently constructed by fsspec_s3_open; no foreign object-store vtable is defined.
+ */
+typedef struct fsspec_object_store fsspec_object_store;
+
+/**
  * Storage options for a filesystem: an opaque string map.
  */
 typedef struct fsspec_options fsspec_options;
@@ -678,6 +684,51 @@ void fsspec_write_result_free(struct fsspec_write_result result);
  * Frees all buffers and the validator in a successful range-read result.
  */
 void fsspec_range_read_result_free(struct fsspec_range_read_result result);
+
+/**
+ * Construct the built-in S3 backend and its native object view together.
+ * Both handles share one client/runtime and can be released independently.
+ * This explicit constructor does not use the protocol registry or its cache.
+ * Options match the registered S3 backend. Outputs are unchanged on failure.
+ */
+fsspec_status fsspec_s3_open(const char *bucket,
+                             size_t bucket_len,
+                             const struct fsspec_options *options,
+                             struct fsspec_fs **out_fs,
+                             struct fsspec_object_store **out_objects);
+
+/**
+ * Retain the native object view; null returns null.
+ */
+struct fsspec_object_store *fsspec_object_store_retain(const struct fsspec_object_store *store);
+
+/**
+ * Release one native object view handle. Null is ignored.
+ */
+void fsspec_object_store_release(struct fsspec_object_store *store);
+
+/**
+ * Native metadata for a bucket-relative object key. Never infers directories.
+ * On success out is always a file with modified_ns and optional extra keys
+ * "etag" and "version". Free it with fsspec_file_info_free. Failure leaves out unchanged.
+ */
+fsspec_operation_status fsspec_object_store_head(const struct fsspec_object_store *store,
+                                                 const char *key,
+                                                 size_t key_len,
+                                                 struct fsspec_file_info *out);
+
+/**
+ * Read ordered nonnegative, nonempty bounded ranges from a bucket-relative key.
+ * Starts at/past EOF fail; ends past EOF are truncated. Empty input does no I/O.
+ * Reuses fsspec_byte_range, but both bounds must be present and 0 <= start < end.
+ * Free a successful result with fsspec_range_read_result_free. Failure leaves out unchanged.
+ */
+fsspec_operation_status fsspec_object_store_read_ranges(const struct fsspec_object_store *store,
+                                                        const char *key,
+                                                        size_t key_len,
+                                                        const struct fsspec_byte_range *ranges,
+                                                        size_t ranges_len,
+                                                        struct fsspec_range_read_result *out);
 
 /**
  * Creates an empty option set. Free with `fsspec_options_free`.
