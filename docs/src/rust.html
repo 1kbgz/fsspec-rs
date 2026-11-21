@@ -174,6 +174,15 @@
     <a href="#filesystem-registry">Filesystem registry</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
+    <a href="#object-store-bridges">Object-store bridges</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#filesystem-to-object-store">Filesystem to object store</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#object-store-to-filesystem">Object store to filesystem</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
     <a href="#python-fsspec-bridge">Python fsspec bridge</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
@@ -635,6 +644,150 @@ registry behind an <code class="docutils literal notranslate"><span class="pre">
 factory may register other protocols in the same registry. The <code class="docutils literal notranslate"><span class="pre">url_to_fs</span></code>
 function and <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> resolve this way.</p>
 </section>
+<section id="object-store-bridges">
+<h2>Object-store bridges<a class="headerlink" href="#object-store-bridges" title="Link to this heading">¶</a></h2>
+<p>The optional <code class="docutils literal notranslate"><span class="pre">object-store</span></code> feature exports <code class="docutils literal notranslate"><span class="pre">object_store_bridge::FileSystemStore</span></code>
+and <code class="docutils literal notranslate"><span class="pre">object_store_bridge::ObjectStoreFs</span></code>. It can be enabled without S3:
+<code class="docutils literal notranslate"><span class="pre">default-features</span> <span class="pre">=</span> <span class="pre">false,</span> <span class="pre">features</span> <span class="pre">=</span> <span class="pre">[&quot;object-store&quot;]</span></code>. The default <code class="docutils literal notranslate"><span class="pre">s3</span></code> feature
+also enables it. Neither adapter requires Python, registration, or a new trait.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Backend implements</p></th>
+<th class="head"><p>Filesystem access</p></th>
+<th class="head"><p>Object access</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> only</p></td>
+<td><p>Native</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">FileSystemStore</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">object_store::ObjectStore</span></code> only</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ObjectStoreFs</span></code></p></td>
+<td><p>Native</p></td>
+</tr>
+<tr class="row-even"><td><p>Both</p></td>
+<td><p>Native</p></td>
+<td><p>Native</p></td>
+</tr>
+</tbody>
+</table>
+<p>Construction is explicit. No blanket trait implementations, automatic discovery,
+or adapter chaining are provided. A backend implementing both traits exposes its
+native interfaces directly over the same data. The compiling example is
+<a class="reference download internal" download="" href="../../_downloads/775d7721561e85970aa39a5f00c44e4f/object_store_bridge.rs"><span class="xref download myst"><code class="docutils literal notranslate"><span class="pre">rust/examples/object_store_bridge.rs</span></code></span></a>.</p>
+<section id="filesystem-to-object-store">
+<h3>Filesystem to object store<a class="headerlink" href="#filesystem-to-object-store" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">FileSystemStore::from_snapshot(Arc&lt;dyn</span> <span class="pre">FileSystem</span> <span class="pre">+</span> <span class="pre">Send</span> <span class="pre">+</span> <span class="pre">Sync&gt;,</span> <span class="pre">root)</span></code> binds a
+read-only object view to an <strong>immutable</strong> filesystem namespace. The caller must
+keep names, metadata, and contents unchanged until the adapter and its streams
+are dropped. The constructor does not create a snapshot or prevent other handles
+from writing. Generic mutable-filesystem adaptation remains unsupported because
+<code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> cannot atomically return both metadata and bytes.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>ObjectStore operation</p></th>
+<th class="head"><p>Behavior</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_opts</span></code></p></td>
+<td><p>Read metadata and open a regular file within the immutable source; return lazy chunks. <code class="docutils literal notranslate"><span class="pre">head</span></code> avoids opening the body.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Read conditions</p></td>
+<td><p>Evaluate ETag/time conditions against snapshot metadata. Version selection is unsupported.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_ranges</span></code></p></td>
+<td><p>Use the trait’s coalescing implementation over range reads.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">list</span></code></p></td>
+<td><p>Walk directories lazily and yield regular-file metadata under a segment-aware prefix.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">list_with_delimiter</span></code></p></td>
+<td><p>Return immediate objects and prefixes containing objects; empty filesystem directories disappear.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Put, multipart, delete, copy, rename</p></td>
+<td><p>Unsupported; no mutation reaches the source.</p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">FileInfo.modified</span></code> is required for object metadata. Missing timestamps and
+reported special files return <code class="docutils literal notranslate"><span class="pre">NotSupported</span></code>; timestamps are never invented.
+Directories, including the root, return <code class="docutils literal notranslate"><span class="pre">NotFound</span></code> for object reads and metadata.
+<code class="docutils literal notranslate"><span class="pre">extra[&quot;etag&quot;]</span></code> and <code class="docutils literal notranslate"><span class="pre">extra[&quot;version&quot;]</span></code> are copied when supplied, without interpreting
+ETags as checksums. Other attributes are not mapped. <code class="docutils literal notranslate"><span class="pre">ls</span></code> must return full paths
+of immediate children. Slash-separated roots map to relative object keys without
+percent decoding. Unrepresentable entries, including backslash names, fail the
+listing with <code class="docutils literal notranslate"><span class="pre">NotSupported</span></code>; they are not silently skipped. Validation covers the
+visited directory before prefix filtering, so an unrelated entry there can fail
+a filtered listing. Delimiter listing currently traverses all descendants to
+exclude empty directories; its cost grows with the entire selected subtree. The root is not a security sandbox: callers must exclude
+symlinks that escape it or change the namespace during a read.</p>
+<p>Filesystem work runs on a shared blocking executor with eight admitted calls.
+Cancelling a future does not interrupt a running blocking call or release its
+slot early. Body chunks are at most 64 KiB and are fetched only when polled.
+The final chunk closes its file on the blocking worker. Dropping an unfinished
+stream schedules closure on that same pool after any in-progress call completes;
+it does not wait for closure. Cleanup jobs share the pool’s eight-thread limit
+but can queue independently of the eight-call admission limit. These limits
+cover the bridge, not allocations inside a backend’s <code class="docutils literal notranslate"><span class="pre">open</span></code> or <code class="docutils literal notranslate"><span class="pre">ls</span></code>:
+listings retain one directory’s entries plus pending directory names, and the
+source may itself buffer entire files. Range collection allocates its output.</p>
+</section>
+<section id="object-store-to-filesystem">
+<h3>Object store to filesystem<a class="headerlink" href="#object-store-to-filesystem" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">ObjectStoreFs::new(Arc&lt;dyn</span> <span class="pre">ObjectStore&gt;,</span> <span class="pre">prefix)</span></code> binds relative filesystem paths
+to one object-store prefix. The adapter owns a shared client handle, not its
+credentials or a separate client. Root is <code class="docutils literal notranslate"><span class="pre">&quot;&quot;</span></code>; paths are parsed without percent
+encoding or decoding. URLs, absolute paths, backslashes and noncanonical paths
+are rejected. Listings also fail with <code class="docutils literal notranslate"><span class="pre">NotSupported</span></code> when returned names cannot
+be reopened through this mapping. No <code class="docutils literal notranslate"><span class="pre">object://</span></code> protocol is registered automatically.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>FileSystem operation</p></th>
+<th class="head"><p>Behavior</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">info</span></code></p></td>
+<td><p>Use native object metadata; infer directories from delimiter listings; root is a directory.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ls</span></code></p></td>
+<td><p>Return objects and synthetic directories; reject object/prefix name collisions.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">open(Read,</span> <span class="pre">None)</span></code></p></td>
+<td><p>Return a seekable handle after metadata checks, without downloading the body.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Handle reads</p></td>
+<td><p>Issue at most 64 KiB per request; use the opening version/ETag when available.</p></td>
+</tr>
+<tr class="row-even"><td><p>Handle seeks</p></td>
+<td><p>Support absolute, relative and end-relative offsets; seeking past EOF is allowed.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Mutations and explicit open options</p></td>
+<td><p>Unsupported.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Metadata and listings are required, including for collision checks on open. Empty
+object-store prefixes have no persistent directory identity. Handles without a
+version or ETag provide no snapshot guarantee; a size mismatch still fails.
+A file handle retains its opening metadata. Reopening obtains current metadata.</p>
+<p>Synchronous I/O uses a process-owned runtime with two worker threads and rejects
+calls from any Tokio runtime context, including blocking tasks entered through
+Tokio. Async callers use <code class="docutils literal notranslate"><span class="pre">ObjectStore</span></code> directly. This also rejects bridge stacking
+before nested runtime execution. Closing an adapter does not shut down the shared
+runtime or a caller-owned client. Other async runtimes cannot be detected; callers
+must keep this synchronous interface off their event-loop threads.</p>
+<p>Object-store missing, permission and unsupported errors map to filesystem error
+categories. Other object errors retain their cause inside <code class="docutils literal notranslate"><span class="pre">FsError::IoError</span></code>.
+Filesystem errors become corresponding object-store categories where available,
+with their causes retained. File-handle errors preserve the I/O kind for missing,
+permission-denied, invalid-input and unsupported failures. Object precondition
+errors remain available as the cause of an <code class="docutils literal notranslate"><span class="pre">Other</span></code> I/O error. No bridge-specific
+retry or deadline policy is added.</p>
+</section>
+</section>
 <section id="python-fsspec-bridge">
 <h2>Python fsspec bridge<a class="headerlink" href="#python-fsspec-bridge" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">fsspec_rs_bridge</span></code> exports <code class="docutils literal notranslate"><span class="pre">PyFsspecFs</span></code>, <code class="docutils literal notranslate"><span class="pre">url_to_fs</span></code>, and <code class="docutils literal notranslate"><span class="pre">StorageOptions</span></code>. It is an
@@ -764,6 +917,15 @@ filesystem errors with these variants:</p>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#filesystem-registry">Filesystem registry</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#object-store-bridges">Object-store bridges</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#filesystem-to-object-store">Filesystem to object store</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#object-store-to-filesystem">Object store to filesystem</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#python-fsspec-bridge">Python fsspec bridge</a>

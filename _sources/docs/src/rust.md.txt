@@ -367,6 +367,104 @@ registry behind an `RwLock` and releases the lock while a factory runs, so a
 factory may register other protocols in the same registry. The `url_to_fs`
 function and `libfsspec` resolve this way.
 
+## Object-store bridges
+
+The optional `object-store` feature exports `object_store_bridge::FileSystemStore`
+and `object_store_bridge::ObjectStoreFs`. It can be enabled without S3:
+`default-features = false, features = ["object-store"]`. The default `s3` feature
+also enables it. Neither adapter requires Python, registration, or a new trait.
+
+| Backend implements               | Filesystem access | Object access     |
+| -------------------------------- | ----------------- | ----------------- |
+| `FileSystem` only                | Native            | `FileSystemStore` |
+| `object_store::ObjectStore` only | `ObjectStoreFs`   | Native            |
+| Both                             | Native            | Native            |
+
+Construction is explicit. No blanket trait implementations, automatic discovery,
+or adapter chaining are provided. A backend implementing both traits exposes its
+native interfaces directly over the same data. The compiling example is
+[`rust/examples/object_store_bridge.rs`](../../rust/examples/object_store_bridge.rs).
+
+### Filesystem to object store
+
+`FileSystemStore::from_snapshot(Arc<dyn FileSystem + Send + Sync>, root)` binds a
+read-only object view to an **immutable** filesystem namespace. The caller must
+keep names, metadata, and contents unchanged until the adapter and its streams
+are dropped. The constructor does not create a snapshot or prevent other handles
+from writing. Generic mutable-filesystem adaptation remains unsupported because
+`FileSystem` cannot atomically return both metadata and bytes.
+
+| ObjectStore operation                | Behavior                                                                                                               |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `get_opts`                           | Read metadata and open a regular file within the immutable source; return lazy chunks. `head` avoids opening the body. |
+| Read conditions                      | Evaluate ETag/time conditions against snapshot metadata. Version selection is unsupported.                             |
+| `get_ranges`                         | Use the trait's coalescing implementation over range reads.                                                            |
+| `list`                               | Walk directories lazily and yield regular-file metadata under a segment-aware prefix.                                  |
+| `list_with_delimiter`                | Return immediate objects and prefixes containing objects; empty filesystem directories disappear.                      |
+| Put, multipart, delete, copy, rename | Unsupported; no mutation reaches the source.                                                                           |
+
+`FileInfo.modified` is required for object metadata. Missing timestamps and
+reported special files return `NotSupported`; timestamps are never invented.
+Directories, including the root, return `NotFound` for object reads and metadata.
+`extra["etag"]` and `extra["version"]` are copied when supplied, without interpreting
+ETags as checksums. Other attributes are not mapped. `ls` must return full paths
+of immediate children. Slash-separated roots map to relative object keys without
+percent decoding. Unrepresentable entries, including backslash names, fail the
+listing with `NotSupported`; they are not silently skipped. Validation covers the
+visited directory before prefix filtering, so an unrelated entry there can fail
+a filtered listing. Delimiter listing currently traverses all descendants to
+exclude empty directories; its cost grows with the entire selected subtree. The root is not a security sandbox: callers must exclude
+symlinks that escape it or change the namespace during a read.
+
+Filesystem work runs on a shared blocking executor with eight admitted calls.
+Cancelling a future does not interrupt a running blocking call or release its
+slot early. Body chunks are at most 64 KiB and are fetched only when polled.
+The final chunk closes its file on the blocking worker. Dropping an unfinished
+stream schedules closure on that same pool after any in-progress call completes;
+it does not wait for closure. Cleanup jobs share the pool's eight-thread limit
+but can queue independently of the eight-call admission limit. These limits
+cover the bridge, not allocations inside a backend's `open` or `ls`:
+listings retain one directory's entries plus pending directory names, and the
+source may itself buffer entire files. Range collection allocates its output.
+
+### Object store to filesystem
+
+`ObjectStoreFs::new(Arc<dyn ObjectStore>, prefix)` binds relative filesystem paths
+to one object-store prefix. The adapter owns a shared client handle, not its
+credentials or a separate client. Root is `""`; paths are parsed without percent
+encoding or decoding. URLs, absolute paths, backslashes and noncanonical paths
+are rejected. Listings also fail with `NotSupported` when returned names cannot
+be reopened through this mapping. No `object://` protocol is registered automatically.
+
+| FileSystem operation                | Behavior                                                                                    |
+| ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| `info`                              | Use native object metadata; infer directories from delimiter listings; root is a directory. |
+| `ls`                                | Return objects and synthetic directories; reject object/prefix name collisions.             |
+| `open(Read, None)`                  | Return a seekable handle after metadata checks, without downloading the body.               |
+| Handle reads                        | Issue at most 64 KiB per request; use the opening version/ETag when available.              |
+| Handle seeks                        | Support absolute, relative and end-relative offsets; seeking past EOF is allowed.           |
+| Mutations and explicit open options | Unsupported.                                                                                |
+
+Metadata and listings are required, including for collision checks on open. Empty
+object-store prefixes have no persistent directory identity. Handles without a
+version or ETag provide no snapshot guarantee; a size mismatch still fails.
+A file handle retains its opening metadata. Reopening obtains current metadata.
+
+Synchronous I/O uses a process-owned runtime with two worker threads and rejects
+calls from any Tokio runtime context, including blocking tasks entered through
+Tokio. Async callers use `ObjectStore` directly. This also rejects bridge stacking
+before nested runtime execution. Closing an adapter does not shut down the shared
+runtime or a caller-owned client. Other async runtimes cannot be detected; callers
+must keep this synchronous interface off their event-loop threads.
+
+Object-store missing, permission and unsupported errors map to filesystem error
+categories. Other object errors retain their cause inside `FsError::IoError`.
+Filesystem errors become corresponding object-store categories where available,
+with their causes retained. File-handle errors preserve the I/O kind for missing,
+permission-denied, invalid-input and unsupported failures. Object precondition
+errors remain available as the cause of an `Other` I/O error. No bridge-specific
+retry or deadline policy is added.
+
 ## Python fsspec bridge
 
 `fsspec_rs_bridge` exports `PyFsspecFs`, `url_to_fs`, and `StorageOptions`. It is an
