@@ -11,6 +11,8 @@ pub mod buffered;
 pub mod caching;
 pub mod error;
 pub mod file;
+#[cfg(feature = "object-store")]
+pub mod object_store_bridge;
 pub mod registry;
 pub mod types;
 
