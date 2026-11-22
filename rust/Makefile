@@ -9,11 +9,7 @@ requirements:  ## install required dev dependencies
 develop: requirements  ## install required dev dependencies
 
 build:  ## build release
-<<<<<<< before updating
-	cargo build --workspace --release --all-features
-=======
 	cargo build --release --workspace --all-features
->>>>>>> after updating
 
 .PHONY: lint lints fix format
 lint:  ## run Clippy for linting, rustfmt for autoformat checks
