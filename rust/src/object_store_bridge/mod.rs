@@ -19,25 +19,12 @@ use std::{fmt, io};
 use object_store::{path::Path, Error, ObjectMeta};
 use tokio::{runtime::Runtime, sync::Semaphore};
 
+use crate::runtime::runtime;
+
 use crate::{FileInfo, FsError, FsResult};
 
 const CHUNK_SIZE: usize = 64 * 1024;
 static BLOCKING_LIMIT: OnceLock<Arc<Semaphore>> = OnceLock::new();
-
-// Process-owned: dropping an adapter never drops a runtime inside async code.
-fn runtime() -> FsResult<&'static Runtime> {
-    static RUNTIME: OnceLock<io::Result<Runtime>> = OnceLock::new();
-    RUNTIME
-        .get_or_init(|| {
-            tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(2)
-                .max_blocking_threads(8)
-                .enable_all()
-                .build()
-        })
-        .as_ref()
-        .map_err(|e| FsError::Other(format!("bridge runtime: {e}")))
-}
 
 fn outside_runtime() -> FsResult<()> {
     if tokio::runtime::Handle::try_current().is_ok() {

@@ -99,6 +99,17 @@ typedef int32_t fsspec_file_type;
 #endif // __STDC_VERSION__ >= 202311L
 #endif // __cplusplus
 
+typedef struct fsspec_async_result fsspec_async_result;
+
+typedef struct fsspec_completion fsspec_completion;
+
+typedef struct fsspec_dispatch_job fsspec_dispatch_job;
+
+/**
+ * Opaque async handles. Retain/release through the matching library functions.
+ */
+typedef struct fsspec_dispatcher fsspec_dispatcher;
+
 /**
  * An open file. Close with `fsspec_file_close`.
  */
@@ -117,10 +128,18 @@ typedef struct fsspec_fs fsspec_fs;
  */
 typedef struct fsspec_object_store fsspec_object_store;
 
+typedef struct fsspec_operation fsspec_operation;
+
 /**
  * Storage options for a filesystem: an opaque string map.
  */
 typedef struct fsspec_options fsspec_options;
+
+/**
+ * Status for typed object operations. Existing status values retain their meaning.
+ * A raw integer permits new operation errors without extending `fsspec_status`.
+ */
+typedef int32_t fsspec_operation_status;
 
 /**
  * A UTF-8 string allocated by libfsspec. `data` is NUL-terminated and `len`
@@ -130,6 +149,27 @@ typedef struct fsspec_string {
   char *data;
   size_t len;
 } fsspec_string;
+
+/**
+ * Owned error; free with fsspec_async_error_free. Never uses thread-local state.
+ */
+typedef struct fsspec_async_error {
+  fsspec_operation_status status;
+  struct fsspec_string message;
+} fsspec_async_error;
+
+/**
+ * Thread-safe nonblocking dispatch. Successful post takes the job and must run
+ * or discard it exactly once, never inline on the submitting stack. Failed post
+ * leaves ownership with libfsspec. release may run on any thread. Callbacks must
+ * not unwind. Initialize struct_size and abi_version; both callbacks required.
+ */
+typedef struct fsspec_dispatcher_vtable {
+  size_t struct_size;
+  uint32_t abi_version;
+  fsspec_operation_status (*post)(void*, struct fsspec_dispatch_job*, struct fsspec_async_error**);
+  void (*release)(void*);
+} fsspec_dispatcher_vtable;
 
 /**
  * Strings allocated by libfsspec. Free with `fsspec_string_list_free`.
@@ -168,12 +208,6 @@ typedef struct fsspec_bytes {
   uint8_t *data;
   size_t len;
 } fsspec_bytes;
-
-/**
- * Status for typed object operations. Existing status values retain their meaning.
- * A raw integer permits new operation errors without extending `fsspec_status`.
- */
-typedef int32_t fsspec_operation_status;
 
 /**
  * Opaque object validator. Both strings null means no validator in a result.
@@ -403,6 +437,144 @@ typedef struct fsspec_file_vtable {
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
+
+/**
+ * Copies a nonzero status and UTF-8 message. Null means invalid arguments.
+ */
+struct fsspec_async_error *fsspec_async_error_new(int32_t status, const char *data, size_t len);
+
+void fsspec_async_error_free(struct fsspec_async_error *error);
+
+/**
+ * Copies the vtable and takes data only on success. Outputs remain untouched on
+ * failure, except out_error (optional), which receives an owned error or null.
+ */
+int32_t fsspec_dispatcher_from_vtable(const struct fsspec_dispatcher_vtable *vtable,
+                                      void *data,
+                                      struct fsspec_dispatcher **out,
+                                      struct fsspec_async_error **out_error);
+
+struct fsspec_dispatcher *fsspec_dispatcher_retain(const struct fsspec_dispatcher *handle);
+
+void fsspec_dispatcher_release(struct fsspec_dispatcher *handle);
+
+/**
+ * Consumes one accepted job. Never call run and discard on the same job.
+ */
+void fsspec_dispatch_job_run(struct fsspec_dispatch_job *job);
+
+void fsspec_dispatch_job_discard(struct fsspec_dispatch_job *job);
+
+/**
+ * Creates an observer/producer pair. kind: 0 unit, 1 bytes. max_bytes bounds a
+ * byte result (including the copy into libfsspec), not foreign allocations.
+ * timeout_ns is relative monotonic time; UINT64_MAX disables the deadline.
+ * Zero times out immediately. Keep a producer reference until cleanup stops.
+ */
+int32_t fsspec_operation_create(uint32_t kind,
+                                size_t max_bytes,
+                                uint64_t timeout_ns,
+                                struct fsspec_operation **out,
+                                struct fsspec_completion **producer,
+                                struct fsspec_async_error **out_error);
+
+struct fsspec_operation *fsspec_operation_retain(const struct fsspec_operation *operation);
+
+/**
+ * Releasing a raw observer does not cancel. Future wrappers should cancel first.
+ */
+void fsspec_operation_release(struct fsspec_operation *operation);
+
+/**
+ * 0 pending, 1 ready, 2 taken. Requires a live, nonnull handle.
+ */
+uint32_t fsspec_operation_state(const struct fsspec_operation *operation);
+
+/**
+ * True only after the last producer reference is consumed/released.
+ */
+bool fsspec_operation_is_quiescent(const struct fsspec_operation *operation);
+
+void fsspec_operation_cancel(struct fsspec_operation *operation);
+
+/**
+ * Transfers a ready result exactly once. Pending/taken returns Invalid.
+ */
+int32_t fsspec_operation_take(struct fsspec_operation *operation,
+                              struct fsspec_async_result **out,
+                              struct fsspec_async_error **out_error);
+
+void fsspec_async_result_free(struct fsspec_async_result *result);
+
+/**
+ * Borrowed until result_free. Null on success. Do not free this borrowed error.
+ */
+const struct fsspec_async_error *fsspec_async_result_error(const struct fsspec_async_result *result);
+
+/**
+ * 0 unit, 1 bytes, UINT32_MAX error. Requires a live, nonnull result.
+ */
+uint32_t fsspec_async_result_kind(const struct fsspec_async_result *result);
+
+/**
+ * Bytes borrowed until result_free. Null with len=0 for unit/error; an empty
+ * bytes result has kind=1. out_len must be nonnull. Never free this pointer.
+ */
+const uint8_t *fsspec_async_result_bytes(const struct fsspec_async_result *result, size_t *out_len);
+
+/**
+ * One subscriber, including after completion. Null dispatcher uses managed
+ * dispatch. Takes data only on success. ready borrows its operation handle;
+ * retain it inside ready to keep it. release may run on any thread.
+ */
+int32_t fsspec_operation_subscribe(struct fsspec_operation *operation,
+                                   const struct fsspec_dispatcher *dispatch,
+                                   void (*ready)(void*, const struct fsspec_operation*),
+                                   void *data,
+                                   void (*release)(void*),
+                                   struct fsspec_async_error **out_error);
+
+struct fsspec_completion *fsspec_completion_retain(const struct fsspec_completion *completion);
+
+void fsspec_completion_release(struct fsspec_completion *completion);
+
+bool fsspec_completion_is_cancelled(const struct fsspec_completion *completion);
+
+/**
+ * UINT64_MAX means no deadline. Requires a live, nonnull producer.
+ */
+uint64_t fsspec_completion_remaining_ns(const struct fsspec_completion *completion);
+
+/**
+ * Registers once; catches cancellation before registration. Data transfers on
+ * success. Registration after successful completion releases data without calling cancel.
+ */
+int32_t fsspec_completion_on_cancel(struct fsspec_completion *completion,
+                                    const struct fsspec_dispatcher *dispatch,
+                                    void (*cancel)(void*),
+                                    void *data,
+                                    void (*release)(void*),
+                                    struct fsspec_async_error **out_error);
+
+/**
+ * Consumes one producer reference, including on invalid or late completion.
+ * Copies borrowed bytes only after checking the operation's byte limit.
+ */
+void fsspec_completion_bytes(struct fsspec_completion *completion, const uint8_t *data, size_t len);
+
+/**
+ * Consumes one producer reference.
+ */
+void fsspec_completion_unit(struct fsspec_completion *completion);
+
+/**
+ * Copies the error message and consumes one producer reference. Invalid inputs
+ * complete with Invalid. No thread-local error state is read or written.
+ */
+void fsspec_completion_error(struct fsspec_completion *completion,
+                             int32_t status,
+                             const char *data,
+                             size_t len);
 
 /**
  * Reads up to `len` bytes into `buf`. `out_read` receives the count, which is

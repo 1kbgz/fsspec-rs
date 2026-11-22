@@ -15,7 +15,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 object_store = { version = "0.14", optional = true }
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "sync"], optional = true }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "sync", "time"], optional = true }
 futures-util = { version = "0.3", optional = true }
 async-trait = { version = "0.1", optional = true }
 bytes = "1"
@@ -26,7 +26,8 @@ percent-encoding = "2"
 [features]
 default = ["s3"]
 # Runtime-backed object adapters; disabling all default features preserves the wasm build.
-object-store = ["dep:object_store", "dep:tokio", "dep:futures-util", "dep:async-trait"]
+async = ["dep:tokio"]
+object-store = ["async", "dep:object_store", "dep:futures-util", "dep:async-trait"]
 # S3Fs and the `s3` registry protocol.
 s3 = ["object-store", "object_store/aws"]
 

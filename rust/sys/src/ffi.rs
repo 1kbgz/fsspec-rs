@@ -236,3 +236,79 @@ extern "C" {
         data: *mut c_void,
     ) -> *mut fsspec_file;
 }
+
+#[allow(improper_ctypes)]
+extern "C" {
+    pub fn fsspec_async_error_new(
+        status: i32,
+        data: *const c_char,
+        len: usize,
+    ) -> *mut fsspec_async_error;
+    pub fn fsspec_async_error_free(error: *mut fsspec_async_error);
+    pub fn fsspec_dispatcher_from_vtable(
+        vtable: *const fsspec_dispatcher_vtable,
+        data: *mut c_void,
+        out: *mut *mut fsspec_dispatcher,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_dispatcher_retain(handle: *const fsspec_dispatcher) -> *mut fsspec_dispatcher;
+    pub fn fsspec_dispatcher_release(handle: *mut fsspec_dispatcher);
+    pub fn fsspec_dispatch_job_run(job: *mut fsspec_dispatch_job);
+    pub fn fsspec_dispatch_job_discard(job: *mut fsspec_dispatch_job);
+    pub fn fsspec_operation_create(
+        kind: u32,
+        max_bytes: usize,
+        timeout_ns: u64,
+        out: *mut *mut fsspec_operation,
+        producer: *mut *mut fsspec_completion,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_operation_retain(operation: *const fsspec_operation) -> *mut fsspec_operation;
+    pub fn fsspec_operation_release(operation: *mut fsspec_operation);
+    pub fn fsspec_operation_state(operation: *const fsspec_operation) -> u32;
+    pub fn fsspec_operation_is_quiescent(operation: *const fsspec_operation) -> bool;
+    pub fn fsspec_operation_cancel(operation: *mut fsspec_operation);
+    pub fn fsspec_operation_take(
+        operation: *mut fsspec_operation,
+        out: *mut *mut fsspec_async_result,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_result_free(result: *mut fsspec_async_result);
+    pub fn fsspec_async_result_error(
+        result: *const fsspec_async_result,
+    ) -> *const fsspec_async_error;
+    pub fn fsspec_async_result_kind(result: *const fsspec_async_result) -> u32;
+    pub fn fsspec_async_result_bytes(
+        result: *const fsspec_async_result,
+        out_len: *mut usize,
+    ) -> *const u8;
+    pub fn fsspec_operation_subscribe(
+        operation: *mut fsspec_operation,
+        dispatch: *const fsspec_dispatcher,
+        ready: Option<unsafe extern "C" fn(*mut c_void, *const fsspec_operation)>,
+        data: *mut c_void,
+        release: Option<unsafe extern "C" fn(*mut c_void)>,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_completion_retain(completion: *const fsspec_completion)
+        -> *mut fsspec_completion;
+    pub fn fsspec_completion_release(completion: *mut fsspec_completion);
+    pub fn fsspec_completion_is_cancelled(completion: *const fsspec_completion) -> bool;
+    pub fn fsspec_completion_remaining_ns(completion: *const fsspec_completion) -> u64;
+    pub fn fsspec_completion_on_cancel(
+        completion: *mut fsspec_completion,
+        dispatch: *const fsspec_dispatcher,
+        cancel: Option<unsafe extern "C" fn(*mut c_void)>,
+        data: *mut c_void,
+        release: Option<unsafe extern "C" fn(*mut c_void)>,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_completion_bytes(completion: *mut fsspec_completion, data: *const u8, len: usize);
+    pub fn fsspec_completion_unit(completion: *mut fsspec_completion);
+    pub fn fsspec_completion_error(
+        completion: *mut fsspec_completion,
+        status: i32,
+        data: *const c_char,
+        len: usize,
+    );
+}
