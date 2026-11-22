@@ -5,13 +5,45 @@
 
 use std::future::{Future, IntoFuture};
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc, Mutex,
+};
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
 
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, Notify};
 
 use crate::{runtime::runtime, ErrorKind, OperationError};
+
+/// Diagnostic text has a separate fixed bound, outside data-buffer accounting.
+pub const MAX_ERROR_BYTES: usize = 4096;
+
+fn bounded_error(error: OperationError) -> OperationError {
+    use std::fmt::Write;
+    struct Message(String);
+    impl std::fmt::Write for Message {
+        fn write_str(&mut self, text: &str) -> std::fmt::Result {
+            let mut end = text.len().min(MAX_ERROR_BYTES - self.0.len());
+            while !text.is_char_boundary(end) {
+                end -= 1;
+            }
+            self.0.push_str(&text[..end]);
+            if end == text.len() {
+                Ok(())
+            } else {
+                Err(std::fmt::Error)
+            }
+        }
+    }
+    let mut message = Message(String::new());
+    let _ = write!(&mut message, "{error}");
+    OperationError::Detailed {
+        kind: error.kind(),
+        retry_safe: error.retry_safe(),
+        message: message.0,
+    }
+}
 
 pub type Outcome = Result<Value, OperationError>;
 
@@ -19,12 +51,18 @@ pub type Outcome = Result<Value, OperationError>;
 pub enum Kind {
     Unit,
     Bytes,
+    Info,
+    File,
+    Position,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Value {
     Unit,
     Bytes(Vec<u8>),
+    Info(crate::FileInfo),
+    File(crate::async_files::AsyncFile),
+    Position(u64),
 }
 
 /// An owned, nonblocking callback. Dropping it discards it and releases captures.
@@ -85,15 +123,23 @@ struct State {
     cancelled: bool,
     quiescent: bool,
     awaiting: bool,
+    successful: bool,
+    retention: Option<Arc<dyn Send + Sync>>,
     waker: Option<Waker>,
     timer: Option<oneshot::Sender<()>>,
 }
+
+type ResultTransform = Arc<dyn Fn(Outcome) -> Outcome + Send + Sync>;
 
 struct Shared {
     state: Mutex<State>,
     kind: Kind,
     max_bytes: usize,
     deadline: Option<Instant>,
+    changed: Notify,
+    jobs: AtomicUsize,
+    settled: AtomicBool,
+    transform: Mutex<Option<ResultTransform>>,
 }
 
 pub(crate) fn error(kind: ErrorKind, message: &str) -> OperationError {
@@ -112,7 +158,7 @@ impl Shared {
 
     fn publish(&self, mut outcome: Outcome, mut cancelled: bool) {
         let mut discarded = None;
-        let (ready, cancel, waker, timer) = {
+        let (ready, cancel, waker, timer, retention) = {
             let mut state = self.state.lock().unwrap();
             if state.outcome.is_some() || state.taken {
                 return;
@@ -124,6 +170,12 @@ impl Shared {
                 ));
                 cancelled = true;
             }
+            let retention = if outcome.is_err() {
+                state.retention.take()
+            } else {
+                None
+            };
+            state.successful = outcome.is_ok();
             state.outcome = Some(outcome);
             state.cancelled = cancelled;
             (
@@ -131,9 +183,12 @@ impl Shared {
                 state.cancel.take(),
                 state.waker.take(),
                 state.timer.take(),
+                retention,
             )
         };
         // Foreign callbacks, captured data and Wakers may reenter this operation.
+        self.changed.notify_waiters();
+        drop(retention);
         drop(discarded);
         drop(timer);
         if let Some(cancel) = cancel {
@@ -185,6 +240,10 @@ impl Operation {
             kind,
             max_bytes,
             deadline,
+            changed: Notify::new(),
+            jobs: AtomicUsize::new(0),
+            settled: AtomicBool::new(true),
+            transform: Mutex::new(None),
         });
         let operation = Self(shared.clone());
         let completion = Completion(Arc::new(Producer {
@@ -221,6 +280,118 @@ impl Operation {
         }
     }
 
+    pub(crate) fn succeeded(&self) -> bool {
+        self.0.state.lock().unwrap().successful
+    }
+
+    pub(crate) fn retain_result(&self, resource: Arc<dyn Send + Sync>) {
+        let previous = {
+            let mut state = self.0.state.lock().unwrap();
+            if state.taken || state.outcome.as_ref().is_some_and(Result::is_err) {
+                return;
+            }
+            state.retention.replace(resource)
+        };
+        drop(previous);
+    }
+
+    pub(crate) fn transform(&self, transform: impl Fn(Outcome) -> Outcome + Send + Sync + 'static) {
+        let previous = self
+            .0
+            .transform
+            .lock()
+            .unwrap()
+            .replace(Arc::new(transform));
+        drop(previous);
+    }
+
+    pub(crate) fn tracked_job(&self, job: Job) -> Job {
+        struct Lease(Arc<Shared>);
+        impl Drop for Lease {
+            fn drop(&mut self) {
+                self.0.jobs.fetch_sub(1, Ordering::AcqRel);
+                self.0.changed.notify_waiters();
+            }
+        }
+        self.0.jobs.fetch_add(1, Ordering::AcqRel);
+        let lease = Lease(self.0.clone());
+        Job::new(move || {
+            job.run();
+            drop(lease);
+        })
+    }
+
+    pub(crate) async fn wait_ready(&self) {
+        loop {
+            let changed = self.0.changed.notified();
+            tokio::pin!(changed);
+            changed.as_mut().enable();
+            if self.state() != 0 {
+                return;
+            }
+            changed.await;
+        }
+    }
+
+    pub(crate) fn track_cleanup(&self) {
+        self.0.settled.store(false, Ordering::Release);
+    }
+    pub(crate) fn finish_cleanup(&self) {
+        self.0.settled.store(true, Ordering::Release);
+        self.0.changed.notify_waiters();
+    }
+
+    /// Waits for producers, accepted callback jobs, and handle accounting cleanup.
+    /// This does not consume the result or cancel the underlying operation.
+    pub fn drain_operation(&self) -> Result<Operation, OperationError> {
+        let (waiter, completion) = Operation::new(Kind::Unit, 0, None)?;
+        let source = self.clone();
+        runtime()?.spawn(async move {
+            source.drain().await;
+            completion.complete(Ok(Value::Unit));
+        });
+        Ok(waiter)
+    }
+
+    pub async fn drain(&self) {
+        loop {
+            let changed = self.0.changed.notified();
+            tokio::pin!(changed);
+            changed.as_mut().enable();
+            if self.is_quiescent()
+                && self.0.jobs.load(Ordering::Acquire) == 0
+                && self.0.settled.load(Ordering::Acquire)
+            {
+                return;
+            }
+            changed.await;
+        }
+    }
+
+    pub(crate) async fn wait_callbacks(&self) {
+        loop {
+            let changed = self.0.changed.notified();
+            tokio::pin!(changed);
+            changed.as_mut().enable();
+            if self.is_quiescent() && self.0.jobs.load(Ordering::Acquire) == 0 {
+                return;
+            }
+            changed.await;
+        }
+    }
+
+    pub(crate) async fn wait_quiescent(&self) {
+        loop {
+            let changed = self.0.changed.notified();
+            tokio::pin!(changed);
+            changed.as_mut().enable();
+            if self.is_quiescent() {
+                return;
+            }
+            changed.await;
+        }
+    }
+
     pub fn is_quiescent(&self) -> bool {
         self.0.state.lock().unwrap().quiescent
     }
@@ -239,6 +410,9 @@ impl Operation {
             .take()
             .ok_or_else(|| error(ErrorKind::Invalid, "operation is pending or already taken"))?;
         state.taken = true;
+        let retention = state.retention.take();
+        drop(state);
+        drop(retention);
         Ok(outcome)
     }
 
@@ -247,7 +421,7 @@ impl Operation {
         dispatcher: Arc<dyn Dispatcher>,
         job: Job,
     ) -> Result<(), OperationError> {
-        let callback = Callback(dispatcher, job);
+        let callback = Callback(dispatcher, self.tracked_job(job));
         {
             let mut state = self.0.state.lock().unwrap();
             if state.subscribed {
@@ -274,6 +448,7 @@ struct Producer {
 impl Drop for Producer {
     fn drop(&mut self) {
         self.shared.state.lock().unwrap().quiescent = true;
+        self.shared.changed.notify_waiters();
         self.shared.publish(
             Err(error(
                 ErrorKind::Unavailable,
@@ -310,7 +485,10 @@ impl Completion {
         dispatcher: Arc<dyn Dispatcher>,
         job: Job,
     ) -> Result<(), OperationError> {
-        let callback = Callback(dispatcher, job);
+        let callback = Callback(
+            dispatcher,
+            Operation(self.0.shared.clone()).tracked_job(job),
+        );
         let cancelled = {
             let mut state = self.0.shared.state.lock().unwrap();
             if state.cancel_registered {
@@ -333,13 +511,25 @@ impl Completion {
     }
 
     pub fn complete(self, outcome: Outcome) {
+        let transform = self.0.shared.transform.lock().unwrap().clone();
+        let outcome = match transform {
+            Some(transform) => transform(outcome),
+            None => outcome,
+        };
         let valid = match &outcome {
             Ok(Value::Unit) => self.0.shared.kind == Kind::Unit,
             Ok(Value::Bytes(bytes)) => {
-                self.0.shared.kind == Kind::Bytes && bytes.len() <= self.max_bytes()
+                self.0.shared.kind == Kind::Bytes && bytes.capacity() <= self.max_bytes()
             }
+            Ok(Value::Info(info)) => {
+                self.0.shared.kind == Kind::Info
+                    && crate::async_files::info_bytes(info) <= self.max_bytes()
+            }
+            Ok(Value::File(_)) => self.0.shared.kind == Kind::File,
+            Ok(Value::Position(_)) => self.0.shared.kind == Kind::Position,
             Err(_) => true,
         };
+        let outcome = outcome.map_err(bounded_error);
         self.0.shared.publish(
             if valid {
                 outcome
@@ -389,11 +579,15 @@ impl Future for OperationFuture {
         }
         // Clone/drop/wake can invoke foreign code: never do these under the lock.
         let new_waker = cx.waker().clone();
-        let (result, old_waker) = {
+        let (result, old_waker, retention) = {
             let mut state = self.operation.0.state.lock().unwrap();
             if let Some(outcome) = state.outcome.take() {
                 state.taken = true;
-                (Poll::Ready(outcome), state.waker.take())
+                (
+                    Poll::Ready(outcome),
+                    state.waker.take(),
+                    state.retention.take(),
+                )
             } else if state.taken {
                 (
                     Poll::Ready(Err(error(
@@ -401,12 +595,14 @@ impl Future for OperationFuture {
                         "operation result already taken",
                     ))),
                     state.waker.take(),
+                    state.retention.take(),
                 )
             } else {
-                (Poll::Pending, state.waker.replace(new_waker))
+                (Poll::Pending, state.waker.replace(new_waker), None)
             }
         };
         drop(old_waker);
+        drop(retention);
         result
     }
 }

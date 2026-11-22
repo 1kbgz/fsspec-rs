@@ -14,6 +14,7 @@
 #![allow(clippy::missing_safety_doc)]
 #![allow(non_camel_case_types)]
 
+pub mod async_files;
 pub mod async_io;
 mod export;
 pub mod ffi;

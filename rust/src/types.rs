@@ -22,7 +22,7 @@ impl std::fmt::Display for FileType {
 }
 
 /// Metadata about a filesystem entry, analogous to fsspec's info dict.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileInfo {
     /// Full path of the entry
     pub name: String,

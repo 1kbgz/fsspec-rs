@@ -282,8 +282,9 @@ Range ordering, consistency and request limits follow the
 
 The [async I/O contract](async-io.md) documents operation/producer handles, managed
 and foreign event-loop dispatch, owned results/errors, cancellation, and deadlines.
-These symbols are exported in `fsspec.h`. Async filesystem/file handles and shared
-byte budgets remain proposed; their draft declarations are not exported.
+`fsspec.h` also exports read-only async filesystem/file vtables, shared budget
+contexts, and close operations that wait for cleanup. Native S3 streaming remains
+proposed; its draft constructor is not exported.
 
 ## Foreign backends
 

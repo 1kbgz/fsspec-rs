@@ -72,6 +72,62 @@ pub struct fsspec_async_result {
     _private: [u8; 0],
 }
 
+/// Async context and read-only handles, independent of the synchronous vtables.
+pub struct fsspec_async_context {
+    _private: [u8; 0],
+}
+pub struct fsspec_async_fs {
+    _private: [u8; 0],
+}
+pub struct fsspec_async_file {
+    _private: [u8; 0],
+}
+
+/// Null options use 64 operations, 64 MiB buffered bytes and 8 MiB per read.
+#[repr(C)]
+pub struct fsspec_async_context_options {
+    pub struct_size: usize,
+    pub max_operations: usize,
+    pub max_buffered_bytes: u64,
+    pub max_read_size: usize,
+}
+/// Relative monotonic timeout, including admission/dispatch. UINT64_MAX disables.
+#[repr(C)]
+pub struct fsspec_async_options {
+    pub struct_size: usize,
+    pub timeout_ns: u64,
+}
+
+/// Nonblocking starts dispatched on the provider's executor. Each callback owns
+/// one completion reference; path inputs are borrowed only during the callback.
+/// info/open_read/release required; close optional for borrowed clients.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct fsspec_async_fs_vtable {
+    pub struct_size: usize,
+    pub abi_version: u32,
+    pub info:
+        Option<unsafe extern "C" fn(*mut c_void, *const c_char, usize, *mut fsspec_completion)>,
+    pub open_read:
+        Option<unsafe extern "C" fn(*mut c_void, *const c_char, usize, *mut fsspec_completion)>,
+    pub close: Option<unsafe extern "C" fn(*mut c_void, *mut fsspec_completion)>,
+    pub release: Option<unsafe extern "C" fn(*mut c_void)>,
+}
+/// read/info/close/release required; seek optional. whence: 0 start, 1 current,
+/// 2 end. Start offsets above INT64_MAX are unsupported through this vtable.
+/// Final release is thread-safe and nonblocking; loop-affine cleanup uses close.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct fsspec_async_file_vtable {
+    pub struct_size: usize,
+    pub abi_version: u32,
+    pub read: Option<unsafe extern "C" fn(*mut c_void, usize, *mut fsspec_completion)>,
+    pub seek: Option<unsafe extern "C" fn(*mut c_void, i64, u32, *mut fsspec_completion)>,
+    pub info: Option<unsafe extern "C" fn(*mut c_void, *mut fsspec_completion)>,
+    pub close: Option<unsafe extern "C" fn(*mut c_void, *mut fsspec_completion)>,
+    pub release: Option<unsafe extern "C" fn(*mut c_void)>,
+}
+
 /// Owned error; free with fsspec_async_error_free. Never uses thread-local state.
 #[repr(C)]
 pub struct fsspec_async_error {

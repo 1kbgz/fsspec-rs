@@ -53,6 +53,26 @@
 #define FSSPEC_CONDITION_MISSING 2
 
 /**
+ * The kind of a filesystem entry.
+ */
+enum fsspec_file_type
+#if defined(__cplusplus) || __STDC_VERSION__ >= 202311L
+  : int32_t
+#endif // defined(__cplusplus) || __STDC_VERSION__ >= 202311L
+ {
+  FSSPEC_FILE_TYPE_FILE = 0,
+  FSSPEC_FILE_TYPE_DIRECTORY = 1,
+  FSSPEC_FILE_TYPE_OTHER = 2,
+};
+#ifndef __cplusplus
+#if __STDC_VERSION__ >= 202311L
+typedef enum fsspec_file_type fsspec_file_type;
+#else
+typedef int32_t fsspec_file_type;
+#endif // __STDC_VERSION__ >= 202311L
+#endif // __cplusplus
+
+/**
  * Status for legacy operations. Non-zero values mirror `FsError`.
  */
 enum fsspec_status
@@ -80,24 +100,13 @@ typedef int32_t fsspec_status;
 #endif // __cplusplus
 
 /**
- * The kind of a filesystem entry.
+ * Async context and read-only handles, independent of the synchronous vtables.
  */
-enum fsspec_file_type
-#if defined(__cplusplus) || __STDC_VERSION__ >= 202311L
-  : int32_t
-#endif // defined(__cplusplus) || __STDC_VERSION__ >= 202311L
- {
-  FSSPEC_FILE_TYPE_FILE = 0,
-  FSSPEC_FILE_TYPE_DIRECTORY = 1,
-  FSSPEC_FILE_TYPE_OTHER = 2,
-};
-#ifndef __cplusplus
-#if __STDC_VERSION__ >= 202311L
-typedef enum fsspec_file_type fsspec_file_type;
-#else
-typedef int32_t fsspec_file_type;
-#endif // __STDC_VERSION__ >= 202311L
-#endif // __cplusplus
+typedef struct fsspec_async_context fsspec_async_context;
+
+typedef struct fsspec_async_file fsspec_async_file;
+
+typedef struct fsspec_async_fs fsspec_async_fs;
 
 typedef struct fsspec_async_result fsspec_async_result;
 
@@ -136,6 +145,16 @@ typedef struct fsspec_operation fsspec_operation;
 typedef struct fsspec_options fsspec_options;
 
 /**
+ * Null options use 64 operations, 64 MiB buffered bytes and 8 MiB per read.
+ */
+typedef struct fsspec_async_context_options {
+  size_t struct_size;
+  size_t max_operations;
+  uint64_t max_buffered_bytes;
+  size_t max_read_size;
+} fsspec_async_context_options;
+
+/**
  * Status for typed object operations. Existing status values retain their meaning.
  * A raw integer permits new operation errors without extending `fsspec_status`.
  */
@@ -159,17 +178,33 @@ typedef struct fsspec_async_error {
 } fsspec_async_error;
 
 /**
- * Thread-safe nonblocking dispatch. Successful post takes the job and must run
- * or discard it exactly once, never inline on the submitting stack. Failed post
- * leaves ownership with libfsspec. release may run on any thread. Callbacks must
- * not unwind. Initialize struct_size and abi_version; both callbacks required.
+ * read/info/close/release required; seek optional. whence: 0 start, 1 current,
+ * 2 end. Start offsets above INT64_MAX are unsupported through this vtable.
+ * Final release is thread-safe and nonblocking; loop-affine cleanup uses close.
  */
-typedef struct fsspec_dispatcher_vtable {
+typedef struct fsspec_async_file_vtable {
   size_t struct_size;
   uint32_t abi_version;
-  fsspec_operation_status (*post)(void*, struct fsspec_dispatch_job*, struct fsspec_async_error**);
+  void (*read)(void*, size_t, struct fsspec_completion*);
+  void (*seek)(void*, int64_t, uint32_t, struct fsspec_completion*);
+  void (*info)(void*, struct fsspec_completion*);
+  void (*close)(void*, struct fsspec_completion*);
   void (*release)(void*);
-} fsspec_dispatcher_vtable;
+} fsspec_async_file_vtable;
+
+/**
+ * Nonblocking starts dispatched on the provider's executor. Each callback owns
+ * one completion reference; path inputs are borrowed only during the callback.
+ * info/open_read/release required; close optional for borrowed clients.
+ */
+typedef struct fsspec_async_fs_vtable {
+  size_t struct_size;
+  uint32_t abi_version;
+  void (*info)(void*, const char*, size_t, struct fsspec_completion*);
+  void (*open_read)(void*, const char*, size_t, struct fsspec_completion*);
+  void (*close)(void*, struct fsspec_completion*);
+  void (*release)(void*);
+} fsspec_async_fs_vtable;
 
 /**
  * Strings allocated by libfsspec. Free with `fsspec_string_list_free`.
@@ -192,6 +227,27 @@ typedef struct fsspec_file_info {
   int64_t modified_ns;
   struct fsspec_string_list extra;
 } fsspec_file_info;
+
+/**
+ * Relative monotonic timeout, including admission/dispatch. UINT64_MAX disables.
+ */
+typedef struct fsspec_async_options {
+  size_t struct_size;
+  uint64_t timeout_ns;
+} fsspec_async_options;
+
+/**
+ * Thread-safe nonblocking dispatch. Successful post takes the job and must run
+ * or discard it exactly once, never inline on the submitting stack. Failed post
+ * leaves ownership with libfsspec. release may run on any thread. Callbacks must
+ * not unwind. Initialize struct_size and abi_version; both callbacks required.
+ */
+typedef struct fsspec_dispatcher_vtable {
+  size_t struct_size;
+  uint32_t abi_version;
+  fsspec_operation_status (*post)(void*, struct fsspec_dispatch_job*, struct fsspec_async_error**);
+  void (*release)(void*);
+} fsspec_dispatcher_vtable;
 
 /**
  * Entries allocated by libfsspec. Free with `fsspec_file_info_list_free`.
@@ -439,7 +495,145 @@ extern "C" {
 #endif // __cplusplus
 
 /**
- * Copies a nonzero status and UTF-8 message. Null means invalid arguments.
+ * Creates a context sharing libfsspec's managed runtime. Outputs unchanged on failure.
+ */
+int32_t fsspec_async_context_create(const struct fsspec_async_context_options *options,
+                                    struct fsspec_async_context **out,
+                                    struct fsspec_async_error **out_error);
+
+/**
+ * Copies vtable and takes data only on success. Context required; null dispatcher
+ * uses managed dispatch. Close must finish loop-affine cleanup before completion.
+ */
+int32_t fsspec_async_file_from_vtable(const struct fsspec_async_context *context,
+                                      const struct fsspec_dispatcher *dispatch,
+                                      const struct fsspec_async_file_vtable *vtable,
+                                      void *data,
+                                      struct fsspec_async_file **out,
+                                      struct fsspec_async_error **out_error);
+
+int32_t fsspec_async_fs_from_vtable(const struct fsspec_async_context *context,
+                                    const struct fsspec_dispatcher *dispatch,
+                                    const struct fsspec_async_fs_vtable *vtable,
+                                    void *data,
+                                    struct fsspec_async_fs **out,
+                                    struct fsspec_async_error **out_error);
+
+/**
+ * Copies bounded metadata and consumes a producer reference, even on invalid input.
+ * UTF-8 string bytes are bounded; map/struct overhead is outside the byte budget.
+ */
+void fsspec_completion_info(struct fsspec_completion *completion,
+                            const struct fsspec_file_info *info);
+
+/**
+ * Consumes one file and producer reference, including on late/invalid completion.
+ */
+void fsspec_completion_file(struct fsspec_completion *completion, struct fsspec_async_file *file);
+
+void fsspec_completion_position(struct fsspec_completion *completion, uint64_t position);
+
+/**
+ * Moves metadata out once. Free with fsspec_file_info_free. Result becomes unit.
+ */
+int32_t fsspec_async_result_take_info(struct fsspec_async_result *result,
+                                      struct fsspec_file_info *out,
+                                      struct fsspec_async_error **out_error);
+
+/**
+ * Moves one file handle out once. Result becomes unit. Release with async_file_release.
+ */
+int32_t fsspec_async_result_take_file(struct fsspec_async_result *result,
+                                      struct fsspec_async_file **out,
+                                      struct fsspec_async_error **out_error);
+
+int32_t fsspec_async_result_position(const struct fsspec_async_result *result,
+                                     uint64_t *out,
+                                     struct fsspec_async_error **out_error);
+
+struct fsspec_async_context *fsspec_async_context_retain(const struct fsspec_async_context *value);
+
+/**
+ * Final release schedules best-effort close; explicitly close to observe cleanup.
+ */
+void fsspec_async_context_release(struct fsspec_async_context *value);
+
+/**
+ * Joins cleanup without consuming the handle. Timeout/cancellation stops only
+ * this waiter; a later close can await cleanup. Control work bypasses data limits.
+ */
+int32_t fsspec_async_context_close(struct fsspec_async_context *value,
+                                   const struct fsspec_async_options *opts,
+                                   struct fsspec_operation **out,
+                                   struct fsspec_async_error **out_error);
+
+struct fsspec_async_file *fsspec_async_file_retain(const struct fsspec_async_file *value);
+
+/**
+ * Final release schedules best-effort close; explicitly close to observe cleanup.
+ */
+void fsspec_async_file_release(struct fsspec_async_file *value);
+
+/**
+ * Joins cleanup without consuming the handle. Timeout/cancellation stops only
+ * this waiter; a later close can await cleanup. Control work bypasses data limits.
+ */
+int32_t fsspec_async_file_close(struct fsspec_async_file *value,
+                                const struct fsspec_async_options *opts,
+                                struct fsspec_operation **out,
+                                struct fsspec_async_error **out_error);
+
+struct fsspec_async_fs *fsspec_async_fs_retain(const struct fsspec_async_fs *value);
+
+/**
+ * Final release schedules best-effort close; explicitly close to observe cleanup.
+ */
+void fsspec_async_fs_release(struct fsspec_async_fs *value);
+
+/**
+ * Joins cleanup without consuming the handle. Timeout/cancellation stops only
+ * this waiter; a later close can await cleanup. Control work bypasses data limits.
+ */
+int32_t fsspec_async_fs_close(struct fsspec_async_fs *value,
+                              const struct fsspec_async_options *opts,
+                              struct fsspec_operation **out,
+                              struct fsspec_async_error **out_error);
+
+int32_t fsspec_async_fs_info(const struct fsspec_async_fs *value,
+                             const char *path,
+                             size_t path_len,
+                             const struct fsspec_async_options *opts,
+                             struct fsspec_operation **out,
+                             struct fsspec_async_error **out_error);
+
+int32_t fsspec_async_fs_open_read(const struct fsspec_async_fs *value,
+                                  const char *path,
+                                  size_t path_len,
+                                  const struct fsspec_async_options *opts,
+                                  struct fsspec_operation **out,
+                                  struct fsspec_async_error **out_error);
+
+int32_t fsspec_async_file_read(const struct fsspec_async_file *value,
+                               size_t max_bytes,
+                               const struct fsspec_async_options *opts,
+                               struct fsspec_operation **out,
+                               struct fsspec_async_error **out_error);
+
+int32_t fsspec_async_file_info(const struct fsspec_async_file *value,
+                               const struct fsspec_async_options *opts,
+                               struct fsspec_operation **out,
+                               struct fsspec_async_error **out_error);
+
+int32_t fsspec_async_file_seek(const struct fsspec_async_file *value,
+                               int64_t offset,
+                               uint32_t whence,
+                               const struct fsspec_async_options *opts,
+                               struct fsspec_operation **out,
+                               struct fsspec_async_error **out_error);
+
+/**
+ * Copies a nonzero status and UTF-8 message, truncated at 4096 bytes on a
+ * character boundary. Null means invalid arguments.
  */
 struct fsspec_async_error *fsspec_async_error_new(int32_t status, const char *data, size_t len);
 
@@ -466,7 +660,7 @@ void fsspec_dispatch_job_run(struct fsspec_dispatch_job *job);
 void fsspec_dispatch_job_discard(struct fsspec_dispatch_job *job);
 
 /**
- * Creates an observer/producer pair. kind: 0 unit, 1 bytes. max_bytes bounds a
+ * Creates an observer/producer pair. kind: 0 unit, 1 bytes, 2 info, 3 file, 4 position. max_bytes bounds a
  * byte result (including the copy into libfsspec), not foreign allocations.
  * timeout_ns is relative monotonic time; UINT64_MAX disables the deadline.
  * Zero times out immediately. Keep a producer reference until cleanup stops.
@@ -512,7 +706,7 @@ void fsspec_async_result_free(struct fsspec_async_result *result);
 const struct fsspec_async_error *fsspec_async_result_error(const struct fsspec_async_result *result);
 
 /**
- * 0 unit, 1 bytes, UINT32_MAX error. Requires a live, nonnull result.
+ * 0 unit, 1 bytes, 2 info, 3 file, 4 position, UINT32_MAX error. Requires a live, nonnull result.
  */
 uint32_t fsspec_async_result_kind(const struct fsspec_async_result *result);
 
@@ -568,13 +762,22 @@ void fsspec_completion_bytes(struct fsspec_completion *completion, const uint8_t
 void fsspec_completion_unit(struct fsspec_completion *completion);
 
 /**
- * Copies the error message and consumes one producer reference. Invalid inputs
+ * Copies up to 4096 UTF-8 bytes of error text and consumes one producer reference. Invalid inputs
  * complete with Invalid. No thread-local error state is read or written.
  */
 void fsspec_completion_error(struct fsspec_completion *completion,
                              int32_t status,
                              const char *data,
                              size_t len);
+
+/**
+ * Returns a unit operation after producer cleanup, accepted callback jobs, and
+ * handle accounting finish. Does not take the source result. Cancelling this
+ * waiter does not cancel the source operation or stop its cleanup.
+ */
+int32_t fsspec_operation_drain(const struct fsspec_operation *operation,
+                               struct fsspec_operation **out,
+                               struct fsspec_async_error **out_error);
 
 /**
  * Reads up to `len` bytes into `buf`. `out_read` receives the count, which is

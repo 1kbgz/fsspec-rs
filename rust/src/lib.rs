@@ -8,6 +8,8 @@
 //! else for free" design pattern as fsspec.
 
 #[cfg(feature = "async")]
+pub mod async_files;
+#[cfg(feature = "async")]
 pub mod async_io;
 pub mod buffered;
 pub mod caching;
@@ -45,7 +47,7 @@ mod s3_tests;
 #[cfg(test)]
 mod tests;
 
-pub use async_fs::AsyncFileSystem;
+pub use async_fs::{AsyncFileSystem, AsyncFsFile, IoFuture};
 pub use buffered::BufferedFile;
 pub use caching::CacheType;
 pub use error::{ErrorKind, FsError, FsResult, OperationError};
