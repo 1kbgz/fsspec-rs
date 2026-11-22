@@ -16,6 +16,7 @@ use object_store::{MultipartUpload, ObjectStore, ObjectStoreExt, PutMode, PutPay
 use tokio::runtime::Runtime;
 use tokio::sync::Semaphore;
 
+mod async_reads;
 mod objects;
 pub use objects::S3ObjectReader;
 
@@ -253,6 +254,78 @@ impl S3Config {
     }
 }
 
+fn s3_builder(
+    cfg: S3Config,
+    options: S3ClientOptions,
+) -> FsResult<(S3Config, AmazonS3Builder, String)> {
+    let cfg = cfg.resolve_environment(|key| std::env::var(key).ok().filter(|v| !v.is_empty()))?;
+    let mut client = object_store::ClientOptions::new();
+    if let Some(timeout) = options.connect_timeout {
+        if timeout.is_zero() {
+            return Err(FsError::InvalidArgument(
+                "connect_timeout must be positive".into(),
+            ));
+        }
+        client = client.with_connect_timeout(timeout);
+    }
+    if let Some(timeout) = options.request_timeout {
+        if timeout.is_zero() {
+            return Err(FsError::InvalidArgument(
+                "request_timeout must be positive".into(),
+            ));
+        }
+        client = client.with_timeout(timeout);
+    }
+    let mut retry = object_store::RetryConfig::default();
+    if let Some(max_retries) = options.max_retries {
+        retry.max_retries = max_retries;
+    }
+    let mut builder = AmazonS3Builder::new()
+        .with_bucket_name(&cfg.bucket)
+        .with_client_options(client)
+        .with_retry(retry)
+        .with_http_connector(crate::s3_http::Connector);
+
+    if let Some(ref region) = cfg.region {
+        builder = builder.with_region(region);
+    }
+    if let Some(ref endpoint) = cfg.endpoint_url {
+        builder = builder.with_endpoint(endpoint);
+        // Allow plain HTTP (needed for MinIO / LocalStack / other local S3)
+        if endpoint.starts_with("http://") {
+            builder = builder.with_allow_http(true);
+        }
+    }
+    if let Some(ref key) = cfg.access_key_id {
+        builder = builder.with_access_key_id(key);
+    }
+    if let Some(ref secret) = cfg.secret_access_key {
+        builder = builder.with_secret_access_key(secret);
+    }
+    if let Some(ref token) = cfg.session_token {
+        builder = builder.with_token(token);
+    }
+    if cfg.anon {
+        builder = builder.with_skip_signature(true);
+    }
+    if cfg.virtual_hosted_style_request {
+        builder = builder.with_virtual_hosted_style_request(true);
+    }
+
+    let endpoint = cfg.endpoint_url.clone().unwrap_or_else(|| {
+        format!(
+            "https://s3.{}.amazonaws.com",
+            cfg.region.as_deref().unwrap_or("us-east-1")
+        )
+    });
+    let endpoint = url::Url::parse(&endpoint)
+        .map_err(|error| FsError::InvalidArgument(error.to_string()))?
+        .to_string()
+        .trim_end_matches('/')
+        .to_string();
+    Ok((cfg, builder, endpoint))
+}
+
 /// Sync S3 filesystem backed by an `object_store` S3 store.
 ///
 /// All async `object_store` calls are executed via an embedded tokio runtime.
@@ -275,60 +348,7 @@ impl S3Fs {
     /// Build with explicit transport options. Environment defaults are captured
     /// at construction; existing clients do not reload them.
     pub fn with_client_options(cfg: S3Config, options: S3ClientOptions) -> FsResult<Self> {
-        let cfg =
-            cfg.resolve_environment(|key| std::env::var(key).ok().filter(|v| !v.is_empty()))?;
-        let mut client = object_store::ClientOptions::new();
-        if let Some(timeout) = options.connect_timeout {
-            if timeout.is_zero() {
-                return Err(FsError::InvalidArgument(
-                    "connect_timeout must be positive".into(),
-                ));
-            }
-            client = client.with_connect_timeout(timeout);
-        }
-        if let Some(timeout) = options.request_timeout {
-            if timeout.is_zero() {
-                return Err(FsError::InvalidArgument(
-                    "request_timeout must be positive".into(),
-                ));
-            }
-            client = client.with_timeout(timeout);
-        }
-        let mut retry = object_store::RetryConfig::default();
-        if let Some(max_retries) = options.max_retries {
-            retry.max_retries = max_retries;
-        }
-        let mut builder = AmazonS3Builder::new()
-            .with_bucket_name(&cfg.bucket)
-            .with_client_options(client)
-            .with_retry(retry)
-            .with_http_connector(crate::s3_http::Connector);
-
-        if let Some(ref region) = cfg.region {
-            builder = builder.with_region(region);
-        }
-        if let Some(ref endpoint) = cfg.endpoint_url {
-            builder = builder.with_endpoint(endpoint);
-            // Allow plain HTTP (needed for MinIO / LocalStack / other local S3)
-            if endpoint.starts_with("http://") {
-                builder = builder.with_allow_http(true);
-            }
-        }
-        if let Some(ref key) = cfg.access_key_id {
-            builder = builder.with_access_key_id(key);
-        }
-        if let Some(ref secret) = cfg.secret_access_key {
-            builder = builder.with_secret_access_key(secret);
-        }
-        if let Some(ref token) = cfg.session_token {
-            builder = builder.with_token(token);
-        }
-        if cfg.anon {
-            builder = builder.with_skip_signature(true);
-        }
-        if cfg.virtual_hosted_style_request {
-            builder = builder.with_virtual_hosted_style_request(true);
-        }
+        let (cfg, builder, endpoint) = s3_builder(cfg, options)?;
 
         // Retrying a PUT can hide a lost success response behind a later 412.
         // Keep retries for reads; resolve uncertain typed writes ourselves.
@@ -346,17 +366,6 @@ impl S3Fs {
             .map_err(|e| FsError::InvalidArgument(e.to_string()))?;
 
         let rt = Runtime::new().map_err(|e| FsError::Other(e.to_string()))?;
-        let endpoint = cfg.endpoint_url.unwrap_or_else(|| {
-            format!(
-                "https://s3.{}.amazonaws.com",
-                cfg.region.as_deref().unwrap_or("us-east-1")
-            )
-        });
-        let endpoint = url::Url::parse(&endpoint)
-            .map_err(|error| FsError::InvalidArgument(error.to_string()))?
-            .to_string()
-            .trim_end_matches('/')
-            .to_string();
 
         Ok(Self {
             store: Arc::new(store),

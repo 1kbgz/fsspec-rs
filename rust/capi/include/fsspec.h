@@ -502,6 +502,18 @@ int32_t fsspec_async_context_create(const struct fsspec_async_context_options *o
                                     struct fsspec_async_error **out_error);
 
 /**
+ * Construct a native read-only S3 filesystem on the managed runtime.
+ * Null context selects default limits. Options match fsspec_s3_open.
+ * No network I/O occurs here; outputs remain unchanged on failure.
+ */
+int32_t fsspec_async_s3_open(const char *bucket,
+                             size_t bucket_len,
+                             const struct fsspec_options *options,
+                             const struct fsspec_async_context *context,
+                             struct fsspec_async_fs **out,
+                             struct fsspec_async_error **out_error);
+
+/**
  * Copies vtable and takes data only on success. Context required; null dispatcher
  * uses managed dispatch. Close must finish loop-affine cleanup before completion.
  */

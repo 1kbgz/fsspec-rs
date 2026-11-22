@@ -58,6 +58,11 @@ def lib():
     lib = _load_library()
     out, error = POINTER(c_void_p), POINTER(POINTER(Error))
     signatures = {
+        "async_s3_open": ([c_char_p, c_size_t, c_void_p, c_void_p, out, error], c_int32),
+        "options_new": ([], c_void_p),
+        "options_set": ([c_void_p, c_char_p, c_size_t, c_char_p, c_size_t], c_int32),
+        "options_free": ([c_void_p], None),
+        "operation_drain": ([c_void_p, out, error], c_int32),
         "async_context_create": ([POINTER(Limits), out, error], c_int32),
         "async_file_from_vtable": ([c_void_p, c_void_p, POINTER(FileVtable), c_void_p, out, error], c_int32),
         "async_fs_from_vtable": ([c_void_p, c_void_p, POINTER(FsVtable), c_void_p, out, error], c_int32),
@@ -349,3 +354,56 @@ def test_large_diagnostic_is_bounded_without_losing_error_kind(lib):
         assert len(text.encode()) == 4095
     finally:
         lib.fsspec_operation_release(operation)
+
+
+@pytest.mark.parametrize("shared_context", [False, True])
+@pytest.mark.parametrize("key", ["data", "test"])
+def test_native_s3_reads_through_async_c_api(lib, s3_endpoint, shared_context, key):
+    async def drained(operation):
+        drain = c_void_p()
+        assert lib.fsspec_operation_drain(operation, byref(drain), None) == 0
+        result = await finish(lib, operation)
+        assert await finish(lib, drain) == (0, None)
+        return result
+
+    async def run():
+        object_path = "/test/" + key
+        url = ("s3://test/" + key).encode()
+        s3_endpoint.objects[object_path] = (b"0123456789", '"original"')
+        ctx = context(lib, size=512, read=128) if shared_context else None
+        fs, file = c_void_p(), c_void_p()
+        options = lib.fsspec_options_new()
+        for option_key, value in [(b"endpoint_url", str(s3_endpoint).encode()), (b"anon", b"true"), (b"max_retries", b"0")]:
+            assert lib.fsspec_options_set(options, option_key, len(option_key), value, len(value)) == 0
+        try:
+            assert lib.fsspec_async_s3_open(b"test", 4, options, ctx, byref(fs), None) == 0
+        finally:
+            lib.fsspec_options_free(options)
+        try:
+            status, file = await drained(start(lib, "async_fs_open_read", fs, url, len(url)))
+            assert status == 0
+            assert await drained(start(lib, "async_file_read", file, 4)) == (0, b"0123")
+            assert await drained(start(lib, "async_file_seek", file, -2, 2)) == (0, 8)
+            assert await drained(start(lib, "async_file_read", file, 4)) == (0, b"89")
+            assert await drained(start(lib, "async_file_read", file, 4)) == (0, b"")
+            assert await drained(start(lib, "async_file_info", file)) == (0, (key, 10))
+            assert await drained(start(lib, "async_file_seek", file, 0, 0)) == (0, 0)
+            s3_endpoint.objects[object_path] = (b"replacement", '"changed"')
+            assert (await drained(start(lib, "async_file_read", file, 4)))[0] == 10
+        finally:
+            assert await finish(lib, start(lib, "async_fs_close", fs)) == (0, None)
+            lib.fsspec_async_file_release(file)
+            lib.fsspec_async_fs_release(fs)
+            lib.fsspec_async_context_release(ctx)
+
+    asyncio.run(run())
+
+
+def test_native_s3_constructor_preserves_output_on_error(lib):
+    output = c_void_p(123)
+    error = POINTER(Error)()
+    status = lib.fsspec_async_s3_open(b"bad/bucket", 10, None, None, byref(output), byref(error))
+    assert status & 0xFFFF == 7
+    assert output.value == 123
+    assert error and error.contents.message.value()
+    lib.fsspec_async_error_free(error)

@@ -91,6 +91,29 @@ impl AsyncFile {
     }
 }
 impl AsyncFilesystem {
+    /// Construct native read-only S3 handles using the shared managed runtime.
+    /// None selects a new context with default limits.
+    pub fn s3(
+        bucket: &str,
+        options: &fsspec_rs::FsOptions,
+        context: Option<&AsyncContext>,
+    ) -> Result<Self> {
+        let options = crate::Options::new(options)?;
+        let mut handle = ptr::null_mut();
+        let mut error = ptr::null_mut();
+        unsafe {
+            let status = ffi::fsspec_async_s3_open(
+                bucket.as_ptr().cast(),
+                bucket.len(),
+                options.0,
+                context.map_or(ptr::null(), |context| context.0),
+                &mut handle,
+                &mut error,
+            );
+            check(status, error)?;
+            Ok(Self::from_raw(handle))
+        }
+    }
     pub fn info(&self, path: &str, timeout: Option<Duration>) -> Result<Operation> {
         unsafe {
             start(timeout, |options, out, error| {
@@ -382,5 +405,21 @@ mod tests {
             cleanup.join().unwrap();
         }
         wait(ctx.close(None).unwrap()).unwrap();
+    }
+    #[test]
+    fn native_s3_constructor_uses_owned_errors_and_contexts() {
+        let options = fsspec_rs::FsOptions::from([("anon".into(), "true".into())]);
+        assert_eq!(
+            AsyncFilesystem::s3("bad/bucket", &options, None)
+                .unwrap_err()
+                .kind(),
+            fsspec_rs::ErrorKind::Invalid
+        );
+        let context = AsyncContext::new(Limits::default()).unwrap();
+        let fs = AsyncFilesystem::s3("bucket", &options, Some(&context)).unwrap();
+        drop(context);
+        wait(fs.close(None).unwrap()).unwrap();
+        let fs = AsyncFilesystem::s3("bucket", &options, None).unwrap();
+        wait(fs.close(None).unwrap()).unwrap();
     }
 }

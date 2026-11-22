@@ -140,7 +140,8 @@ jobs:
       - name: Build distributions (Linux x86_64)
         run: |
           rm -rf dist
-          make dist-rs
+          # Cargo caches the dry-run registry by target path, even when package contents change.
+          CARGO_TARGET_DIR="$RUNNER_TEMP/cargo-package-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" make dist-rs
           make dist-py-sdist
           make dist-py-wheel
           make dist-check

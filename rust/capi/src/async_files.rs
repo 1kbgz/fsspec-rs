@@ -81,6 +81,37 @@ pub unsafe extern "C" fn fsspec_async_context_create(
     })
 }
 
+/// Construct a native read-only S3 filesystem on the managed runtime.
+/// Null context selects default limits. Options match fsspec_s3_open.
+/// No network I/O occurs here; outputs remain unchanged on failure.
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_async_s3_open(
+    bucket: *const c_char,
+    bucket_len: usize,
+    options: *const fsspec_options,
+    context: *const fsspec_async_context,
+    out: *mut *mut fsspec_async_fs,
+    out_error: *mut *mut fsspec_async_error,
+) -> i32 {
+    guard(out_error, || {
+        if out.is_null() {
+            return Err(invalid("null filesystem output"));
+        }
+        let context = if context.is_null() {
+            AsyncContext::new(Limits::default())?
+        } else {
+            handle::<AsyncContext, _>(context)?.clone()
+        };
+        let fs = AsyncFilesystem::s3(
+            string(bucket, bucket_len)?,
+            &crate::options::options_arg(options),
+            &context,
+        )?;
+        *out = Box::into_raw(Box::new(fs)).cast();
+        Ok(())
+    })
+}
+
 struct ForeignFile {
     vtable: fsspec_async_file_vtable,
     data: *mut c_void,

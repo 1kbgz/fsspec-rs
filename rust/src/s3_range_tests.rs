@@ -460,3 +460,249 @@ fn s3_range_concurrency_limits_cover_bodies_and_shared_instances() {
         }
     }
 }
+
+fn native_async_fs(
+    server: &RangeServer,
+    limits: crate::async_files::Limits,
+) -> crate::async_files::AsyncFilesystem {
+    let options = crate::FsOptions::from([
+        ("endpoint_url".into(), server.endpoint.clone()),
+        ("anon".into(), "true".into()),
+        ("max_retries".into(), "0".into()),
+    ]);
+    let context = crate::async_files::AsyncContext::new(limits).unwrap();
+    crate::async_files::AsyncFilesystem::s3("bucket", &options, &context).unwrap()
+}
+
+async fn async_file(fs: &crate::async_files::AsyncFilesystem) -> crate::async_files::AsyncFile {
+    let operation = fs.open_read("s3://bucket/data", None).unwrap();
+    let crate::async_io::Value::File(file) = operation.clone().await.unwrap() else {
+        panic!("file expected")
+    };
+    operation.drain().await;
+    file
+}
+
+#[tokio::test]
+async fn native_async_s3_reads_seek_and_pin_validators() {
+    use crate::AsyncFsFile;
+    let server = RangeServer::new(false);
+    let fs = native_async_fs(&server, Default::default());
+    let mut file = async_file(&fs).await;
+    assert_eq!(
+        AsyncFsFile::read(&mut file, 5).await.unwrap(),
+        [0, 1, 2, 3, 4]
+    );
+    assert_eq!(AsyncFsFile::read(&mut file, 3).await.unwrap(), [5, 6, 7]);
+    assert_eq!(
+        AsyncFsFile::seek(&mut file, std::io::SeekFrom::End(-2))
+            .await
+            .unwrap(),
+        126
+    );
+    assert_eq!(AsyncFsFile::read(&mut file, 10).await.unwrap(), [126, 127]);
+    let count = server.requests().len();
+    assert!(AsyncFsFile::read(&mut file, 10).await.unwrap().is_empty());
+    assert!(AsyncFsFile::read(&mut file, 0).await.unwrap().is_empty());
+    assert_eq!(server.requests().len(), count);
+    let requests: Vec<_> = server
+        .requests()
+        .into_iter()
+        .filter(|r| r.method == "GET")
+        .collect();
+    assert_eq!(
+        requests
+            .iter()
+            .map(|r| r.range.unwrap())
+            .collect::<Vec<_>>(),
+        [(0, 5), (5, 8), (126, 128)]
+    );
+    assert!(requests
+        .iter()
+        .all(|r| r.if_match.as_deref() == Some("\"stable\"")));
+    assert_eq!(AsyncFsFile::info(&file).await.unwrap().size, 128);
+    AsyncFsFile::close(&mut file).await.unwrap();
+    fs.close(None).unwrap().await.unwrap();
+}
+
+#[tokio::test]
+async fn native_async_s3_rejects_changed_or_malformed_reads() {
+    use crate::{AsyncFsFile, ErrorKind};
+    for fault in [
+        Fault::Precondition,
+        Fault::WrongValidator,
+        Fault::MissingValidator,
+        Fault::ShortBody,
+    ] {
+        let server = RangeServer::new(false);
+        let fs = native_async_fs(&server, Default::default());
+        let mut file = async_file(&fs).await;
+        server.fault(fault);
+        let operation = file.read(8, None).unwrap();
+        let error = operation.clone().await.unwrap_err();
+        operation.drain().await;
+        if !matches!(fault, Fault::ShortBody) {
+            assert_eq!(error.kind(), ErrorKind::Conflict);
+        }
+        assert_eq!(
+            AsyncFsFile::read(&mut file, 8).await.unwrap_err().kind(),
+            ErrorKind::Invalid
+        );
+        file.close(None).unwrap().await.unwrap();
+    }
+    let server = RangeServer::new(false);
+    server.fault(Fault::MissingValidator);
+    let fs = native_async_fs(&server, Default::default());
+    assert_eq!(
+        fs.open_read("data", None)
+            .unwrap()
+            .await
+            .unwrap_err()
+            .kind(),
+        ErrorKind::NotSupported
+    );
+    assert_eq!(
+        fs.open_read("s3://other/data", None)
+            .unwrap()
+            .await
+            .unwrap_err()
+            .kind(),
+        ErrorKind::Invalid
+    );
+}
+
+#[tokio::test]
+async fn native_async_s3_accounts_for_output_and_staging_before_dispatch() {
+    use crate::async_files::Limits;
+    use crate::async_io::Value;
+    let server = RangeServer::new(false);
+    let fs = native_async_fs(
+        &server,
+        Limits {
+            max_operations: 8,
+            max_buffered_bytes: 256,
+            max_read_size: 128,
+        },
+    );
+    let first = async_file(&fs).await;
+    let second = async_file(&fs).await;
+    let first_read = first.read(128, None).unwrap();
+    first_read.drain().await;
+    let second_read = second.read(128, None).unwrap();
+    tokio::time::sleep(Duration::from_millis(30)).await;
+    assert_eq!(second_read.state(), 0);
+    assert_eq!(
+        server
+            .requests()
+            .iter()
+            .filter(|r| r.method == "GET")
+            .count(),
+        1
+    );
+    assert!(matches!(
+        first_read.take().unwrap().unwrap(),
+        Value::Bytes(_)
+    ));
+    assert!(matches!(
+        second_read.clone().await.unwrap(),
+        Value::Bytes(_)
+    ));
+    second_read.drain().await;
+    fs.close(None).unwrap().await.unwrap();
+}
+
+#[tokio::test]
+async fn native_async_s3_cancel_timeout_and_close_drain_a_stalled_body() {
+    use crate::ErrorKind;
+    for timeout in [false, true] {
+        let server = RangeServer::new(true);
+        let fs = native_async_fs(&server, Default::default());
+        let file = async_file(&fs).await;
+        let operation = file
+            .read(8, timeout.then_some(Duration::from_millis(100)))
+            .unwrap();
+        assert!(server.wait_for_gets(1, Duration::from_secs(2)));
+        if !timeout {
+            operation.cancel();
+        }
+        assert_eq!(
+            operation.clone().await.unwrap_err().kind(),
+            if timeout {
+                ErrorKind::Timeout
+            } else {
+                ErrorKind::Cancelled
+            }
+        );
+        tokio::time::timeout(Duration::from_secs(2), operation.drain())
+            .await
+            .unwrap();
+        assert!(operation.is_quiescent());
+        tokio::time::timeout(Duration::from_secs(2), file.close(None).unwrap())
+            .await
+            .unwrap()
+            .unwrap();
+        server.release();
+    }
+}
+
+#[tokio::test]
+async fn native_async_s3_close_releases_endpoint_capacity() {
+    let server = RangeServer::new(true);
+    let fs = native_async_fs(&server, Default::default());
+    let mut files = Vec::new();
+    for _ in 0..9 {
+        files.push(async_file(&fs).await);
+    }
+    let reads: Vec<_> = files
+        .iter()
+        .map(|file| file.read(8, None).unwrap())
+        .collect();
+    assert!(server.wait_for_gets(8, Duration::from_secs(2)));
+    tokio::time::sleep(Duration::from_millis(30)).await;
+    assert_eq!(
+        server
+            .requests()
+            .iter()
+            .filter(|r| r.method == "GET")
+            .count(),
+        8
+    );
+    tokio::time::timeout(Duration::from_secs(2), fs.close(None).unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    for read in reads {
+        assert_eq!(
+            read.clone().await.unwrap_err().kind(),
+            crate::ErrorKind::Cancelled
+        );
+        read.drain().await;
+    }
+    server.release();
+    let next = native_async_fs(&server, Default::default());
+    let mut file = async_file(&next).await;
+    assert_eq!(
+        crate::AsyncFsFile::read(&mut file, 2).await.unwrap(),
+        [0, 1]
+    );
+}
+
+#[tokio::test]
+async fn native_async_s3_rejects_staging_larger_than_context() {
+    use crate::async_files::Limits;
+    let server = RangeServer::new(false);
+    let fs = native_async_fs(
+        &server,
+        Limits {
+            max_operations: 8,
+            max_buffered_bytes: 128,
+            max_read_size: 128,
+        },
+    );
+    let file = async_file(&fs).await;
+    assert_eq!(
+        file.read(128, None).err().unwrap().kind(),
+        crate::ErrorKind::Invalid
+    );
+    assert!(!server.requests().iter().any(|r| r.method == "GET"));
+}
