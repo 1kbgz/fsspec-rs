@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Async I/O and execution contexts &#8212; fsspec-rs v0.3.0</title>
+    <title>Async I/O and execution contexts &#8212; fsspec-rs v0.4.0</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/fuma.css?v=ca04d621" />
     <link rel="stylesheet" type="text/css" href="../../_static/fuma-code.css?v=a950e949" />
@@ -16,7 +16,7 @@
     <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=6a604523" />
     <link rel="stylesheet" type="text/css" href="../../_static/fonts/fuma-fonts.css?v=c2892c73" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/custom.css?v=88c24c6a" />
-    <script src="../../_static/documentation_options.js?v=e259d695"></script>
+    <script src="../../_static/documentation_options.js?v=6c02275b"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
@@ -49,7 +49,7 @@
   <div class="fd-subnav-inner">
     <button type="button" class="fd-icon-button fd-sidebar-toggle" aria-controls="fd-sidebar" aria-expanded="false" aria-label="Toggle navigation" title="Toggle navigation">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
-    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.3.0</span>
+    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.4.0</span>
 </a>
 
     <div class="fd-nav-actions">
@@ -64,7 +64,7 @@
 
 <aside id="fd-sidebar" aria-label="Documentation">
   <div class="fd-sidebar-header">
-    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.3.0</span>
+    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">fsspec-rs v0.4.0</span>
 </a>
       <button type="button" class="fd-icon-button fd-sidebar-collapse" aria-label="Collapse sidebar" title="Collapse sidebar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
     </div>
@@ -152,6 +152,9 @@
     <a href="#rust-interfaces">Rust interfaces</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
+    <a href="#native-s3-reads">Native S3 reads</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
     <a href="#operation-results">Operation results</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
@@ -179,8 +182,8 @@
   <section class="tex2jax_ignore mathjax_ignore" id="async-i-o-and-execution-contexts">
 <h1>Async I/O and execution contexts<a class="headerlink" href="#async-i-o-and-execution-contexts" title="Link to this heading">¶</a></h1>
 <p>Async operation lifetimes, callback dispatch, read-only file/filesystem handles,
-shared limits, and cleanup are implemented in Rust and the C ABI. Native S3
-streaming and a public Python async filesystem wrapper remain future work.
+shared limits, cleanup, and native S3 range streaming are implemented in Rust and
+the C ABI. A public Python async filesystem wrapper remains future work.
 Existing synchronous interfaces and C vtables are unchanged.</p>
 <section id="rust-interfaces">
 <h2>Rust interfaces<a class="headerlink" href="#rust-interfaces" title="Link to this heading">¶</a></h2>
@@ -217,12 +220,48 @@ and an absolute seek before reuse. Closing waits for that cleanup.</p>
 <p><code class="docutils literal notranslate"><span class="pre">AsyncFileSystem::open_async</span></code> is an additive, read-only entry point returning this
 handle; its default is <code class="docutils literal notranslate"><span class="pre">NotSupported</span></code>. <code class="docutils literal notranslate"><span class="pre">close_async</span></code> defaults to a no-op for borrowed
 backend resources. Existing <code class="docutils literal notranslate"><span class="pre">open</span></code> still returns a blocking <code class="docutils literal notranslate"><span class="pre">FsFile</span></code>; its derived
-helpers remain potentially blocking. There is no implicit thread-pool adapter or
-native async S3 implementation in this change.</p>
+helpers remain potentially blocking. There is no implicit thread-pool adapter. Native S3 uses the explicit
+<code class="docutils literal notranslate"><span class="pre">AsyncFilesystem::s3</span></code> constructor below; the synchronous <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> API is unchanged.</p>
 <p><code class="docutils literal notranslate"><span class="pre">fsspec_sys::async_files</span></code> provides owned context, filesystem, and file handles
 through <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>, with the same operations and Rust trait implementation.
 Its unsafe <code class="docutils literal notranslate"><span class="pre">from_raw</span></code> constructors take one owned handle reference; <code class="docutils literal notranslate"><span class="pre">into_raw</span></code>
 transfers one to C. The library and provider code must remain loaded through cleanup.</p>
+</section>
+<section id="native-s3-reads">
+<h2>Native S3 reads<a class="headerlink" href="#native-s3-reads" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">AsyncFilesystem::s3(bucket,</span> <span class="pre">options,</span> <span class="pre">context)</span></code> constructs a native S3 client
+without registry lookup or network I/O. Options match <code class="docutils literal notranslate"><span class="pre">S3Fs::from_options</span></code>, including
+credentials, endpoint, region, timeouts, and retries. <code class="docutils literal notranslate"><span class="pre">fsspec_async_s3_open</span></code> exposes
+the same constructor in C; a null context selects default limits.
+<code class="docutils literal notranslate"><span class="pre">fsspec_sys::async_files::AsyncFilesystem::s3</span></code> wraps it for shared-library callers.
+All native operations use the shared managed runtime, without per-client runtimes
+or <code class="docutils literal notranslate"><span class="pre">block_on</span></code>. Consumer notifications can still use a caller-owned dispatcher.</p>
+<p>Paths accept bucket-relative filesystem keys, bucket-prefixed paths, and
+<code class="docutils literal notranslate"><span class="pre">s3://bucket/key</span></code> URLs. URLs naming another bucket are rejected. Keys retain the
+synchronous filesystem’s escaping rules. Metadata addresses objects directly;
+there is no directory inference or listing fallback.</p>
+<p>Opening performs HEAD and pins the object’s ETag and size. Each nonempty read
+issues a bounded GET with <code class="docutils literal notranslate"><span class="pre">If-Match</span></code>, checks the returned ETag, size, and range,
+and streams the response into the requested output buffer. No body or prefetch
+survives the operation. Changed or missing objects fail as Conflict; missing ETags
+at open are NotSupported. Invalid ranges and incomplete bodies fail without
+advancing the cursor. Transport errors retain their structured classification.
+Metadata on an open file describes the pinned object. Zero-length and EOF reads
+return empty buffers without GET requests. Seek uses the pinned size and permits
+positions beyond EOF, but rejects negative positions and offset overflow.</p>
+<p>A native read reserves twice its requested size before dispatch: one output buffer
+and one incoming chunk. Reservations share the context budget and remain until
+producer cleanup and result transfer/disposal. Reads whose combined reservation
+exceeds the context budget fail as Invalid. HTTP/TLS internal allocations and
+backing allocations retained by transport chunks remain outside this byte budget;
+it is not a process memory cap. Cached file metadata is bounded by the context’s
+read limit per handle and remains provider-owned. Endpoint concurrency permits
+cover headers and body consumption and are shared with synchronous range reads.</p>
+<p>Cancellation and deadlines abort pending native requests, including waiting for
+endpoint capacity or response data. Drain waits for the request future and its
+body buffers to be dropped. File/filesystem/context close uses the same cancellation
+and drain rules as foreign providers. Async writes and public Python wrappers are
+not implemented.</p>
 </section>
 <section id="operation-results">
 <h2>Operation results<a class="headerlink" href="#operation-results" title="Link to this heading">¶</a></h2>
@@ -268,49 +307,52 @@ advertise native async support.</p>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_context_create</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_s3_open</span></code></p></td>
+<td><p>Construct native read-only S3 handles; null context selects defaults.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_context_create</span></code></p></td>
 <td><p>Construct a budget context; null options select defaults.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_fs_from_vtable</span></code>, <code class="docutils literal notranslate"><span class="pre">fsspec_async_file_from_vtable</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_fs_from_vtable</span></code>, <code class="docutils literal notranslate"><span class="pre">fsspec_async_file_from_vtable</span></code></p></td>
 <td><p>Copy a versioned vtable and retain a required context and optional dispatcher. Null dispatcher selects managed dispatch.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_fs_open_read</span></code>, <code class="docutils literal notranslate"><span class="pre">fsspec_async_fs_info</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_fs_open_read</span></code>, <code class="docutils literal notranslate"><span class="pre">fsspec_async_fs_info</span></code></p></td>
 <td><p>Copy the path and start an operation.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_file_read</span></code>, <code class="docutils literal notranslate"><span class="pre">seek</span></code>, <code class="docutils literal notranslate"><span class="pre">info</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_file_read</span></code>, <code class="docutils literal notranslate"><span class="pre">seek</span></code>, <code class="docutils literal notranslate"><span class="pre">info</span></code></p></td>
 <td><p>Start cursor or metadata operations. Seek whence is 0 start, 1 current, 2 end; negative start offsets are invalid.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_file_close</span></code>, <code class="docutils literal notranslate"><span class="pre">fs_close</span></code>, <code class="docutils literal notranslate"><span class="pre">context_close</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_file_close</span></code>, <code class="docutils literal notranslate"><span class="pre">fs_close</span></code>, <code class="docutils literal notranslate"><span class="pre">context_close</span></code></p></td>
 <td><p>Start or join cleanup without consuming the handle. Control operations bypass data admission limits.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_create</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_create</span></code></p></td>
 <td><p>Construct an independent observer/producer pair without a context budget.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_state</span></code>, <code class="docutils literal notranslate"><span class="pre">take</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_state</span></code>, <code class="docutils literal notranslate"><span class="pre">take</span></code></p></td>
 <td><p>States: 0 pending, 1 ready, 2 taken. Transfer one owned result. Pending/taken is Invalid.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_subscribe</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_subscribe</span></code></p></td>
 <td><p>Install one notification, including after completion; null dispatcher uses managed dispatch.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_cancel</span></code>, <code class="docutils literal notranslate"><span class="pre">is_quiescent</span></code>, <code class="docutils literal notranslate"><span class="pre">drain</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_cancel</span></code>, <code class="docutils literal notranslate"><span class="pre">is_quiescent</span></code>, <code class="docutils literal notranslate"><span class="pre">drain</span></code></p></td>
 <td><p>Request cancellation, inspect producer cleanup, or return a unit operation waiting for complete drain.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_completion_on_cancel</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_completion_on_cancel</span></code></p></td>
 <td><p>Register one cancellation hook, including after cancellation occurred.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_completion_unit</span></code>, <code class="docutils literal notranslate"><span class="pre">bytes</span></code>, <code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">file</span></code>, <code class="docutils literal notranslate"><span class="pre">position</span></code>, <code class="docutils literal notranslate"><span class="pre">error</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_completion_unit</span></code>, <code class="docutils literal notranslate"><span class="pre">bytes</span></code>, <code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">file</span></code>, <code class="docutils literal notranslate"><span class="pre">position</span></code>, <code class="docutils literal notranslate"><span class="pre">error</span></code></p></td>
 <td><p>Complete and consume one producer reference, including late or invalid completion. Bytes, metadata, and error text are copied; file ownership transfers.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_kind</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_kind</span></code></p></td>
 <td><p>0 unit, 1 bytes, 2 info, 3 file, 4 position; <code class="docutils literal notranslate"><span class="pre">UINT32_MAX</span></code> error.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_error</span></code>, <code class="docutils literal notranslate"><span class="pre">bytes</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_error</span></code>, <code class="docutils literal notranslate"><span class="pre">bytes</span></code></p></td>
 <td><p>Borrow data until result free; never free those borrowed pointers.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_take_info</span></code>, <code class="docutils literal notranslate"><span class="pre">take_file</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_take_info</span></code>, <code class="docutils literal notranslate"><span class="pre">take_file</span></code></p></td>
 <td><p>Move payload out once and leave a unit result. Free metadata with <code class="docutils literal notranslate"><span class="pre">fsspec_file_info_free</span></code>; release files with <code class="docutils literal notranslate"><span class="pre">fsspec_async_file_release</span></code>.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_position</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_position</span></code></p></td>
 <td><p>Copy a successful position value.</p></td>
 </tr>
 </tbody>
@@ -376,8 +418,8 @@ filesystem <code class="docutils literal notranslate"><span class="pre">open_rea
 up front. If capacity is unavailable, these starts return retry-safe <code class="docutils literal notranslate"><span class="pre">Unavailable</span></code>
 instead of retaining unaccounted path data while waiting. Oversized requests fail
 as Invalid before allocation or dispatch.</p>
-<p>Reservations cover copied paths and retained byte/metadata string buffers. A read
-reserves its requested size; metadata reserves the context’s read limit. Native
+<p>Reservations cover copied paths and retained byte/metadata string buffers. A generic read
+reserves its requested size (providers can declare additional staging capacity); metadata reserves the context’s read limit. Native
 <code class="docutils literal notranslate"><span class="pre">Vec</span></code> and <code class="docutils literal notranslate"><span class="pre">String</span></code> capacities, including unused capacity, must fit the reservation.
 C byte/metadata inputs are checked before copying. Reservations remain until both
 producer cleanup and result transfer/disposal; errors release unused result capacity
@@ -425,11 +467,11 @@ parent close ordering, cancelled coroutine cleanup, shared limits, and final rel
 Rust tests cover retained producer leases, result capacities, cursor recovery, close
 retries, dispatcher rejection/discard, and safe futures through C. These fixtures
 are not a public Python async filesystem implementation.</p>
-<p>Native S3 is next. The <a class="reference download internal" download="" href="../../_downloads/944ce50f61936e212fb89467e8e5766e/async-io.h"><code class="xref download docutils literal notranslate"><span class="pre">draft</span> <span class="pre">header</span></code></a> contains
-only its proposed constructor. Native opened readers will pin a validator and check
-subsequent reads, so replacing an object fails instead of mixing versions. Shared
-budgets and runtime ownership must also apply to native transport/prefetch buffers.
-Async scan integration and context-aware Python wrappers can then use those handles.</p>
+<p>Native S3 fixtures cover HTTP ranges, validator changes, stalled response bodies,
+shared output/staging budgets, and cancellation cleanup. The ctypes fixture reads
+S3 objects through the installed library from asyncio. Async scan integration and
+context-aware Python wrappers can now use these handles; live-store certification
+remains separate.</p>
 <p>The execution rules are grounded in Python’s
 <a class="reference external" href="https://docs.python.org/3/library/asyncio-dev.html#concurrency-and-multithreading">thread-safe asyncio scheduling</a>
 and <a class="reference external" href="https://docs.python.org/3/library/asyncio-eventloop.html#running-and-stopping-the-loop">event-loop lifecycle</a>,
@@ -473,6 +515,9 @@ and <a class="reference external" href="https://docs.rs/tokio/latest/tokio/runti
     </svg><ul class="fd-toc-list">
   <li class="fd-toc-item" data-depth="1">
     <a href="#rust-interfaces">Rust interfaces</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#native-s3-reads">Native S3 reads</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#operation-results">Operation results</a>

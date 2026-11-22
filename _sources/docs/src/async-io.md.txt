@@ -1,8 +1,8 @@
 # Async I/O and execution contexts
 
 Async operation lifetimes, callback dispatch, read-only file/filesystem handles,
-shared limits, and cleanup are implemented in Rust and the C ABI. Native S3
-streaming and a public Python async filesystem wrapper remain future work.
+shared limits, cleanup, and native S3 range streaming are implemented in Rust and
+the C ABI. A public Python async filesystem wrapper remains future work.
 Existing synchronous interfaces and C vtables are unchanged.
 
 ## Rust interfaces
@@ -46,13 +46,53 @@ and an absolute seek before reuse. Closing waits for that cleanup.
 `AsyncFileSystem::open_async` is an additive, read-only entry point returning this
 handle; its default is `NotSupported`. `close_async` defaults to a no-op for borrowed
 backend resources. Existing `open` still returns a blocking `FsFile`; its derived
-helpers remain potentially blocking. There is no implicit thread-pool adapter or
-native async S3 implementation in this change.
+helpers remain potentially blocking. There is no implicit thread-pool adapter. Native S3 uses the explicit
+`AsyncFilesystem::s3` constructor below; the synchronous `S3Fs` API is unchanged.
 
 `fsspec_sys::async_files` provides owned context, filesystem, and file handles
 through `libfsspec`, with the same operations and Rust trait implementation.
 Its unsafe `from_raw` constructors take one owned handle reference; `into_raw`
 transfers one to C. The library and provider code must remain loaded through cleanup.
+
+## Native S3 reads
+
+`AsyncFilesystem::s3(bucket, options, context)` constructs a native S3 client
+without registry lookup or network I/O. Options match `S3Fs::from_options`, including
+credentials, endpoint, region, timeouts, and retries. `fsspec_async_s3_open` exposes
+the same constructor in C; a null context selects default limits.
+`fsspec_sys::async_files::AsyncFilesystem::s3` wraps it for shared-library callers.
+All native operations use the shared managed runtime, without per-client runtimes
+or `block_on`. Consumer notifications can still use a caller-owned dispatcher.
+
+Paths accept bucket-relative filesystem keys, bucket-prefixed paths, and
+`s3://bucket/key` URLs. URLs naming another bucket are rejected. Keys retain the
+synchronous filesystem's escaping rules. Metadata addresses objects directly;
+there is no directory inference or listing fallback.
+
+Opening performs HEAD and pins the object's ETag and size. Each nonempty read
+issues a bounded GET with `If-Match`, checks the returned ETag, size, and range,
+and streams the response into the requested output buffer. No body or prefetch
+survives the operation. Changed or missing objects fail as Conflict; missing ETags
+at open are NotSupported. Invalid ranges and incomplete bodies fail without
+advancing the cursor. Transport errors retain their structured classification.
+Metadata on an open file describes the pinned object. Zero-length and EOF reads
+return empty buffers without GET requests. Seek uses the pinned size and permits
+positions beyond EOF, but rejects negative positions and offset overflow.
+
+A native read reserves twice its requested size before dispatch: one output buffer
+and one incoming chunk. Reservations share the context budget and remain until
+producer cleanup and result transfer/disposal. Reads whose combined reservation
+exceeds the context budget fail as Invalid. HTTP/TLS internal allocations and
+backing allocations retained by transport chunks remain outside this byte budget;
+it is not a process memory cap. Cached file metadata is bounded by the context's
+read limit per handle and remains provider-owned. Endpoint concurrency permits
+cover headers and body consumption and are shared with synchronous range reads.
+
+Cancellation and deadlines abort pending native requests, including waiting for
+endpoint capacity or response data. Drain waits for the request future and its
+body buffers to be dropped. File/filesystem/context close uses the same cancellation
+and drain rules as foreign providers. Async writes and public Python wrappers are
+not implemented.
 
 ## Operation results
 
@@ -98,6 +138,7 @@ advertise native async support.
 
 | Function family                                                        | Behavior                                                                                                                                                 |
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fsspec_async_s3_open`                                                 | Construct native read-only S3 handles; null context selects defaults.                                                                                    |
 | `fsspec_async_context_create`                                          | Construct a budget context; null options select defaults.                                                                                                |
 | `fsspec_async_fs_from_vtable`, `fsspec_async_file_from_vtable`         | Copy a versioned vtable and retain a required context and optional dispatcher. Null dispatcher selects managed dispatch.                                 |
 | `fsspec_async_fs_open_read`, `fsspec_async_fs_info`                    | Copy the path and start an operation.                                                                                                                    |
@@ -172,8 +213,8 @@ up front. If capacity is unavailable, these starts return retry-safe `Unavailabl
 instead of retaining unaccounted path data while waiting. Oversized requests fail
 as Invalid before allocation or dispatch.
 
-Reservations cover copied paths and retained byte/metadata string buffers. A read
-reserves its requested size; metadata reserves the context's read limit. Native
+Reservations cover copied paths and retained byte/metadata string buffers. A generic read
+reserves its requested size (providers can declare additional staging capacity); metadata reserves the context's read limit. Native
 `Vec` and `String` capacities, including unused capacity, must fit the reservation.
 C byte/metadata inputs are checked before copying. Reservations remain until both
 producer cleanup and result transfer/disposal; errors release unused result capacity
@@ -227,11 +268,11 @@ Rust tests cover retained producer leases, result capacities, cursor recovery, c
 retries, dispatcher rejection/discard, and safe futures through C. These fixtures
 are not a public Python async filesystem implementation.
 
-Native S3 is next. The {download}`draft header <../proposals/async-io.h>` contains
-only its proposed constructor. Native opened readers will pin a validator and check
-subsequent reads, so replacing an object fails instead of mixing versions. Shared
-budgets and runtime ownership must also apply to native transport/prefetch buffers.
-Async scan integration and context-aware Python wrappers can then use those handles.
+Native S3 fixtures cover HTTP ranges, validator changes, stalled response bodies,
+shared output/staging budgets, and cancellation cleanup. The ctypes fixture reads
+S3 objects through the installed library from asyncio. Async scan integration and
+context-aware Python wrappers can now use these handles; live-store certification
+remains separate.
 
 The execution rules are grounded in Python's
 [thread-safe asyncio scheduling](https://docs.python.org/3/library/asyncio-dev.html#concurrency-and-multithreading)
