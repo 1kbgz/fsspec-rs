@@ -161,6 +161,14 @@ async def finish(lib, operation):
         lib.fsspec_operation_release(operation)
 
 
+async def drained(lib, operation):
+    drain = c_void_p()
+    assert lib.fsspec_operation_drain(operation, byref(drain), None) == 0
+    result = await finish(lib, operation)
+    assert await finish(lib, drain) == (0, None)
+    return result
+
+
 class FileProvider:
     def __init__(self, lib, ctx, dispatch):
         self.lib, self.dispatch = lib, dispatch
@@ -254,17 +262,17 @@ def test_asyncio_open_read_seek_metadata_and_parent_close(lib):
         ctx = context(lib)
         dispatch = LoopDispatcher(lib, asyncio.get_running_loop())
         fs = FilesystemProvider(lib, ctx, dispatch)
-        status, file = await finish(lib, start(lib, "async_fs_open_read", fs.handle, b"part", 4))
+        status, file = await drained(lib, start(lib, "async_fs_open_read", fs.handle, b"part", 4))
         assert status == 0
-        assert await finish(lib, start(lib, "async_file_read", file, 3)) == (0, b"abc")
-        assert await finish(lib, start(lib, "async_file_seek", file, 1, 0)) == (0, 1)
-        assert await finish(lib, start(lib, "async_file_read", file, 2)) == (0, b"bc")
-        assert await finish(lib, start(lib, "async_file_info", file)) == (0, ("part", 6))
-        assert (await finish(lib, start(lib, "async_fs_info", fs.handle, b"none", 4)))[0] == 1
-        assert await finish(lib, start(lib, "async_fs_close", fs.handle)) == (0, None)
+        assert await drained(lib, start(lib, "async_file_read", file, 3)) == (0, b"abc")
+        assert await drained(lib, start(lib, "async_file_seek", file, 1, 0)) == (0, 1)
+        assert await drained(lib, start(lib, "async_file_read", file, 2)) == (0, b"bc")
+        assert await drained(lib, start(lib, "async_file_info", file)) == (0, ("part", 6))
+        assert (await drained(lib, start(lib, "async_fs_info", fs.handle, b"none", 4)))[0] == 1
+        assert await drained(lib, start(lib, "async_fs_close", fs.handle)) == (0, None)
         assert fs.events == [[1]]
         start(lib, "async_file_read", file, 1, expected=12)
-        assert await finish(lib, start(lib, "async_context_close", ctx)) == (0, None)
+        assert await drained(lib, start(lib, "async_context_close", ctx)) == (0, None)
         lib.fsspec_async_file_release(file)
         lib.fsspec_async_fs_release(fs.handle)
         lib.fsspec_async_context_release(ctx)
@@ -359,13 +367,6 @@ def test_large_diagnostic_is_bounded_without_losing_error_kind(lib):
 @pytest.mark.parametrize("shared_context", [False, True])
 @pytest.mark.parametrize("key", ["data", "test"])
 def test_native_s3_reads_through_async_c_api(lib, s3_endpoint, shared_context, key):
-    async def drained(operation):
-        drain = c_void_p()
-        assert lib.fsspec_operation_drain(operation, byref(drain), None) == 0
-        result = await finish(lib, operation)
-        assert await finish(lib, drain) == (0, None)
-        return result
-
     async def run():
         object_path = "/test/" + key
         url = ("s3://test/" + key).encode()
@@ -380,16 +381,16 @@ def test_native_s3_reads_through_async_c_api(lib, s3_endpoint, shared_context, k
         finally:
             lib.fsspec_options_free(options)
         try:
-            status, file = await drained(start(lib, "async_fs_open_read", fs, url, len(url)))
+            status, file = await drained(lib, start(lib, "async_fs_open_read", fs, url, len(url)))
             assert status == 0
-            assert await drained(start(lib, "async_file_read", file, 4)) == (0, b"0123")
-            assert await drained(start(lib, "async_file_seek", file, -2, 2)) == (0, 8)
-            assert await drained(start(lib, "async_file_read", file, 4)) == (0, b"89")
-            assert await drained(start(lib, "async_file_read", file, 4)) == (0, b"")
-            assert await drained(start(lib, "async_file_info", file)) == (0, (key, 10))
-            assert await drained(start(lib, "async_file_seek", file, 0, 0)) == (0, 0)
+            assert await drained(lib, start(lib, "async_file_read", file, 4)) == (0, b"0123")
+            assert await drained(lib, start(lib, "async_file_seek", file, -2, 2)) == (0, 8)
+            assert await drained(lib, start(lib, "async_file_read", file, 4)) == (0, b"89")
+            assert await drained(lib, start(lib, "async_file_read", file, 4)) == (0, b"")
+            assert await drained(lib, start(lib, "async_file_info", file)) == (0, (key, 10))
+            assert await drained(lib, start(lib, "async_file_seek", file, 0, 0)) == (0, 0)
             s3_endpoint.objects[object_path] = (b"replacement", '"changed"')
-            assert (await drained(start(lib, "async_file_read", file, 4)))[0] == 10
+            assert (await drained(lib, start(lib, "async_file_read", file, 4)))[0] == 10
         finally:
             assert await finish(lib, start(lib, "async_fs_close", fs)) == (0, None)
             lib.fsspec_async_file_release(file)
