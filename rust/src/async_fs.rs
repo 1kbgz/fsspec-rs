@@ -5,6 +5,19 @@ use crate::file::FsFile;
 use crate::fs::byte_range;
 use crate::types::{DuResult, FileInfo, FileType, OpenMode, OpenOptions, WalkEntry};
 
+/// Owned-buffer asynchronous file operations. Backends keep cleanup resources
+/// alive when a returned future is dropped. Close never publishes a write.
+pub type IoFuture<'a, T> = std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<T, crate::OperationError>> + Send + 'a>,
+>;
+
+pub trait AsyncFsFile: Send + Sync {
+    fn read(&mut self, max_bytes: usize) -> IoFuture<'_, Vec<u8>>;
+    fn seek(&mut self, position: std::io::SeekFrom) -> IoFuture<'_, u64>;
+    fn info(&self) -> IoFuture<'_, FileInfo>;
+    fn close(&mut self) -> IoFuture<'_, ()>;
+}
+
 /// Async filesystem trait. Mirrors [`super::fs::FileSystem`] but with
 /// `async fn` methods, suitable for backends that are inherently async
 /// (e.g. S3 via `object_store`, HTTP).
@@ -55,6 +68,23 @@ pub trait AsyncFileSystem: Send + Sync {
         mode: OpenMode,
         opts: Option<OpenOptions>,
     ) -> impl std::future::Future<Output = FsResult<Box<dyn FsFile>>> + Send;
+
+    /// Open a read-only, genuinely asynchronous handle. Legacy `open` still
+    /// returns a blocking FsFile. Sync-only backends do not gain async support.
+    fn open_async(
+        &self,
+        _path: &str,
+    ) -> impl std::future::Future<Output = Result<Box<dyn AsyncFsFile>, crate::OperationError>> + Send
+    {
+        async { Err(FsError::NotSupported("async file handles unavailable".into()).into()) }
+    }
+
+    /// Close backend-owned asynchronous resources; borrowed resources need no cleanup.
+    fn close_async(
+        &self,
+    ) -> impl std::future::Future<Output = Result<(), crate::OperationError>> + Send {
+        async { Ok(()) }
+    }
 
     /// Return metadata about a single path.
     fn info(&self, path: &str) -> impl std::future::Future<Output = FsResult<FileInfo>> + Send;

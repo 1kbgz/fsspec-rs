@@ -18,7 +18,7 @@ use fsspec_sys::{
     types::*,
 };
 
-fn invalid(message: &str) -> OperationError {
+pub(crate) fn invalid(message: &str) -> OperationError {
     OperationError::Detailed {
         kind: ErrorKind::Invalid,
         message: message.into(),
@@ -37,7 +37,7 @@ fn error_value(error: &OperationError) -> fsspec_async_error {
     }
 }
 
-unsafe fn guard(
+pub(crate) unsafe fn guard(
     out: *mut *mut fsspec_async_error,
     body: impl FnOnce() -> Result<(), OperationError>,
 ) -> i32 {
@@ -58,7 +58,7 @@ unsafe fn guard(
     }
 }
 
-unsafe fn bytes<'a>(data: *const u8, len: usize) -> Result<&'a [u8], OperationError> {
+pub(crate) unsafe fn bytes<'a>(data: *const u8, len: usize) -> Result<&'a [u8], OperationError> {
     if len == 0 {
         return Ok(&[]);
     }
@@ -81,14 +81,19 @@ unsafe fn message(
     let text = std::str::from_utf8(bytes(data.cast(), len)?)
         .map_err(|_| invalid("error message is not UTF-8"))?;
     let kind = operation_error(status, String::new()).kind();
+    let mut end = text.len().min(fsspec_rs::async_io::MAX_ERROR_BYTES);
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
     Ok(OperationError::Detailed {
         kind,
-        message: text.into(),
+        message: text[..end].into(),
         retry_safe: status & FSSPEC_RETRY_SAFE != 0 && kind != ErrorKind::UnknownOutcome,
     })
 }
 
-/// Copies a nonzero status and UTF-8 message. Null means invalid arguments.
+/// Copies a nonzero status and UTF-8 message, truncated at 4096 bytes on a
+/// character boundary. Null means invalid arguments.
 #[no_mangle]
 pub unsafe extern "C" fn fsspec_async_error_new(
     status: i32,
@@ -146,7 +151,7 @@ impl Dispatcher for ForeignDispatcher {
     }
 }
 
-unsafe fn dispatcher(handle: *const fsspec_dispatcher) -> Arc<dyn Dispatcher> {
+pub(crate) unsafe fn dispatcher(handle: *const fsspec_dispatcher) -> Arc<dyn Dispatcher> {
     if handle.is_null() {
         Arc::new(ManagedDispatcher)
     } else {
@@ -216,7 +221,7 @@ pub unsafe extern "C" fn fsspec_dispatch_job_discard(job: *mut fsspec_dispatch_j
     }
 }
 
-/// Creates an observer/producer pair. kind: 0 unit, 1 bytes. max_bytes bounds a
+/// Creates an observer/producer pair. kind: 0 unit, 1 bytes, 2 info, 3 file, 4 position. max_bytes bounds a
 /// byte result (including the copy into libfsspec), not foreign allocations.
 /// timeout_ns is relative monotonic time; UINT64_MAX disables the deadline.
 /// Zero times out immediately. Keep a producer reference until cleanup stops.
@@ -236,6 +241,9 @@ pub unsafe extern "C" fn fsspec_operation_create(
         let kind = match kind {
             0 => Kind::Unit,
             1 => Kind::Bytes,
+            2 => Kind::Info,
+            3 => Kind::File,
+            4 => Kind::Position,
             _ => return Err(invalid("unknown result kind")),
         };
         let timeout = (timeout_ns != u64::MAX).then(|| Duration::from_nanos(timeout_ns));
@@ -283,8 +291,8 @@ pub unsafe extern "C" fn fsspec_operation_cancel(operation: *mut fsspec_operatio
     }
 }
 
-struct ResultValue {
-    outcome: Outcome,
+pub(crate) struct ResultValue {
+    pub(crate) outcome: Outcome,
     error: *mut fsspec_async_error,
 }
 impl Drop for ResultValue {
@@ -329,12 +337,15 @@ pub unsafe extern "C" fn fsspec_async_result_error(
     (&*result.cast::<ResultValue>()).error
 }
 
-/// 0 unit, 1 bytes, UINT32_MAX error. Requires a live, nonnull result.
+/// 0 unit, 1 bytes, 2 info, 3 file, 4 position, UINT32_MAX error. Requires a live, nonnull result.
 #[no_mangle]
 pub unsafe extern "C" fn fsspec_async_result_kind(result: *const fsspec_async_result) -> u32 {
     match &(&*result.cast::<ResultValue>()).outcome {
         Ok(Value::Unit) => 0,
         Ok(Value::Bytes(_)) => 1,
+        Ok(Value::Info(_)) => 2,
+        Ok(Value::File(_)) => 3,
+        Ok(Value::Position(_)) => 4,
         Err(_) => u32::MAX,
     }
 }
@@ -514,7 +525,7 @@ pub unsafe extern "C" fn fsspec_completion_unit(completion: *mut fsspec_completi
     }
 }
 
-/// Copies the error message and consumes one producer reference. Invalid inputs
+/// Copies up to 4096 UTF-8 bytes of error text and consumes one producer reference. Invalid inputs
 /// complete with Invalid. No thread-local error state is read or written.
 #[no_mangle]
 pub unsafe extern "C" fn fsspec_completion_error(
@@ -527,4 +538,24 @@ pub unsafe extern "C" fn fsspec_completion_error(
         Box::from_raw(completion.cast::<Completion>())
             .complete(Err(message(status, data, len).unwrap_or_else(|error| error)));
     }
+}
+
+/// Returns a unit operation after producer cleanup, accepted callback jobs, and
+/// handle accounting finish. Does not take the source result. Cancelling this
+/// waiter does not cancel the source operation or stop its cleanup.
+#[no_mangle]
+pub unsafe extern "C" fn fsspec_operation_drain(
+    operation: *const fsspec_operation,
+    out: *mut *mut fsspec_operation,
+    out_error: *mut *mut fsspec_async_error,
+) -> i32 {
+    guard(out_error, || {
+        if operation.is_null() || out.is_null() {
+            return Err(invalid("null drain operation/output"));
+        }
+        let source = (&*operation.cast::<Operation>()).clone();
+        let waiter = source.drain_operation()?;
+        *out = Box::into_raw(Box::new(waiter)).cast();
+        Ok(())
+    })
 }

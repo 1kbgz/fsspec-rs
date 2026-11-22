@@ -202,6 +202,10 @@ fn expired_completion_drops_provider_error_outside_lock() {
         kind: Kind::Unit,
         max_bytes: 0,
         deadline: Some(Instant::now()),
+        changed: Notify::new(),
+        jobs: AtomicUsize::new(0),
+        settled: AtomicBool::new(true),
+        transform: Mutex::new(None),
     });
     let failure = crate::FsError::IoError(std::io::Error::other(Reenter(Arc::downgrade(&shared))));
     shared.publish(Err(failure.into()), false);

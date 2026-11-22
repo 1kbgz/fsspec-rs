@@ -7,7 +7,16 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
-pub use fsspec_rs::async_io::{Kind, Outcome, Value};
+pub use fsspec_rs::async_io::Kind;
+pub type Outcome = Result<Value, OperationError>;
+#[derive(Debug, PartialEq, Eq)]
+pub enum Value {
+    Unit,
+    Bytes(Vec<u8>),
+    Info(fsspec_rs::FileInfo),
+    File(crate::async_files::AsyncFile),
+    Position(u64),
+}
 use fsspec_rs::OperationError;
 
 use crate::{
@@ -33,7 +42,10 @@ unsafe extern "C" fn release(data: *mut std::ffi::c_void) {
     }));
 }
 
-unsafe fn check(status: i32, error: *mut fsspec_async_error) -> Result<(), OperationError> {
+pub(crate) unsafe fn check(
+    status: i32,
+    error: *mut fsspec_async_error,
+) -> Result<(), OperationError> {
     let message = if error.is_null() {
         "async C operation failed".into()
     } else {
@@ -87,6 +99,9 @@ impl Operation {
                 match kind {
                     Kind::Unit => 0,
                     Kind::Bytes => 1,
+                    Kind::Info => 2,
+                    Kind::File => 3,
+                    Kind::Position => 4,
                 },
                 max_bytes,
                 timeout,
@@ -131,6 +146,17 @@ impl Operation {
         Ok(operation)
     }
 
+    /// Wait for producer/callback/accounting cleanup without taking the result.
+    pub fn drain(&self) -> Result<Self, OperationError> {
+        unsafe {
+            let mut handle = ptr::null_mut();
+            let mut error = ptr::null_mut();
+            let status = ffi::fsspec_operation_drain(self.handle, &mut handle, &mut error);
+            check(status, error)?;
+            Self::from_raw(handle)
+        }
+    }
+
     pub fn cancel(&self) {
         unsafe {
             ffi::fsspec_operation_cancel(self.handle);
@@ -161,22 +187,52 @@ impl Future for Operation {
             if let Err(error) = check(status, error) {
                 return Poll::Ready(Err(error));
             }
-            let error = ffi::fsspec_async_result_error(result);
-            let outcome = if !error.is_null() {
+            let borrowed_error = ffi::fsspec_async_result_error(result);
+            let outcome = if !borrowed_error.is_null() {
                 Err(decode_error(
-                    (*error).status,
-                    (*error).message.as_str().into_owned(),
+                    (*borrowed_error).status,
+                    (*borrowed_error).message.as_str().into_owned(),
                 ))
-            } else if ffi::fsspec_async_result_kind(result) == 0 {
-                Ok(Value::Unit)
             } else {
-                let mut len = 0;
-                let data = ffi::fsspec_async_result_bytes(result, &mut len);
-                Ok(Value::Bytes(if len == 0 {
-                    Vec::new()
-                } else {
-                    std::slice::from_raw_parts(data, len).to_vec()
-                }))
+                match ffi::fsspec_async_result_kind(result) {
+                    0 => Ok(Value::Unit),
+                    2 => {
+                        let mut info = std::mem::MaybeUninit::uninit();
+                        let status = ffi::fsspec_async_result_take_info(
+                            result,
+                            info.as_mut_ptr(),
+                            &mut error,
+                        );
+                        check(status, error).map(|()| {
+                            let info = info.assume_init();
+                            let copied = info.to_info();
+                            ffi::fsspec_file_info_free(info);
+                            Value::Info(copied)
+                        })
+                    }
+                    3 => {
+                        let mut file = ptr::null_mut();
+                        let status =
+                            ffi::fsspec_async_result_take_file(result, &mut file, &mut error);
+                        check(status, error)
+                            .map(|()| Value::File(crate::async_files::AsyncFile::from_raw(file)))
+                    }
+                    4 => {
+                        let mut position = 0;
+                        let status =
+                            ffi::fsspec_async_result_position(result, &mut position, &mut error);
+                        check(status, error).map(|()| Value::Position(position))
+                    }
+                    _ => {
+                        let mut len = 0;
+                        let data = ffi::fsspec_async_result_bytes(result, &mut len);
+                        Ok(Value::Bytes(if len == 0 {
+                            Vec::new()
+                        } else {
+                            std::slice::from_raw_parts(data, len).to_vec()
+                        }))
+                    }
+                }
             };
             ffi::fsspec_async_result_free(result);
             Poll::Ready(outcome)
@@ -222,6 +278,17 @@ impl Completion {
                 Ok(Value::Unit) => ffi::fsspec_completion_unit(self.into_raw()),
                 Ok(Value::Bytes(bytes)) => {
                     ffi::fsspec_completion_bytes(self.into_raw(), bytes.as_ptr(), bytes.len())
+                }
+                Ok(Value::Info(info)) => {
+                    let info = fsspec_file_info::from_info(info);
+                    ffi::fsspec_completion_info(self.into_raw(), &info);
+                    ffi::fsspec_file_info_free(info);
+                }
+                Ok(Value::File(file)) => {
+                    ffi::fsspec_completion_file(self.into_raw(), file.into_raw())
+                }
+                Ok(Value::Position(position)) => {
+                    ffi::fsspec_completion_position(self.into_raw(), position)
                 }
                 Err(error) => {
                     let message = error.to_string();

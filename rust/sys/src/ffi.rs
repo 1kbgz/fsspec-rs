@@ -312,3 +312,121 @@ extern "C" {
         len: usize,
     );
 }
+
+#[allow(improper_ctypes)]
+extern "C" {
+    pub fn fsspec_async_context_create(
+        options: *const fsspec_async_context_options,
+        out: *mut *mut fsspec_async_context,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_file_from_vtable(
+        context: *const fsspec_async_context,
+        dispatch: *const fsspec_dispatcher,
+        vtable: *const fsspec_async_file_vtable,
+        data: *mut c_void,
+        out: *mut *mut fsspec_async_file,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_fs_from_vtable(
+        context: *const fsspec_async_context,
+        dispatch: *const fsspec_dispatcher,
+        vtable: *const fsspec_async_fs_vtable,
+        data: *mut c_void,
+        out: *mut *mut fsspec_async_fs,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_completion_info(
+        completion: *mut fsspec_completion,
+        info: *const fsspec_file_info,
+    );
+    pub fn fsspec_completion_file(completion: *mut fsspec_completion, file: *mut fsspec_async_file);
+    pub fn fsspec_completion_position(completion: *mut fsspec_completion, position: u64);
+    pub fn fsspec_async_result_take_info(
+        result: *mut fsspec_async_result,
+        out: *mut fsspec_file_info,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_result_take_file(
+        result: *mut fsspec_async_result,
+        out: *mut *mut fsspec_async_file,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_result_position(
+        result: *const fsspec_async_result,
+        out: *mut u64,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_context_retain(
+        value: *const fsspec_async_context,
+    ) -> *mut fsspec_async_context;
+    pub fn fsspec_async_context_release(value: *mut fsspec_async_context);
+    pub fn fsspec_async_context_close(
+        value: *mut fsspec_async_context,
+        opts: *const fsspec_async_options,
+        out: *mut *mut fsspec_operation,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_file_retain(value: *const fsspec_async_file) -> *mut fsspec_async_file;
+    pub fn fsspec_async_file_release(value: *mut fsspec_async_file);
+    pub fn fsspec_async_file_close(
+        value: *mut fsspec_async_file,
+        opts: *const fsspec_async_options,
+        out: *mut *mut fsspec_operation,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_fs_retain(value: *const fsspec_async_fs) -> *mut fsspec_async_fs;
+    pub fn fsspec_async_fs_release(value: *mut fsspec_async_fs);
+    pub fn fsspec_async_fs_close(
+        value: *mut fsspec_async_fs,
+        opts: *const fsspec_async_options,
+        out: *mut *mut fsspec_operation,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_fs_info(
+        value: *const fsspec_async_fs,
+        path: *const c_char,
+        path_len: usize,
+        opts: *const fsspec_async_options,
+        out: *mut *mut fsspec_operation,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_fs_open_read(
+        value: *const fsspec_async_fs,
+        path: *const c_char,
+        path_len: usize,
+        opts: *const fsspec_async_options,
+        out: *mut *mut fsspec_operation,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_file_read(
+        value: *const fsspec_async_file,
+        max_bytes: usize,
+        opts: *const fsspec_async_options,
+        out: *mut *mut fsspec_operation,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_file_info(
+        value: *const fsspec_async_file,
+        opts: *const fsspec_async_options,
+        out: *mut *mut fsspec_operation,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+    pub fn fsspec_async_file_seek(
+        value: *const fsspec_async_file,
+        offset: i64,
+        whence: u32,
+        opts: *const fsspec_async_options,
+        out: *mut *mut fsspec_operation,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+}
+
+#[allow(improper_ctypes)]
+extern "C" {
+    pub fn fsspec_operation_drain(
+        operation: *const fsspec_operation,
+        out: *mut *mut fsspec_operation,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
+}

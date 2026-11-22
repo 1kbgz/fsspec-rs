@@ -231,7 +231,9 @@ primitive methods return futures, and its default helpers are `async fn`s.
 `AsyncFileSystem::open` currently returns a blocking `FsFile`; awaiting open does not
 make subsequent reads asynchronous. The [async I/O contract](async-io.md) provides
 operation futures and managed/foreign callback dispatch in `fsspec_rs::async_io`, plus Rust futures over the shared library
-in `fsspec_sys::async_io`. Async file handles and shared byte budgets remain proposed.
+in `fsspec_sys::async_io`. `AsyncFsFile` provides owned-buffer read/seek/info/close;
+`async_files` in both crates supplies handles with shared limits and cleanup.
+`open_async` is additive and defaults to `NotSupported`; native S3 is still pending.
 
 The default async implementation avoids recursive async futures in `walk()` by
 using an explicit stack. Method semantics otherwise match `FileSystem`.

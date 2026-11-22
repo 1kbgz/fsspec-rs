@@ -16,6 +16,7 @@
 #![allow(clippy::missing_safety_doc)]
 #![allow(non_camel_case_types)]
 
+mod async_files;
 mod async_io;
 mod file;
 mod filesystem;
@@ -30,6 +31,7 @@ mod tests;
 
 pub use fsspec_sys::types::*;
 
+pub use async_files::*;
 pub use async_io::*;
 pub use file::*;
 pub use filesystem::*;

@@ -23,8 +23,7 @@ class DispatcherVtable(Structure):
     _fields_ = [("struct_size", c_size_t), ("abi_version", c_uint32), ("post", POST), ("release", RELEASE)]
 
 
-@pytest.fixture(scope="module")
-def lib():
+def _load_library():
     path = _library_path()
     if not path.exists():
         pytest.skip(f"libfsspec is not built: {path}")
@@ -67,6 +66,11 @@ def lib():
         function = getattr(lib, "fsspec_" + name)
         function.argtypes, function.restype = args, result
     return lib
+
+
+@pytest.fixture(scope="module")
+def lib():
+    return _load_library()
 
 
 def create(lib, *, kind=1, limit=16, timeout=2**64 - 1):
