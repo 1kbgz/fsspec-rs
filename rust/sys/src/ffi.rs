@@ -315,6 +315,14 @@ extern "C" {
 
 #[allow(improper_ctypes)]
 extern "C" {
+    pub fn fsspec_async_s3_open(
+        bucket: *const c_char,
+        bucket_len: usize,
+        options: *const fsspec_options,
+        context: *const fsspec_async_context,
+        out: *mut *mut fsspec_async_fs,
+        out_error: *mut *mut fsspec_async_error,
+    ) -> i32;
     pub fn fsspec_async_context_create(
         options: *const fsspec_async_context_options,
         out: *mut *mut fsspec_async_context,

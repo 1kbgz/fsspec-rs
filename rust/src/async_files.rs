@@ -34,6 +34,11 @@ impl Default for Limits {
 /// Calls are dispatched on the registered executor; metadata can run concurrently.
 pub trait FileProvider: Send + Sync + 'static {
     fn read(&self, max_bytes: usize, completion: Completion);
+    /// Total data reservation, including output and provider staging buffers.
+    /// Must be at least max_bytes. Reserved atomically before provider dispatch.
+    fn read_buffer_bytes(&self, max_bytes: usize) -> Result<usize> {
+        Ok(max_bytes)
+    }
     fn seek(&self, _position: SeekFrom, completion: Completion) {
         completion.complete(Err(error(ErrorKind::NotSupported, "file is not seekable")));
     }
@@ -402,6 +407,16 @@ impl Resource {
         reserved: Option<Arc<Reservation>>,
         call: impl FnOnce(&Provider, Completion) + Send + 'static,
     ) -> Result<Operation> {
+        let buffer_bytes = match (&self.provider, kind) {
+            (Provider::File(provider), Kind::Bytes) => provider.read_buffer_bytes(bytes)?,
+            _ => bytes,
+        };
+        if buffer_bytes < bytes || buffer_bytes > self.context.limits.max_buffered_bytes {
+            return Err(error(
+                ErrorKind::Invalid,
+                "read buffers exceed context byte limit",
+            ));
+        }
         let admission = self.context.admit()?;
         let (operation, completion) = Operation::new(kind, bytes, timeout)?;
         static NEXT: AtomicUsize = AtomicUsize::new(0);
@@ -473,7 +488,7 @@ impl Resource {
             let reservation = match reserved {
                 Some(reservation) => Some(reservation),
                 None => tokio::select! {
-                    reservation = resource.context.reserve_wait(bytes) => Some(reservation),
+                    reservation = resource.context.reserve_wait(buffer_bytes) => Some(reservation),
                     _ = observer.wait_ready() => None,
                 },
             };
