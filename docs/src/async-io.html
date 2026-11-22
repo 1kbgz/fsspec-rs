@@ -149,37 +149,25 @@
     </button>
     <div id="fd-toc-mobile" hidden><ul class="fd-toc-list">
   <li class="fd-toc-item" data-depth="1">
-    <a href="#implemented-operation-api">Implemented operation API</a>
+    <a href="#rust-interfaces">Rust interfaces</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
-    <a href="#execution-contexts-proposed">Execution contexts (proposed)</a>
-  </li>
-  <li class="fd-toc-item" data-depth="2">
-    <a href="#managed-default">Managed default</a>
-  </li>
-  <li class="fd-toc-item" data-depth="2">
-    <a href="#foreign-dispatcher">Foreign dispatcher</a>
+    <a href="#operation-results">Operation results</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
-    <a href="#rust-file-contract-proposed">Rust file contract (proposed)</a>
+    <a href="#c-abi">C ABI</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
-    <a href="#operations-and-errors">Operations and errors</a>
+    <a href="#runtime-and-dispatcher-ownership">Runtime and dispatcher ownership</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
-    <a href="#foreign-backend-completion-and-cancellation">Foreign backend completion and cancellation</a>
+    <a href="#limits-and-backpressure">Limits and backpressure</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
-    <a href="#file-and-context-shutdown-proposed">File and context shutdown (proposed)</a>
+    <a href="#cursor-and-shutdown-behavior">Cursor and shutdown behavior</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
-    <a href="#deadlines-and-shared-bounds">Deadlines and shared bounds</a>
-  </li>
-  <li class="fd-toc-item" data-depth="1">
-    <a href="#python-asyncio-binding-proposed">Python asyncio binding (proposed)</a>
-  </li>
-  <li class="fd-toc-item" data-depth="1">
-    <a href="#compatibility-and-acceptance">Compatibility and acceptance</a>
+    <a href="#integration-coverage-and-remaining-native-work">Integration coverage and remaining native work</a>
   </li>
 </ul>
 </div>
@@ -190,19 +178,59 @@
       <div class="fd-prose">
   <section class="tex2jax_ignore mathjax_ignore" id="async-i-o-and-execution-contexts">
 <h1>Async I/O and execution contexts<a class="headerlink" href="#async-i-o-and-execution-contexts" title="Link to this heading">¶</a></h1>
-<p><strong>Status: operation lifetimes and callback dispatch are implemented.</strong> Async
-filesystem/file handles, shared byte budgets, native S3 streams, and context shutdown
-remain proposed. Existing synchronous interfaces and C vtables are unchanged.
-The <a class="reference download internal" download="" href="../../_downloads/944ce50f61936e212fb89467e8e5766e/async-io.h"><code class="xref download docutils literal notranslate"><span class="pre">draft</span> <span class="pre">C</span> <span class="pre">header</span></code></a> declares only that future
-file/context API; implemented symbols are in the installed <code class="docutils literal notranslate"><span class="pre">fsspec.h</span></code>.</p>
-<section id="implemented-operation-api">
-<h2>Implemented operation API<a class="headerlink" href="#implemented-operation-api" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">fsspec_rs::async_io</span></code> is available with the <code class="docutils literal notranslate"><span class="pre">async</span></code> feature, also enabled by
-<code class="docutils literal notranslate"><span class="pre">object-store</span></code> and the default <code class="docutils literal notranslate"><span class="pre">s3</span></code> feature. <code class="docutils literal notranslate"><span class="pre">Operation::new</span></code> returns an observer
-and a <code class="docutils literal notranslate"><span class="pre">Completion</span></code> producer. <code class="docutils literal notranslate"><span class="pre">Kind::Unit</span></code> and <code class="docutils literal notranslate"><span class="pre">Kind::Bytes</span></code> are supported; byte
-operations require an explicit maximum result length. A zero limit permits only
-an empty byte result. This limit covers the copied result, not provider allocations
-or total bytes across operations.</p>
+<p>Async operation lifetimes, callback dispatch, read-only file/filesystem handles,
+shared limits, and cleanup are implemented in Rust and the C ABI. Native S3
+streaming and a public Python async filesystem wrapper remain future work.
+Existing synchronous interfaces and C vtables are unchanged.</p>
+<section id="rust-interfaces">
+<h2>Rust interfaces<a class="headerlink" href="#rust-interfaces" title="Link to this heading">¶</a></h2>
+<p>Enable the <code class="docutils literal notranslate"><span class="pre">async</span></code> feature for <code class="docutils literal notranslate"><span class="pre">fsspec_rs::async_io</span></code> and
+<code class="docutils literal notranslate"><span class="pre">fsspec_rs::async_files</span></code>. The <code class="docutils literal notranslate"><span class="pre">object-store</span></code> feature and default <code class="docutils literal notranslate"><span class="pre">s3</span></code> feature
+also enable it. The core without default features still supports WASM.</p>
+<p><code class="docutils literal notranslate"><span class="pre">AsyncContext::new(Limits)</span></code> creates a shared admission and byte budget.
+<code class="docutils literal notranslate"><span class="pre">AsyncFile::new</span></code> and <code class="docutils literal notranslate"><span class="pre">AsyncFilesystem::new</span></code> register a provider and dispatcher in
+that context. Their <code class="docutils literal notranslate"><span class="pre">read</span></code>, <code class="docutils literal notranslate"><span class="pre">seek</span></code>, <code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">open_read</span></code>, and <code class="docutils literal notranslate"><span class="pre">close</span></code> methods return
+operations that can be awaited on any Rust executor. Paths are copied before
+start returns; providers borrow them only during their start callback.</p>
+<p><code class="docutils literal notranslate"><span class="pre">FileProvider</span></code> and <code class="docutils literal notranslate"><span class="pre">FilesystemProvider</span></code> expose nonblocking start callbacks. A
+provider schedules I/O on its own executor and retains a <code class="docutils literal notranslate"><span class="pre">Completion</span></code> through
+cleanup. <code class="docutils literal notranslate"><span class="pre">ManagedDispatcher</span></code> schedules callbacks on the library’s shared Tokio
+runtime. A caller-supplied <code class="docutils literal notranslate"><span class="pre">Dispatcher</span></code> can instead post them to another executor.
+Neither dispatcher polls foreign futures on behalf of their owner.</p>
+<p><code class="docutils literal notranslate"><span class="pre">AsyncFsFile</span></code> provides an object-safe interface with owned read buffers:</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">pub</span><span class="w"> </span><span class="k">type</span><span class="w"> </span><span class="nc">IoFuture</span><span class="o">&lt;'</span><span class="na">a</span><span class="p">,</span><span class="w"> </span><span class="n">T</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">Pin</span><span class="o">&lt;</span><span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span><span class="w"> </span><span class="n">Future</span><span class="o">&lt;</span><span class="n">Output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span><span class="w"> </span><span class="n">OperationError</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nb">Send</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="o">'</span><span class="na">a</span><span class="o">&gt;&gt;</span><span class="p">;</span>
+
+<span class="k">pub</span><span class="w"> </span><span class="k">trait</span><span class="w"> </span><span class="n">AsyncFsFile</span><span class="p">:</span><span class="w"> </span><span class="nb">Send</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nb">Sync</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">read</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">max_bytes</span><span class="p">:</span><span class="w"> </span><span class="kt">usize</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">IoFuture</span><span class="o">&lt;'</span><span class="nb">_</span><span class="p">,</span><span class="w"> </span><span class="nb">Vec</span><span class="o">&lt;</span><span class="kt">u8</span><span class="o">&gt;&gt;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">seek</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">position</span><span class="p">:</span><span class="w"> </span><span class="nc">SeekFrom</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">IoFuture</span><span class="o">&lt;'</span><span class="nb">_</span><span class="p">,</span><span class="w"> </span><span class="kt">u64</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">info</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">IoFuture</span><span class="o">&lt;'</span><span class="nb">_</span><span class="p">,</span><span class="w"> </span><span class="n">FileInfo</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">IoFuture</span><span class="o">&lt;'</span><span class="nb">_</span><span class="p">,</span><span class="w"> </span><span class="p">()</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The provided core and shared-library file wrappers implement this trait. Successful
+trait reads, seeks, and metadata calls wait for producer and accounting cleanup
+before returning, so sequential calls work even when a provider publishes success
+early. Errors remain prompt; a cancelled cursor operation may still need cleanup
+and an absolute seek before reuse. Closing waits for that cleanup.</p>
+<p><code class="docutils literal notranslate"><span class="pre">AsyncFileSystem::open_async</span></code> is an additive, read-only entry point returning this
+handle; its default is <code class="docutils literal notranslate"><span class="pre">NotSupported</span></code>. <code class="docutils literal notranslate"><span class="pre">close_async</span></code> defaults to a no-op for borrowed
+backend resources. Existing <code class="docutils literal notranslate"><span class="pre">open</span></code> still returns a blocking <code class="docutils literal notranslate"><span class="pre">FsFile</span></code>; its derived
+helpers remain potentially blocking. There is no implicit thread-pool adapter or
+native async S3 implementation in this change.</p>
+<p><code class="docutils literal notranslate"><span class="pre">fsspec_sys::async_files</span></code> provides owned context, filesystem, and file handles
+through <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>, with the same operations and Rust trait implementation.
+Its unsafe <code class="docutils literal notranslate"><span class="pre">from_raw</span></code> constructors take one owned handle reference; <code class="docutils literal notranslate"><span class="pre">into_raw</span></code>
+transfers one to C. The library and provider code must remain loaded through cleanup.</p>
+</section>
+<section id="operation-results">
+<h2>Operation results<a class="headerlink" href="#operation-results" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">Operation::new</span></code> returns an observer and a <code class="docutils literal notranslate"><span class="pre">Completion</span></code> producer. Results can be
+unit, bytes, metadata, a file, or a position. An operation has one terminal outcome
+and its result can be taken once across all observers. Only one core observer can
+be awaited. Dropping its future requests cancellation; releasing an ordinary raw
+observer does not.</p>
 <div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::</span><span class="n">async_io</span><span class="p">::{</span><span class="n">Kind</span><span class="p">,</span><span class="w"> </span><span class="n">Operation</span><span class="p">,</span><span class="w"> </span><span class="n">Value</span><span class="p">};</span>
 
 <span class="k">async</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">example</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">fsspec_rs</span><span class="p">::</span><span class="n">OperationError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
@@ -213,458 +241,195 @@ or total bytes across operations.</p>
 <span class="p">}</span>
 </pre></div>
 </div>
-<p>Only one clone may be awaited. Dropping that future requests cancellation; dropping
-an ordinary observer does not. <code class="docutils literal notranslate"><span class="pre">is_quiescent()</span></code> reports whether the last producer
-reference has been released. Producers retain a reference through their cleanup,
-even if another reference publishes a result earlier.</p>
-<p>The same operations are exported through C:</p>
+<p>Success, failure, cancellation, and timeout compete for one terminal transition.
+An expired deadline prevents success even if its timer has not run yet. Late
+completions consume their payload and producer reference without replacing the
+recorded result. Dropping the final producer without completing pending work
+records <code class="docutils literal notranslate"><span class="pre">Unavailable</span></code>.</p>
+<p>Readiness does not imply cleanup. <code class="docutils literal notranslate"><span class="pre">is_quiescent()</span></code> reports release of the last
+producer reference. <code class="docutils literal notranslate"><span class="pre">drain()</span></code> waits for producers, accepted callback jobs, and
+handle accounting cleanup. <code class="docutils literal notranslate"><span class="pre">drain_operation()</span></code> returns a unit operation for the
+same wait. Neither takes the source result. A retained, untaken byte result keeps
+its buffer reservation even after work drains.</p>
+<p>Each producer reference is a cleanup lease. Retain one when publishing an early
+result while I/O or a coroutine’s <code class="docutils literal notranslate"><span class="pre">finally</span></code> block still uses resources. Cancellation
+may wake the consumer immediately but does not free those resources or permit
+replacement work to exceed the context limits.</p>
+</section>
+<section id="c-abi">
+<h2>C ABI<a class="headerlink" href="#c-abi" title="Link to this heading">¶</a></h2>
+<p>Implemented declarations are installed in <code class="docutils literal notranslate"><span class="pre">fsspec.h</span></code>. New handles and vtables are
+independent of the synchronous registry. Registering a sync filesystem does not
+advertise native async support.</p>
 <table class="docutils align-default">
 <thead>
-<tr class="row-odd"><th class="head"><p>Function</p></th>
-<th class="head"><p>Contract</p></th>
+<tr class="row-odd"><th class="head"><p>Function family</p></th>
+<th class="head"><p>Behavior</p></th>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_create</span></code></p></td>
-<td><p>Return observer/producer handles; kind 0 is unit, 1 is bytes. Relative <code class="docutils literal notranslate"><span class="pre">timeout_ns</span></code> includes dispatch; <code class="docutils literal notranslate"><span class="pre">UINT64_MAX</span></code> disables it, zero expires immediately.</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_context_create</span></code></p></td>
+<td><p>Construct a budget context; null options select defaults.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_state</span></code> / <code class="docutils literal notranslate"><span class="pre">take</span></code></p></td>
-<td><p>States 0 pending, 1 ready, 2 taken. Transfer one owned result; pending/taken is Invalid.</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_fs_from_vtable</span></code>, <code class="docutils literal notranslate"><span class="pre">fsspec_async_file_from_vtable</span></code></p></td>
+<td><p>Copy a versioned vtable and retain a required context and optional dispatcher. Null dispatcher selects managed dispatch.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_subscribe</span></code></p></td>
-<td><p>Register one readiness callback and optional dispatcher; null selects managed dispatch.</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_fs_open_read</span></code>, <code class="docutils literal notranslate"><span class="pre">fsspec_async_fs_info</span></code></p></td>
+<td><p>Copy the path and start an operation.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_cancel</span></code></p></td>
-<td><p>Publish Cancelled if pending; an expired deadline publishes Timeout. Neither proves cleanup is complete.</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_file_read</span></code>, <code class="docutils literal notranslate"><span class="pre">seek</span></code>, <code class="docutils literal notranslate"><span class="pre">info</span></code></p></td>
+<td><p>Start cursor or metadata operations. Seek whence is 0 start, 1 current, 2 end; negative start offsets are invalid.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_is_quiescent</span></code></p></td>
-<td><p>Report release of the last producer reference.</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_file_close</span></code>, <code class="docutils literal notranslate"><span class="pre">fs_close</span></code>, <code class="docutils literal notranslate"><span class="pre">context_close</span></code></p></td>
+<td><p>Start or join cleanup without consuming the handle. Control operations bypass data admission limits.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_create</span></code></p></td>
+<td><p>Construct an independent observer/producer pair without a context budget.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_state</span></code>, <code class="docutils literal notranslate"><span class="pre">take</span></code></p></td>
+<td><p>States: 0 pending, 1 ready, 2 taken. Transfer one owned result. Pending/taken is Invalid.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_subscribe</span></code></p></td>
+<td><p>Install one notification, including after completion; null dispatcher uses managed dispatch.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_operation_cancel</span></code>, <code class="docutils literal notranslate"><span class="pre">is_quiescent</span></code>, <code class="docutils literal notranslate"><span class="pre">drain</span></code></p></td>
+<td><p>Request cancellation, inspect producer cleanup, or return a unit operation waiting for complete drain.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_completion_on_cancel</span></code></p></td>
-<td><p>Register one cancellation callback, including after cancellation occurred.</p></td>
+<td><p>Register one cancellation hook, including after cancellation occurred.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_completion_unit</span></code> / <code class="docutils literal notranslate"><span class="pre">bytes</span></code> / <code class="docutils literal notranslate"><span class="pre">error</span></code></p></td>
-<td><p>Consume a producer reference. Bytes and error text are copied; oversized bytes are rejected before copying.</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_completion_unit</span></code>, <code class="docutils literal notranslate"><span class="pre">bytes</span></code>, <code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">file</span></code>, <code class="docutils literal notranslate"><span class="pre">position</span></code>, <code class="docutils literal notranslate"><span class="pre">error</span></code></p></td>
+<td><p>Complete and consume one producer reference, including late or invalid completion. Bytes, metadata, and error text are copied; file ownership transfers.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_kind</span></code> / <code class="docutils literal notranslate"><span class="pre">error</span></code> / <code class="docutils literal notranslate"><span class="pre">bytes</span></code></p></td>
-<td><p>Borrow payloads from an opaque result. Kind is 0 unit, 1 bytes, <code class="docutils literal notranslate"><span class="pre">UINT32_MAX</span></code> error. Free only the result with <code class="docutils literal notranslate"><span class="pre">fsspec_async_result_free</span></code>.</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_kind</span></code></p></td>
+<td><p>0 unit, 1 bytes, 2 info, 3 file, 4 position; <code class="docutils literal notranslate"><span class="pre">UINT32_MAX</span></code> error.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_error</span></code>, <code class="docutils literal notranslate"><span class="pre">bytes</span></code></p></td>
+<td><p>Borrow data until result free; never free those borrowed pointers.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_take_info</span></code>, <code class="docutils literal notranslate"><span class="pre">take_file</span></code></p></td>
+<td><p>Move payload out once and leave a unit result. Free metadata with <code class="docutils literal notranslate"><span class="pre">fsspec_file_info_free</span></code>; release files with <code class="docutils literal notranslate"><span class="pre">fsspec_async_file_release</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result_position</span></code></p></td>
+<td><p>Copy a successful position value.</p></td>
 </tr>
 </tbody>
 </table>
-<p>Retain/release functions manage independent observer, producer, and dispatcher
-references. <code class="docutils literal notranslate"><span class="pre">fsspec_sys::async_io::Operation</span></code> implements <code class="docutils literal notranslate"><span class="pre">Future</span></code> over these C
-functions; its <code class="docutils literal notranslate"><span class="pre">Completion</span></code> wrapper can transfer a producer with <code class="docutils literal notranslate"><span class="pre">into_raw</span></code> and
-accept one with unsafe <code class="docutils literal notranslate"><span class="pre">from_raw</span></code>. Errors contain owned status/message data and do
-not use thread-local last-error state. Generic cancellation, timeout, and abandonment
-are conservatively marked unsafe to retry because this layer cannot know whether
-backend I/O had side effects.</p>
-<p><code class="docutils literal notranslate"><span class="pre">ManagedDispatcher</span></code> and C null dispatchers use the same lazy, process-owned Tokio
-runtime as the object-store bridge. Foreign dispatchers schedule nonblocking jobs
-on a caller-owned loop. They never receive Rust futures or native runtime handles.
-An accepted job retains its dispatcher until run/discard. Finite deadlines use the
-managed runtime even when callbacks use a foreign dispatcher.</p>
-<p><code class="docutils literal notranslate"><span class="pre">fsspec_rs/tests/test_async_capi.py</span></code> provides an asyncio integration fixture using
-the bundled shared library. It exercises separate provider/consumer loops,
-managed callback threads, cancellation before hook registration, delayed coroutine
-cleanup, deadlines, and shutdown rejection/discard. It is a fixture, not a public
-Python async filesystem API.</p>
-<p>The remaining sections specify shared execution rules and the proposed file/context
-extension. No async filesystem registration or native S3 streaming entry point is
-exported yet.</p>
+<p>Filesystem callbacks <code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">open_read</span></code>, and <code class="docutils literal notranslate"><span class="pre">release</span></code> are required; <code class="docutils literal notranslate"><span class="pre">close</span></code> is
+optional for borrowed clients. File callbacks <code class="docutils literal notranslate"><span class="pre">read</span></code>, <code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">close</span></code>, and <code class="docutils literal notranslate"><span class="pre">release</span></code>
+are required; missing <code class="docutils literal notranslate"><span class="pre">seek</span></code> returns <code class="docutils literal notranslate"><span class="pre">NotSupported</span></code>. C start offsets above
+<code class="docutils literal notranslate"><span class="pre">INT64_MAX</span></code> are unsupported. All callbacks must return promptly and never unwind.</p>
+<p>Constructors take one provider <code class="docutils literal notranslate"><span class="pre">data</span></code> reference only on success. On failure,
+ownership remains with the caller. Start errors and asynchronous results use owned
+status/message errors, never thread-local last-error state. Optional <code class="docutils literal notranslate"><span class="pre">out_error</span></code>
+is set to null on success or an owned error on failure; other outputs are unchanged
+on failure. Free prior errors before reusing an error slot. Retain of null returns
+null; release/free of null is a no-op. Query functions require live nonnull handles.</p>
 </section>
-<section id="execution-contexts-proposed">
-<h2>Execution contexts (proposed)<a class="headerlink" href="#execution-contexts-proposed" title="Link to this heading">¶</a></h2>
-<p>An async context owns admission limits, buffer accounting, deadlines, and operation
-tracking. Filesystems, files, and operations retain their context. Context selection
-is explicit when constructing a backend; there is no process-wide replacement hook.</p>
-<p>Execution and callback dispatch are separate:</p>
+<section id="runtime-and-dispatcher-ownership">
+<h2>Runtime and dispatcher ownership<a class="headerlink" href="#runtime-and-dispatcher-ownership" title="Link to this heading">¶</a></h2>
+<p>Native coordination, callback defaults, and deadlines share one lazy, process-owned
+Tokio runtime with the object-store bridge: two async workers and up to eight
+blocking workers. Constructing a context or file does not create a worker pool.
+Current synchronous <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> still has its existing runtime behavior.</p>
+<p>A foreign dispatcher schedules callback jobs on a caller-owned event loop. Python
+coroutines use that loop’s I/O facilities; Tokio futures need their native runtime
+and reactor. No Python loop object, Rust future, or Tokio handle crosses C. Finite
+deadlines still use the managed runtime when callbacks use a foreign dispatcher.
+Selecting a borrowed Tokio runtime for native coordination is not implemented yet.</p>
+<p><code class="docutils literal notranslate"><span class="pre">post(data,</span> <span class="pre">job,</span> <span class="pre">out_error)</span></code> may run on any thread. It must not execute the job on
+the submitting stack. Another thread may execute it before <code class="docutils literal notranslate"><span class="pre">post</span></code> returns.</p>
 <table class="docutils align-default">
 <thead>
-<tr class="row-odd"><th class="head"><p>Component</p></th>
-<th class="head"><p>Runs where</p></th>
+<tr class="row-odd"><th class="head"><p>Post result</p></th>
 <th class="head"><p>Ownership</p></th>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p>Native S3 futures</p></td>
-<td><p>Tokio runtime selected by the Rust execution context</p></td>
-<td><p>Managed by default; explicitly borrowed in a Rust application</p></td>
-</tr>
-<tr class="row-odd"><td><p>Python backend coroutines</p></td>
-<td><p>The backend’s registered asyncio loop</p></td>
-<td><p>Caller-owned; fsspec never starts, stops, or closes it</p></td>
-</tr>
-<tr class="row-even"><td><p>Backend start/cancel/close callbacks</p></td>
-<td><p>Dispatcher supplied with the backend</p></td>
-<td><p>Retained for all pending work and cleanup</p></td>
-</tr>
-<tr class="row-odd"><td><p>Consumer readiness notification</p></td>
-<td><p>Dispatcher supplied at subscription</p></td>
-<td><p>May differ from the backend’s dispatcher</p></td>
-</tr>
-<tr class="row-even"><td><p>Deadlines and operation accounting</p></td>
-<td><p>Context’s native execution runtime</p></td>
-<td><p>Shared managed default, including for C-registered foreign backends</p></td>
-</tr>
-</tbody>
-</table>
-<p>An asyncio dispatcher executes callback jobs; it does not poll Tokio futures or
-provide Tokio’s network reactor. A foreign-only backend uses its own I/O runtime,
-while <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> still supplies the shared runtime for deadline supervision.
-Applications requiring zero native runtime threads are outside this initial contract.</p>
-<section id="managed-default">
-<h3>Managed default<a class="headerlink" href="#managed-default" title="Link to this heading">¶</a></h3>
-<p>The proposed <code class="docutils literal notranslate"><span class="pre">fsspec_async_context_create(NULL,</span> <span class="pre">...)</span></code> creates an independent budget
-and uses the existing shared managed Tokio runtime per loaded <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code>. The initial worker count
-is two, matching the existing object-store bridge runtime. The operation implementation shares
-that runtime with callback dispatch; constructing a filesystem never creates another
-worker pool. This does not claim that current <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> already uses the shared pool.</p>
-<p>The runtime lives for the process lifetime; closing a context drains its operations
-without stopping the shared runtime or unrelated contexts. <code class="docutils literal notranslate"><span class="pre">libfsspec</span></code> remains loaded
-for the process lifetime when using this default. Foreign provider modules can be
-unloaded after their own contexts drain and all their handles are released.</p>
-<p>The proposed Rust context API lets applications explicitly construct a context with a Tokio <code class="docutils literal notranslate"><span class="pre">Handle</span></code> from
-the same linked Rust implementation. The application must keep the owning runtime
-alive and drive it until context close completes. A handle alone does not prevent
-runtime shutdown, and a current-thread runtime needs an actively driven event loop.
-There is no implicit <code class="docutils literal notranslate"><span class="pre">Handle::current()</span></code> selection and no nested <code class="docutils literal notranslate"><span class="pre">block_on</span></code>.</p>
-<p>Operation wrappers implement Rust’s standard <code class="docutils literal notranslate"><span class="pre">Future</span></code>; their consumers can await
-completion on another Rust executor. This does not change the runtime driving native I/O.</p>
-<p>A Tokio <code class="docutils literal notranslate"><span class="pre">Handle</span></code>, Rust future, Python loop pointer, or interpreter object is never
-passed directly across the C ABI. A Rust extension with its own Tokio copy uses the
-foreign backend/dispatcher interface, just as a Python extension does.</p>
-</section>
-<section id="foreign-dispatcher">
-<h3>Foreign dispatcher<a class="headerlink" href="#foreign-dispatcher" title="Link to this heading">¶</a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">fsspec_dispatcher_from_vtable</span></code> copies the versioned vtable and takes ownership of
-one <code class="docutils literal notranslate"><span class="pre">data</span></code> reference on success. Failure leaves ownership with the caller. A null
-dispatcher on a backend or subscription selects managed callback dispatch.</p>
-<p><code class="docutils literal notranslate"><span class="pre">post(data,</span> <span class="pre">job,</span> <span class="pre">out_error)</span></code> may be called from any thread. It must return promptly
-and never run the job on the submitting call stack. Another thread may run an
-accepted job before <code class="docutils literal notranslate"><span class="pre">post</span></code> returns. All operation state is installed before posting.
-No fsspec lock is held while entering foreign code.</p>
-<p>A rejected post may return a library-owned error created by <code class="docutils literal notranslate"><span class="pre">async_error_new</span></code>; its
-status must match the returned status. Without a message, fsspec supplies a generic
-one. Foreign callbacks never return stack-allocated errors or buffers that fsspec’s
-allocator would later free. Successful posts return no error.</p>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">post</span></code> outcome</p></th>
-<th class="head"><p>Job ownership</p></th>
-</tr>
-</thead>
-<tbody>
 <tr class="row-even"><td><p>Success</p></td>
-<td><p>Dispatcher owns the job and calls exactly one of <code class="docutils literal notranslate"><span class="pre">job_run</span></code> or <code class="docutils literal notranslate"><span class="pre">job_discard</span></code></p></td>
+<td><p>Dispatcher owns the job and must call exactly one of <code class="docutils literal notranslate"><span class="pre">fsspec_dispatch_job_run</span></code> or <code class="docutils literal notranslate"><span class="pre">discard</span></code>.</p></td>
 </tr>
 <tr class="row-odd"><td><p>Failure</p></td>
-<td><p>Dispatcher has neither run nor retained the job; ownership remains with fsspec</p></td>
+<td><p>Dispatcher has neither run nor retained the job; library retains ownership.</p></td>
 </tr>
 </tbody>
 </table>
-<p>A dispatcher may serialize jobs on an event-loop thread or execute them concurrently;
-its provider must match that guarantee. No global FIFO ordering is assumed. A started
-job is not discarded, and each job handle is consumed once. Closing a dispatcher
-rejects new posts and executes or discards accepted jobs before releasing its context.</p>
-<p>Discarding a backend-start job fails its pending operation as <code class="docutils literal notranslate"><span class="pre">Unavailable</span></code> without
-starting I/O. Discarding a notification does not overwrite an already recorded result;
-that result remains available through operation state/take. Cancel-job discard does
-not acknowledge that the underlying I/O stopped. Loop shutdown cannot make an abandoned
-coroutine safe to free. Owners must drain work before stopping their loops.</p>
-<p><code class="docutils literal notranslate"><span class="pre">release(data)</span></code> and callback-context release functions may run on any thread. They
-must be thread-safe and nonblocking. Loop-affine cleanup happens during async close,
-before these final reference releases. Python release trampolines acquire the GIL
-while the interpreter is alive; interpreter shutdown must follow context drain.</p>
+<p>Accepted jobs retain their dispatcher until execution/discard. Closing a dispatcher
+rejects new posts and runs or discards accepted jobs. Rejected/discarded starts fail
+as <code class="docutils literal notranslate"><span class="pre">Unavailable</span></code>. Discarding a readiness notification preserves its recorded result;
+discarding cancellation does not prove I/O stopped. There is no fallback to an
+arbitrary thread after a caller-owned dispatcher rejects work.</p>
+<p>Provider and callback <code class="docutils literal notranslate"><span class="pre">release(data)</span></code> functions may run on any thread and must be
+thread-safe and nonblocking. Loop-affine cleanup belongs in <code class="docutils literal notranslate"><span class="pre">close</span></code>. Python release
+trampolines acquire the GIL while the interpreter is alive. Keep loops driven and
+all callback code loaded until operations drain and references are released.</p>
 </section>
+<section id="limits-and-backpressure">
+<h2>Limits and backpressure<a class="headerlink" href="#limits-and-backpressure" title="Link to this heading">¶</a></h2>
+<p>Context defaults are 64 admitted operations, 64 MiB of data buffers, and 8 MiB per
+read/metadata result. Limits must be positive, with read limit no greater than the
+context byte limit. All handles in a context share limits.</p>
+<p>Admission exhaustion returns retry-safe <code class="docutils literal notranslate"><span class="pre">Unavailable</span></code> before dispatch. An admitted
+file read or metadata request waits asynchronously for byte capacity; that wait
+counts toward its deadline. Paths must be copied before a C start returns, so
+filesystem <code class="docutils literal notranslate"><span class="pre">open_read</span></code> and <code class="docutils literal notranslate"><span class="pre">info</span></code> reserve their argument and maximum result capacity
+up front. If capacity is unavailable, these starts return retry-safe <code class="docutils literal notranslate"><span class="pre">Unavailable</span></code>
+instead of retaining unaccounted path data while waiting. Oversized requests fail
+as Invalid before allocation or dispatch.</p>
+<p>Reservations cover copied paths and retained byte/metadata string buffers. A read
+reserves its requested size; metadata reserves the context’s read limit. Native
+<code class="docutils literal notranslate"><span class="pre">Vec</span></code> and <code class="docutils literal notranslate"><span class="pre">String</span></code> capacities, including unused capacity, must fit the reservation.
+C byte/metadata inputs are checked before copying. Reservations remain until both
+producer cleanup and result transfer/disposal; errors release unused result capacity
+once producers stop. Caller-owned returned data and foreign provider allocations
+are outside the budget.</p>
+<p>Diagnostics have a separate 4096-byte UTF-8 text limit. Oversized provider errors are
+truncated at a character boundary while preserving error kind and retry safety.
+Diagnostics, handle/control structures, metadata map overhead, allocator overhead,
+and uninstrumented provider/HTTP buffers are outside the data-byte budget. These
+limits are not an RSS cap. Providers must bound their own buffering.</p>
+<p>Timeouts use relative monotonic nanoseconds. Zero expires immediately;
+<code class="docutils literal notranslate"><span class="pre">UINT64_MAX</span></code> means no deadline. A producer can query remaining time without sharing
+clock epochs. Cancellation/timeouts are conservatively unsafe to retry. Provider
+errors preserve their retry-safe flag, except unknown outcomes are never safe to
+retry. Writes require a separate async publication contract.</p>
 </section>
-<section id="rust-file-contract-proposed">
-<h2>Rust file contract (proposed)<a class="headerlink" href="#rust-file-contract-proposed" title="Link to this heading">¶</a></h2>
-<p>The new object-safe handle uses ordinary <code class="docutils literal notranslate"><span class="pre">Send</span></code> futures and owned read buffers:</p>
-<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">type</span><span class="w"> </span><span class="nc">IoFuture</span><span class="o">&lt;'</span><span class="na">a</span><span class="p">,</span><span class="w"> </span><span class="n">T</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Pin</span><span class="o">&lt;</span><span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span><span class="w"> </span><span class="n">Future</span><span class="o">&lt;</span><span class="n">Output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span><span class="w"> </span><span class="n">OperationError</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nb">Send</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="o">'</span><span class="na">a</span><span class="o">&gt;&gt;</span><span class="p">;</span>
-
-<span class="k">trait</span><span class="w"> </span><span class="n">AsyncFsFile</span><span class="p">:</span><span class="w"> </span><span class="nb">Send</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">read</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">max_bytes</span><span class="p">:</span><span class="w"> </span><span class="kt">usize</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">IoFuture</span><span class="o">&lt;'</span><span class="nb">_</span><span class="p">,</span><span class="w"> </span><span class="nb">Vec</span><span class="o">&lt;</span><span class="kt">u8</span><span class="o">&gt;&gt;</span><span class="p">;</span>
-<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">seek</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">position</span><span class="p">:</span><span class="w"> </span><span class="nc">SeekFrom</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">IoFuture</span><span class="o">&lt;'</span><span class="nb">_</span><span class="p">,</span><span class="w"> </span><span class="kt">u64</span><span class="o">&gt;</span><span class="p">;</span>
-<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">info</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">IoFuture</span><span class="o">&lt;'</span><span class="nb">_</span><span class="p">,</span><span class="w"> </span><span class="n">FileInfo</span><span class="o">&gt;</span><span class="p">;</span>
-<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">IoFuture</span><span class="o">&lt;'</span><span class="nb">_</span><span class="p">,</span><span class="w"> </span><span class="p">()</span><span class="o">&gt;</span><span class="p">;</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-<p><code class="docutils literal notranslate"><span class="pre">read</span></code> returns at most <code class="docutils literal notranslate"><span class="pre">max_bytes</span></code>. An empty result for a positive request means EOF;
-a zero-byte request does not test EOF. <code class="docutils literal notranslate"><span class="pre">seek</span></code> uses the existing start/current/end
-semantics; non-seekable backends return <code class="docutils literal notranslate"><span class="pre">NotSupported</span></code>. Metadata may require I/O.
-<code class="docutils literal notranslate"><span class="pre">close</span></code> is asynchronous, idempotent, and releases resources after pending work stops.</p>
-<p>The initial additive entry point is <code class="docutils literal notranslate"><span class="pre">AsyncFileSystem::open_async</span></code>, returning this
-handle, with a default <code class="docutils literal notranslate"><span class="pre">NotSupported</span></code> implementation. Its context is bound at backend
-construction. The existing <code class="docutils literal notranslate"><span class="pre">open</span></code> returns blocking <code class="docutils literal notranslate"><span class="pre">FsFile</span></code> and remains a legacy route;
-its derived helpers remain documented as potentially blocking. New scans and Python
-async bindings use <code class="docutils literal notranslate"><span class="pre">open_async</span></code>, not those helpers. An additive <code class="docutils literal notranslate"><span class="pre">close_async</span></code> method
-provides backend-owned client cleanup, with a default no-op for borrowed resources. Renaming/removing the legacy route
-requires a later compatibility decision. No sync backend becomes native async through
-a blanket implementation or an implicit thread-pool wrapper.</p>
-<p>Owned reads match the C result lifetime and avoid retaining a caller’s borrowed buffer
-across suspension. Standard async reader adapters can follow once this contract works;
-they must preserve pending data when a caller changes its buffer between polls.</p>
-<p>The proposed <code class="docutils literal notranslate"><span class="pre">fsspec_async_s3_open</span></code> uses an explicit context, or a new default-budget
-context when passed null. Construction validates configuration without network I/O;
-metadata requests occur through async operations. It creates a native client without a
-per-filesystem runtime and without probing or wrapping a synchronous registry backend.</p>
-<p>Native S3 opened readers pin an ETag or equivalent native validator and check it on
-subsequent reads. Replacing an object fails the read instead of mixing versions. A
-backend without that guarantee reports its limitation; it does not claim a snapshot.</p>
+<section id="cursor-and-shutdown-behavior">
+<h2>Cursor and shutdown behavior<a class="headerlink" href="#cursor-and-shutdown-behavior" title="Link to this heading">¶</a></h2>
+<p>One read/seek can use a file cursor at a time. Metadata can run separately. Raw
+operation calls report retry-safe <code class="docutils literal notranslate"><span class="pre">Unavailable</span></code> when a previous cursor operation
+has not stopped. Failed or cancelled dispatched cursor operations require an
+absolute seek before reuse; a non-seekable file must be closed. Cancellation before
+provider invocation does not invalidate the cursor.</p>
+<p>Files retain their context; files returned by <code class="docutils literal notranslate"><span class="pre">open_read</span></code> also retain their parent
+filesystem. Releasing the caller’s context or filesystem reference does not close
+these dependents. The final file reference schedules best-effort close; use explicit
+close to observe cleanup and failures. Dropping an untaken file result also releases
+its file reference.</p>
+<p>File close rejects new I/O, cancels existing operations, drains producers and
+accepted jobs, and invokes provider close. Filesystem close drains its open/info
+operations, closes its children, then closes its provider client. Context close
+rejects new work and joins cleanup for its resources. Provider close itself must
+retain its completion until resource cleanup is finished.</p>
+<p>Repeated close calls join a pending cleanup or reuse successful cleanup. A close
+waiter’s cancellation/timeout does not stop cleanup; another close can await it.
+A failed provider close can be retried, while the handle remains closed to new I/O.
+Read-only cleanup never commits writes. Closing cannot guarantee progress after
+an event-loop owner stops driving its loop.</p>
 </section>
-<section id="operations-and-errors">
-<h2>Operations and errors<a class="headerlink" href="#operations-and-errors" title="Link to this heading">¶</a></h2>
-<p>A successful start returns an owned <code class="docutils literal notranslate"><span class="pre">fsspec_operation</span></code>. All path/options inputs are
-copied or retained before start returns. Output buffers are never borrowed from callers
-for the duration of an asynchronous operation. Backend callbacks borrow those copied
-inputs only during the callback; providers copy values they need afterward.</p>
-<p>Start functions report admission errors synchronously. The operation reports I/O errors
-asynchronously. Both use the existing status kind and retry-safe bit. Errors have owned
-UTF-8 messages; asynchronous completions never read thread-local last-error state.
-Optional <code class="docutils literal notranslate"><span class="pre">out_error</span></code> receives an owned error on failure and null on success. Callers free
-previous errors before reusing that slot. Other output arguments are unchanged on failure.</p>
-<p>Operation states are <code class="docutils literal notranslate"><span class="pre">Pending</span></code>, <code class="docutils literal notranslate"><span class="pre">Ready</span></code>, and <code class="docutils literal notranslate"><span class="pre">Taken</span></code>. A Ready result contains exactly one
-terminal outcome: success, failure, cancellation, or timeout. Publishing a terminal outcome
-is atomic; competing outcomes cannot replace it. A completion must check deadline expiry
-before publishing success, even if the timer callback has not run yet.</p>
-<p><code class="docutils literal notranslate"><span class="pre">operation_subscribe</span></code> installs one readiness callback and retains the supplied dispatcher.
-Registration atomically checks readiness, including completion before or during registration.
-A second subscription fails without replacing the first. Success transfers ownership of its
-callback context; failure does not. Posting happens outside internal locks. Delivery may
-precede the subscribing function’s return on another thread.</p>
-<p>Readiness callbacks borrow the operation for their call and run at most once. They are
-notifications, not owners of its result. A rejected/discarded notification releases its
-callback context; the result remains queryable. No callback is redirected to an arbitrary
-thread after a foreign dispatcher rejects it. A stopped caller event loop cannot be made
-to resume its awaiting tasks by fsspec.</p>
-<p><code class="docutils literal notranslate"><span class="pre">operation_take</span></code> transfers the owned result once. Taking a Pending or Taken operation is
-<code class="docutils literal notranslate"><span class="pre">InvalidArgument</span></code>. Concurrent consumers must coordinate; retaining an operation is useful
-for cancellation and inspection, not for broadcasting its payload. Rust Future wrappers
-subscribe once, maintain their own current waker, and check readiness when polling.</p>
-<p><code class="docutils literal notranslate"><span class="pre">fsspec_async_result</span></code> is opaque. Its error and byte accessors borrow data until
-<code class="docutils literal notranslate"><span class="pre">async_result_free</span></code>; callers must not free those borrowed pointers. The current
-payloads are unit and bytes. Metadata, file, and position payloads require additive
-accessors when the file API is implemented; no public result union is frozen now.</p>
-<p>Raw C <code class="docutils literal notranslate"><span class="pre">operation_release</span></code> drops a reference, without implicitly cancelling work. High-level
-Rust/Python wrappers request cancellation when an await is abandoned, then release their
-reference. Provider leases keep operation state and resources valid independently.</p>
-</section>
-<section id="foreign-backend-completion-and-cancellation">
-<h2>Foreign backend completion and cancellation<a class="headerlink" href="#foreign-backend-completion-and-cancellation" title="Link to this heading">¶</a></h2>
-<p>A backend receives an owned <code class="docutils literal notranslate"><span class="pre">fsspec_completion</span></code> producer token. Its start callback does
-not wait for I/O: it schedules work and returns, retaining the token until I/O and cleanup
-finish. It may complete synchronously inside the callback. The caller’s readiness callback
-is still dispatched separately.</p>
-<p>Completion functions consume one producer reference. Bytes and error messages are
-copied during that call. The proposed <code class="docutils literal notranslate"><span class="pre">info</span></code> completion copies metadata; <code class="docutils literal notranslate"><span class="pre">file</span></code>
-transfers one owned handle reference. Completion payloads
-must match the operation type and declared read limit. Invalid payloads fail as
-<code class="docutils literal notranslate"><span class="pre">InvalidArgument</span></code>. Late completions consume/dispose their payloads but do not change the
-terminal outcome. Releasing the final producer token without a completion fails an otherwise
-pending operation as <code class="docutils literal notranslate"><span class="pre">Unavailable</span></code>; it acknowledges that no producer work remains.</p>
-<p>A producer registers at most one cancellation hook with <code class="docutils literal notranslate"><span class="pre">completion_on_cancel</span></code>. The hook
-has its own dispatcher and context lifetime. Registration catches cancellation that happened
-before it; cancellation after registration schedules the same hook. It runs at most once,
-including when timeout and explicit cancellation race. It is a request to stop, not proof of
-cleanup. Token completion/final release is the acknowledgement of quiescence. Providers
-retain tokens for work that ignores cancellation or is still in a <code class="docutils literal notranslate"><span class="pre">finally</span></code> block.</p>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>Race</p></th>
-<th class="head"><p>Required outcome</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>Cancel before backend-start job runs</p></td>
-<td><p>Record Cancelled and skip backend invocation</p></td>
-</tr>
-<tr class="row-odd"><td><p>Cancel during/after start, before hook installation</p></td>
-<td><p>Record Cancelled; run hook when installed</p></td>
-</tr>
-<tr class="row-even"><td><p>Success versus cancellation/timeout</p></td>
-<td><p>First valid terminal transition wins; expired deadlines prevent success</p></td>
-</tr>
-<tr class="row-odd"><td><p>Completion after cancellation/timeout</p></td>
-<td><p>Dispose payload; release producer lease only after actual cleanup</p></td>
-</tr>
-<tr class="row-even"><td><p>Consumer releases operation while work continues</p></td>
-<td><p>Producer lease prevents use-after-free</p></td>
-</tr>
-<tr class="row-odd"><td><p>Provider loses its last token without completing</p></td>
-<td><p>Pending operation becomes Unavailable; no silent permanent Pending state</p></td>
-</tr>
-</tbody>
-</table>
-<p>Logical cancellation may wake a consumer promptly while the provider is still cleaning up.
-The proposed admission slots and buffer reservations remain charged until work is quiescent; cancellation
-cannot be used to exceed resource limits by repeatedly starting replacements.</p>
-</section>
-<section id="file-and-context-shutdown-proposed">
-<h2>File and context shutdown (proposed)<a class="headerlink" href="#file-and-context-shutdown-proposed" title="Link to this heading">¶</a></h2>
-<p>Read/seek operations share a cursor. Rust’s mutable borrow serializes them; the C wrapper
-allows one outstanding cursor operation per file. An overlapping operation fails with
-<code class="docutils literal notranslate"><span class="pre">Unavailable</span></code> and the retry-safe bit. Pending close rejects new I/O. Immutable metadata
-queries can proceed separately where the provider supports them.</p>
-<p>A cancelled read or seek may have changed the cursor. The handle remains busy until its
-producer stops. Before reuse, a seekable handle requires a successful absolute seek;
-a non-seekable handle must be closed. Queued operations that never reached the backend
-have not changed the cursor. Rust adapters preserve this distinction internally.</p>
-<p><code class="docutils literal notranslate"><span class="pre">file_close</span></code> cancels pending work, waits for quiescence, invokes provider close, and finishes
-only after cleanup completes. Repeated close joins the same cleanup; it does not invoke
-provider close twice. A close timeout leaves the file Closing. Another close can await the
-remaining cleanup. Final handle release schedules best-effort cleanup; explicit close is the
-observable guarantee. Read-handle close never publishes writes.</p>
-<p><code class="docutils literal notranslate"><span class="pre">fs_close</span></code> rejects new filesystem work, drains its operations/files, then invokes the
-optional provider filesystem-close hook once. An open result attaches its file to that
-filesystem and must use the same context. Independently constructed file handles belong
-to their context directly. The filesystem hook closes provider-owned async clients;
-it never implicitly closes a caller-owned shared client. A missing hook means there
-are no provider-owned resources needing async cleanup.</p>
-<p><code class="docutils literal notranslate"><span class="pre">context_close</span></code> rejects new work, cancels pending operations, closes its files and
-filesystems in that order, and drains producer leases and queued jobs. Its own close operation is excluded from the drain count.
-Control operations have reserved admission, so a full data queue cannot prevent cancellation
-or close. Repeated context close joins existing cleanup. A timed-out close does not authorize
-releasing resources still used by a foreign provider.</p>
-<p>The owner keeps its event loop driven through drain. The interpreter and provider code
-remain alive until drain completes and all foreign handles and callback references are released.
-A loop that rejects new jobs fails newly submitted backend work as Unavailable. Stopping a
-loop after it accepted jobs without executing/discarding them violates the dispatcher contract;
-fsspec retains outstanding leases rather than freeing live pointers. No runtime can guarantee
-cleanup progress after its owner has stopped driving it.</p>
-</section>
-<section id="deadlines-and-shared-bounds">
-<h2>Deadlines and shared bounds<a class="headerlink" href="#deadlines-and-shared-bounds" title="Link to this heading">¶</a></h2>
-<p>Proposed context defaults are 64 admitted data operations, 64 MiB of accounted buffers, and
-8 MiB per read. Values must be positive and <code class="docutils literal notranslate"><span class="pre">max_read_size</span> <span class="pre">&lt;=</span> <span class="pre">max_buffered_bytes</span></code>. All
-backends under a context share its budget, regardless of bucket or credential identity.
-Separate contexts have separate budgets but share the default runtime.</p>
-<p>Admission exhaustion returns retry-safe Unavailable before dispatch. An admitted operation
-waits asynchronously for byte capacity; the wait counts toward its deadline. Large reads
-are decomposed by callers or streaming adapters into bounded requests. One request above
-the context’s read limit is InvalidArgument, with no allocation or backend I/O.</p>
-<p>Accounting covers copied arguments, fsspec-owned transport/output buffers, and queued
-results. Reserve capacity before allocation/dispatch, including copies at an ABI crossing.
-Count retained allocations, not just the lengths of slices sharing a larger allocation.
-Credit is released when memory is freed or the result is transferred to its consumer.
-Foreign producer buffers borrowed during completion remain provider-owned; the copied
-result is charged to fsspec. Foreign clients must bound their own buffering, and returning
-more bytes than requested is an error. Caller-retained results, provider allocations,
-independent backend caches, allocator overhead, and uninstrumented HTTP/codec internals
-are outside the context budget: it is not an RSS cap or a bound on arbitrary foreign code.
-A later shared buffer-allocation ABI would be needed to account for foreign allocations.</p>
-<p>Streaming has bounded prefetch and stops requesting more data when consumers stop reading.
-Early close cancels pending reads and drains their leases. Existing materializing
-<code class="docutils literal notranslate"><span class="pre">get_ranges</span></code> remains a collecting API; this proposal does not relabel it as streaming.</p>
-<p>Timeouts are durations from submission, measured by fsspec’s monotonic clock, including
-queueing and dispatch. Zero expires without starting I/O; <code class="docutils literal notranslate"><span class="pre">UINT64_MAX</span></code> means no deadline.
-The producer can query remaining time without sharing clock epochs. Timeout records the
-Timeout kind, requests cancellation, and follows the same lease rules as explicit cancel.
-The future file wrapper can mark cancellation/timeouts before dispatch safe to retry.
-The implemented generic operation layer always marks its cancellation/timeouts unsafe to retry. After dispatch, cursor reads
-and relative seeks report <code class="docutils literal notranslate"><span class="pre">retry_safe=false</span></code> when their position is uncertain; callers
-recover position before submitting a new read. Metadata, immutable positioned reads,
-and idempotent close can report retry-safe errors. Future writes must define their own
-unknown-outcome rules.</p>
-</section>
-<section id="python-asyncio-binding-proposed">
-<h2>Python asyncio binding (proposed)<a class="headerlink" href="#python-asyncio-binding-proposed" title="Link to this heading">¶</a></h2>
-<p>The binding captures an explicit loop, or <code class="docutils literal notranslate"><span class="pre">asyncio.get_running_loop()</span></code> at construction from
-an async context. It holds strong references to the loop and provider while work exists.
-It does not select a process-global loop or call <code class="docutils literal notranslate"><span class="pre">asyncio.run()</span></code> for each request.</p>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>C hook</p></th>
-<th class="head"><p>Python behavior</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>Dispatcher <code class="docutils literal notranslate"><span class="pre">post</span></code></p></td>
-<td><p>Acquire GIL; enqueue <code class="docutils literal notranslate"><span class="pre">job_run</span></code> with <code class="docutils literal notranslate"><span class="pre">loop.call_soon_threadsafe</span></code>; retain job wrapper until run/discard</p></td>
-</tr>
-<tr class="row-odd"><td><p>Backend start</p></td>
-<td><p>On provider loop, create an asyncio Task for the backend coroutine; keep producer token through task cleanup</p></td>
-</tr>
-<tr class="row-even"><td><p>Cancellation hook</p></td>
-<td><p>Dispatch <code class="docutils literal notranslate"><span class="pre">task.cancel</span></code> onto provider loop; do not mutate a Task from a worker thread</p></td>
-</tr>
-<tr class="row-odd"><td><p>Backend completion</p></td>
-<td><p>Convert task result/exception and finish producer; cancellation is acknowledged only after coroutine cleanup</p></td>
-</tr>
-<tr class="row-even"><td><p>Consumer readiness</p></td>
-<td><p>On consumer loop, take result and settle its asyncio Future if still pending</p></td>
-</tr>
-<tr class="row-odd"><td><p>Await cancelled</p></td>
-<td><p>Request native operation cancellation; preserve producer lifetime until cleanup finishes</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">aclose()</span></code></p></td>
-<td><p>Await context/file drain while provider and consumer loops remain driven</p></td>
-</tr>
-</tbody>
-</table>
-<p>The adapter must register task cancellation and completion safely even with an eager task
-factory or a task already completed at registration. Consumer subscriptions capture the
-originating Python caller’s <code class="docutils literal notranslate"><span class="pre">contextvars</span></code> context for readiness delivery. Python backend
-registration captures a provider context and copies it for each C-originated operation;
-arbitrary per-request Python context is not implicitly transported through C. Neither
-side inherits a native callback thread’s context. Credentials remain explicit backend
-configuration. Callback exceptions are caught and translated to structured operation errors;
-Python exceptions and Rust panics never unwind across C. GIL acquisition alone does not
-make manipulating asyncio Futures from a foreign thread valid.</p>
-<p>A Python backend can therefore export its async files through C to a Rust consumer:
-Rust starts an operation, the registered dispatcher schedules the coroutine on Python’s
-loop, and the producer resolves a Rust Future through completion notification. The inverse
-uses the managed Tokio backend and posts its completion onto the awaiting Python loop.
-These loops can be different and may run on different threads.</p>
-<p>The Python adapter must use an explicit closing state and retain accepted job wrappers;
-<code class="docutils literal notranslate"><span class="pre">call_soon_threadsafe</span></code> alone does not provide discard/drain accounting. <code class="docutils literal notranslate"><span class="pre">aclose()</span></code> disposes
-queued wrappers before loop shutdown. Closing somebody else’s loop is never part of release.</p>
-</section>
-<section id="compatibility-and-acceptance">
-<h2>Compatibility and acceptance<a class="headerlink" href="#compatibility-and-acceptance" title="Link to this heading">¶</a></h2>
-<p>New opaque handles, vtables, and symbols are additive. Existing file/fs vtables are not
-reinterpreted. New vtables start with <code class="docutils literal notranslate"><span class="pre">struct_size</span></code>/<code class="docutils literal notranslate"><span class="pre">abi_version</span></code>, use existing validation
-rules, and copy callback tables. Missing required callbacks fail construction; optional
-seek reports NotSupported. Required filesystem callbacks are info/open/release; close is optional for borrowed
-resources. Required
-file callbacks are read/info/close/release. Dispatcher post/release are required.</p>
-<p>Constructor success transfers the provider’s one data reference; failure leaves it
-with the caller. Context and dispatcher arguments are borrowed and internally retained.
-Null options select defaults, including no operation deadline. Nonnull option structs
-must include all fields declared in this draft; invalid sizes or zero context limits
-are rejected before dispatch. Retain of null returns null; release/free of null is a
-no-op. Query and completion functions require valid nonnull handles. Typed completion
-entry points consume their token even when the payload is invalid or the result is late.</p>
-<p>New async APIs do not make synchronous <code class="docutils literal notranslate"><span class="pre">FsFile</span></code> calls on event-loop threads. Explicit
-blocking adapters, if added later, use a bounded shared executor and retain accounting until
-the blocking call ends. Async operations never wait synchronously for callbacks on their
-own event loop. Native async registration and lookup remain separate from the existing
-synchronous registry until an additive factory contract is implemented; a sync registry
-entry alone does not advertise async support.</p>
-<p>Implementation must pass these cases in Rust and through the built wheel’s C ABI:</p>
-<ul class="simple">
-<li><p>Two native S3 backends share the managed runtime and context budget; none creates a worker
-pool per file/backend. An explicitly borrowed Tokio runtime remains caller-owned.</p></li>
-<li><p>A Python asyncio backend serves a Rust consumer and a native Rust backend serves an asyncio
-consumer. Heartbeats continue during delayed I/O and cancellation cleanup.</p></li>
-<li><p>Provider loop and consumer loop differ; contextvars and callback thread identity are correct.</p></li>
-<li><p>Complete-before-subscribe, cancellation-before-hook, synchronous completion, eager Python
-tasks, completion-after-timeout, discarded dispatch jobs, and released consumer handles.</p></li>
-<li><p>Start errors and asynchronous failures preserve kind, retry safety, and owned messages
-despite unrelated errors on worker threads. Invalid pointers/options fail before dispatch.</p></li>
-<li><p>Slow consumers, oversized requests, retained slices, ABI copies, repeated cancelled requests,
-and pending cleanup cannot exceed the declared accounting budget.</p></li>
-<li><p>Same-handle cursor races, cancelled seek/read recovery, repeated close, close timeout, and
-context close with a saturated data queue. Cleanup never implicitly commits.</p></li>
-<li><p>Provider/loop shutdown rejects new work and drains accepted work; callbacks and finalizers
-cannot use an unloaded module or finalized Python interpreter.</p></li>
-<li><p>Unchanged synchronous suites, C/C++ header compilation, direct Rust builds, shared-library
-wheels, and the no-default-features core/WASM build.</p></li>
-</ul>
-<p>Operation/producer lifetimes, managed and foreign callback dispatch, Rust Future
-wrappers, and the asyncio integration fixture are implemented. Next add async file
-handles with shared admission/byte budgets and drainable close, then native S3
-reads over that boundary.</p>
+<section id="integration-coverage-and-remaining-native-work">
+<h2>Integration coverage and remaining native work<a class="headerlink" href="#integration-coverage-and-remaining-native-work" title="Link to this heading">¶</a></h2>
+<p>The ctypes fixtures in <code class="docutils literal notranslate"><span class="pre">test_async_capi.py</span></code> and <code class="docutils literal notranslate"><span class="pre">test_async_files.py</span></code> exercise
+managed notification threads, caller-owned asyncio providers, read/seek/metadata,
+parent close ordering, cancelled coroutine cleanup, shared limits, and final release.
+Rust tests cover retained producer leases, result capacities, cursor recovery, close
+retries, dispatcher rejection/discard, and safe futures through C. These fixtures
+are not a public Python async filesystem implementation.</p>
+<p>Native S3 is next. The <a class="reference download internal" download="" href="../../_downloads/944ce50f61936e212fb89467e8e5766e/async-io.h"><code class="xref download docutils literal notranslate"><span class="pre">draft</span> <span class="pre">header</span></code></a> contains
+only its proposed constructor. Native opened readers will pin a validator and check
+subsequent reads, so replacing an object fails instead of mixing versions. Shared
+budgets and runtime ownership must also apply to native transport/prefetch buffers.
+Async scan integration and context-aware Python wrappers can then use those handles.</p>
 <p>The execution rules are grounded in Python’s
 <a class="reference external" href="https://docs.python.org/3/library/asyncio-dev.html#concurrency-and-multithreading">thread-safe asyncio scheduling</a>
 and <a class="reference external" href="https://docs.python.org/3/library/asyncio-eventloop.html#running-and-stopping-the-loop">event-loop lifecycle</a>,
@@ -707,37 +472,25 @@ and <a class="reference external" href="https://docs.rs/tokio/latest/tokio/runti
       <path class="fd-toc-thumb" fill="none" />
     </svg><ul class="fd-toc-list">
   <li class="fd-toc-item" data-depth="1">
-    <a href="#implemented-operation-api">Implemented operation API</a>
+    <a href="#rust-interfaces">Rust interfaces</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
-    <a href="#execution-contexts-proposed">Execution contexts (proposed)</a>
-  </li>
-  <li class="fd-toc-item" data-depth="2">
-    <a href="#managed-default">Managed default</a>
-  </li>
-  <li class="fd-toc-item" data-depth="2">
-    <a href="#foreign-dispatcher">Foreign dispatcher</a>
+    <a href="#operation-results">Operation results</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
-    <a href="#rust-file-contract-proposed">Rust file contract (proposed)</a>
+    <a href="#c-abi">C ABI</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
-    <a href="#operations-and-errors">Operations and errors</a>
+    <a href="#runtime-and-dispatcher-ownership">Runtime and dispatcher ownership</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
-    <a href="#foreign-backend-completion-and-cancellation">Foreign backend completion and cancellation</a>
+    <a href="#limits-and-backpressure">Limits and backpressure</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
-    <a href="#file-and-context-shutdown-proposed">File and context shutdown (proposed)</a>
+    <a href="#cursor-and-shutdown-behavior">Cursor and shutdown behavior</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
-    <a href="#deadlines-and-shared-bounds">Deadlines and shared bounds</a>
-  </li>
-  <li class="fd-toc-item" data-depth="1">
-    <a href="#python-asyncio-binding-proposed">Python asyncio binding (proposed)</a>
-  </li>
-  <li class="fd-toc-item" data-depth="1">
-    <a href="#compatibility-and-acceptance">Compatibility and acceptance</a>
+    <a href="#integration-coverage-and-remaining-native-work">Integration coverage and remaining native work</a>
   </li>
 </ul>
 

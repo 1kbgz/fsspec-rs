@@ -497,7 +497,9 @@ primitive methods return futures, and its default helpers are <code class="docut
 <p><code class="docutils literal notranslate"><span class="pre">AsyncFileSystem::open</span></code> currently returns a blocking <code class="docutils literal notranslate"><span class="pre">FsFile</span></code>; awaiting open does not
 make subsequent reads asynchronous. The <a class="reference internal" href="async-io.html"><span class="std std-doc">async I/O contract</span></a> provides
 operation futures and managed/foreign callback dispatch in <code class="docutils literal notranslate"><span class="pre">fsspec_rs::async_io</span></code>, plus Rust futures over the shared library
-in <code class="docutils literal notranslate"><span class="pre">fsspec_sys::async_io</span></code>. Async file handles and shared byte budgets remain proposed.</p>
+in <code class="docutils literal notranslate"><span class="pre">fsspec_sys::async_io</span></code>. <code class="docutils literal notranslate"><span class="pre">AsyncFsFile</span></code> provides owned-buffer read/seek/info/close;
+<code class="docutils literal notranslate"><span class="pre">async_files</span></code> in both crates supplies handles with shared limits and cleanup.
+<code class="docutils literal notranslate"><span class="pre">open_async</span></code> is additive and defaults to <code class="docutils literal notranslate"><span class="pre">NotSupported</span></code>; native S3 is still pending.</p>
 <p>The default async implementation avoids recursive async futures in <code class="docutils literal notranslate"><span class="pre">walk()</span></code> by
 using an explicit stack. Method semantics otherwise match <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code>.</p>
 </section>

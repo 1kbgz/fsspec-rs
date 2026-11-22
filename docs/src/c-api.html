@@ -708,8 +708,9 @@ the new symbols require an updated library.</p>
 <h2>Async operations and dispatch<a class="headerlink" href="#async-operations-and-dispatch" title="Link to this heading">¶</a></h2>
 <p>The <a class="reference internal" href="async-io.html"><span class="std std-doc">async I/O contract</span></a> documents operation/producer handles, managed
 and foreign event-loop dispatch, owned results/errors, cancellation, and deadlines.
-These symbols are exported in <code class="docutils literal notranslate"><span class="pre">fsspec.h</span></code>. Async filesystem/file handles and shared
-byte budgets remain proposed; their draft declarations are not exported.</p>
+<code class="docutils literal notranslate"><span class="pre">fsspec.h</span></code> also exports read-only async filesystem/file vtables, shared budget
+contexts, and close operations that wait for cleanup. Native S3 streaming remains
+proposed; its draft constructor is not exported.</p>
 </section>
 <section id="foreign-backends">
 <h2>Foreign backends<a class="headerlink" href="#foreign-backends" title="Link to this heading">¶</a></h2>

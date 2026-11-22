@@ -1,19 +1,66 @@
 # Async I/O and execution contexts
 
-**Status: operation lifetimes and callback dispatch are implemented.** Async
-filesystem/file handles, shared byte budgets, native S3 streams, and context shutdown
-remain proposed. Existing synchronous interfaces and C vtables are unchanged.
-The {download}`draft C header <../proposals/async-io.h>` declares only that future
-file/context API; implemented symbols are in the installed `fsspec.h`.
+Async operation lifetimes, callback dispatch, read-only file/filesystem handles,
+shared limits, and cleanup are implemented in Rust and the C ABI. Native S3
+streaming and a public Python async filesystem wrapper remain future work.
+Existing synchronous interfaces and C vtables are unchanged.
 
-## Implemented operation API
+## Rust interfaces
 
-`fsspec_rs::async_io` is available with the `async` feature, also enabled by
-`object-store` and the default `s3` feature. `Operation::new` returns an observer
-and a `Completion` producer. `Kind::Unit` and `Kind::Bytes` are supported; byte
-operations require an explicit maximum result length. A zero limit permits only
-an empty byte result. This limit covers the copied result, not provider allocations
-or total bytes across operations.
+Enable the `async` feature for `fsspec_rs::async_io` and
+`fsspec_rs::async_files`. The `object-store` feature and default `s3` feature
+also enable it. The core without default features still supports WASM.
+
+`AsyncContext::new(Limits)` creates a shared admission and byte budget.
+`AsyncFile::new` and `AsyncFilesystem::new` register a provider and dispatcher in
+that context. Their `read`, `seek`, `info`, `open_read`, and `close` methods return
+operations that can be awaited on any Rust executor. Paths are copied before
+start returns; providers borrow them only during their start callback.
+
+`FileProvider` and `FilesystemProvider` expose nonblocking start callbacks. A
+provider schedules I/O on its own executor and retains a `Completion` through
+cleanup. `ManagedDispatcher` schedules callbacks on the library's shared Tokio
+runtime. A caller-supplied `Dispatcher` can instead post them to another executor.
+Neither dispatcher polls foreign futures on behalf of their owner.
+
+`AsyncFsFile` provides an object-safe interface with owned read buffers:
+
+```rust
+pub type IoFuture<'a, T> =
+    Pin<Box<dyn Future<Output = Result<T, OperationError>> + Send + 'a>>;
+
+pub trait AsyncFsFile: Send + Sync {
+    fn read(&mut self, max_bytes: usize) -> IoFuture<'_, Vec<u8>>;
+    fn seek(&mut self, position: SeekFrom) -> IoFuture<'_, u64>;
+    fn info(&self) -> IoFuture<'_, FileInfo>;
+    fn close(&mut self) -> IoFuture<'_, ()>;
+}
+```
+
+The provided core and shared-library file wrappers implement this trait. Successful
+trait reads, seeks, and metadata calls wait for producer and accounting cleanup
+before returning, so sequential calls work even when a provider publishes success
+early. Errors remain prompt; a cancelled cursor operation may still need cleanup
+and an absolute seek before reuse. Closing waits for that cleanup.
+
+`AsyncFileSystem::open_async` is an additive, read-only entry point returning this
+handle; its default is `NotSupported`. `close_async` defaults to a no-op for borrowed
+backend resources. Existing `open` still returns a blocking `FsFile`; its derived
+helpers remain potentially blocking. There is no implicit thread-pool adapter or
+native async S3 implementation in this change.
+
+`fsspec_sys::async_files` provides owned context, filesystem, and file handles
+through `libfsspec`, with the same operations and Rust trait implementation.
+Its unsafe `from_raw` constructors take one owned handle reference; `into_raw`
+transfers one to C. The library and provider code must remain loaded through cleanup.
+
+## Operation results
+
+`Operation::new` returns an observer and a `Completion` producer. Results can be
+unit, bytes, metadata, a file, or a position. An operation has one terminal outcome
+and its result can be taken once across all observers. Only one core observer can
+be awaited. Dropping its future requests cancellation; releasing an ordinary raw
+observer does not.
 
 ```rust
 use fsspec_rs::async_io::{Kind, Operation, Value};
@@ -26,413 +73,165 @@ async fn example() -> Result<(), fsspec_rs::OperationError> {
 }
 ```
 
-Only one clone may be awaited. Dropping that future requests cancellation; dropping
-an ordinary observer does not. `is_quiescent()` reports whether the last producer
-reference has been released. Producers retain a reference through their cleanup,
-even if another reference publishes a result earlier.
-
-The same operations are exported through C:
-
-| Function                                       | Contract                                                                                                                                                   |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fsspec_operation_create`                      | Return observer/producer handles; kind 0 is unit, 1 is bytes. Relative `timeout_ns` includes dispatch; `UINT64_MAX` disables it, zero expires immediately. |
-| `fsspec_operation_state` / `take`              | States 0 pending, 1 ready, 2 taken. Transfer one owned result; pending/taken is Invalid.                                                                   |
-| `fsspec_operation_subscribe`                   | Register one readiness callback and optional dispatcher; null selects managed dispatch.                                                                    |
-| `fsspec_operation_cancel`                      | Publish Cancelled if pending; an expired deadline publishes Timeout. Neither proves cleanup is complete.                                                   |
-| `fsspec_operation_is_quiescent`                | Report release of the last producer reference.                                                                                                             |
-| `fsspec_completion_on_cancel`                  | Register one cancellation callback, including after cancellation occurred.                                                                                 |
-| `fsspec_completion_unit` / `bytes` / `error`   | Consume a producer reference. Bytes and error text are copied; oversized bytes are rejected before copying.                                                |
-| `fsspec_async_result_kind` / `error` / `bytes` | Borrow payloads from an opaque result. Kind is 0 unit, 1 bytes, `UINT32_MAX` error. Free only the result with `fsspec_async_result_free`.                  |
-
-Retain/release functions manage independent observer, producer, and dispatcher
-references. `fsspec_sys::async_io::Operation` implements `Future` over these C
-functions; its `Completion` wrapper can transfer a producer with `into_raw` and
-accept one with unsafe `from_raw`. Errors contain owned status/message data and do
-not use thread-local last-error state. Generic cancellation, timeout, and abandonment
-are conservatively marked unsafe to retry because this layer cannot know whether
-backend I/O had side effects.
-
-`ManagedDispatcher` and C null dispatchers use the same lazy, process-owned Tokio
-runtime as the object-store bridge. Foreign dispatchers schedule nonblocking jobs
-on a caller-owned loop. They never receive Rust futures or native runtime handles.
-An accepted job retains its dispatcher until run/discard. Finite deadlines use the
-managed runtime even when callbacks use a foreign dispatcher.
-
-`fsspec_rs/tests/test_async_capi.py` provides an asyncio integration fixture using
-the bundled shared library. It exercises separate provider/consumer loops,
-managed callback threads, cancellation before hook registration, delayed coroutine
-cleanup, deadlines, and shutdown rejection/discard. It is a fixture, not a public
-Python async filesystem API.
-
-The remaining sections specify shared execution rules and the proposed file/context
-extension. No async filesystem registration or native S3 streaming entry point is
-exported yet.
-
-## Execution contexts (proposed)
-
-An async context owns admission limits, buffer accounting, deadlines, and operation
-tracking. Filesystems, files, and operations retain their context. Context selection
-is explicit when constructing a backend; there is no process-wide replacement hook.
-
-Execution and callback dispatch are separate:
-
-| Component                            | Runs where                                           | Ownership                                                           |
-| ------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------- |
-| Native S3 futures                    | Tokio runtime selected by the Rust execution context | Managed by default; explicitly borrowed in a Rust application       |
-| Python backend coroutines            | The backend's registered asyncio loop                | Caller-owned; fsspec never starts, stops, or closes it              |
-| Backend start/cancel/close callbacks | Dispatcher supplied with the backend                 | Retained for all pending work and cleanup                           |
-| Consumer readiness notification      | Dispatcher supplied at subscription                  | May differ from the backend's dispatcher                            |
-| Deadlines and operation accounting   | Context's native execution runtime                   | Shared managed default, including for C-registered foreign backends |
-
-An asyncio dispatcher executes callback jobs; it does not poll Tokio futures or
-provide Tokio's network reactor. A foreign-only backend uses its own I/O runtime,
-while `libfsspec` still supplies the shared runtime for deadline supervision.
-Applications requiring zero native runtime threads are outside this initial contract.
-
-### Managed default
-
-The proposed `fsspec_async_context_create(NULL, ...)` creates an independent budget
-and uses the existing shared managed Tokio runtime per loaded `libfsspec`. The initial worker count
-is two, matching the existing object-store bridge runtime. The operation implementation shares
-that runtime with callback dispatch; constructing a filesystem never creates another
-worker pool. This does not claim that current `S3Fs` already uses the shared pool.
-
-The runtime lives for the process lifetime; closing a context drains its operations
-without stopping the shared runtime or unrelated contexts. `libfsspec` remains loaded
-for the process lifetime when using this default. Foreign provider modules can be
-unloaded after their own contexts drain and all their handles are released.
-
-The proposed Rust context API lets applications explicitly construct a context with a Tokio `Handle` from
-the same linked Rust implementation. The application must keep the owning runtime
-alive and drive it until context close completes. A handle alone does not prevent
-runtime shutdown, and a current-thread runtime needs an actively driven event loop.
-There is no implicit `Handle::current()` selection and no nested `block_on`.
-
-Operation wrappers implement Rust's standard `Future`; their consumers can await
-completion on another Rust executor. This does not change the runtime driving native I/O.
-
-A Tokio `Handle`, Rust future, Python loop pointer, or interpreter object is never
-passed directly across the C ABI. A Rust extension with its own Tokio copy uses the
-foreign backend/dispatcher interface, just as a Python extension does.
-
-### Foreign dispatcher
-
-`fsspec_dispatcher_from_vtable` copies the versioned vtable and takes ownership of
-one `data` reference on success. Failure leaves ownership with the caller. A null
-dispatcher on a backend or subscription selects managed callback dispatch.
-
-`post(data, job, out_error)` may be called from any thread. It must return promptly
-and never run the job on the submitting call stack. Another thread may run an
-accepted job before `post` returns. All operation state is installed before posting.
-No fsspec lock is held while entering foreign code.
-
-A rejected post may return a library-owned error created by `async_error_new`; its
-status must match the returned status. Without a message, fsspec supplies a generic
-one. Foreign callbacks never return stack-allocated errors or buffers that fsspec's
-allocator would later free. Successful posts return no error.
-
-| `post` outcome | Job ownership                                                                  |
-| -------------- | ------------------------------------------------------------------------------ |
-| Success        | Dispatcher owns the job and calls exactly one of `job_run` or `job_discard`    |
-| Failure        | Dispatcher has neither run nor retained the job; ownership remains with fsspec |
-
-A dispatcher may serialize jobs on an event-loop thread or execute them concurrently;
-its provider must match that guarantee. No global FIFO ordering is assumed. A started
-job is not discarded, and each job handle is consumed once. Closing a dispatcher
-rejects new posts and executes or discards accepted jobs before releasing its context.
-
-Discarding a backend-start job fails its pending operation as `Unavailable` without
-starting I/O. Discarding a notification does not overwrite an already recorded result;
-that result remains available through operation state/take. Cancel-job discard does
-not acknowledge that the underlying I/O stopped. Loop shutdown cannot make an abandoned
-coroutine safe to free. Owners must drain work before stopping their loops.
-
-`release(data)` and callback-context release functions may run on any thread. They
-must be thread-safe and nonblocking. Loop-affine cleanup happens during async close,
-before these final reference releases. Python release trampolines acquire the GIL
-while the interpreter is alive; interpreter shutdown must follow context drain.
-
-## Rust file contract (proposed)
-
-The new object-safe handle uses ordinary `Send` futures and owned read buffers:
-
-```rust
-type IoFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T, OperationError>> + Send + 'a>>;
-
-trait AsyncFsFile: Send {
-    fn read(&mut self, max_bytes: usize) -> IoFuture<'_, Vec<u8>>;
-    fn seek(&mut self, position: SeekFrom) -> IoFuture<'_, u64>;
-    fn info(&self) -> IoFuture<'_, FileInfo>;
-    fn close(&mut self) -> IoFuture<'_, ()>;
-}
-```
-
-`read` returns at most `max_bytes`. An empty result for a positive request means EOF;
-a zero-byte request does not test EOF. `seek` uses the existing start/current/end
-semantics; non-seekable backends return `NotSupported`. Metadata may require I/O.
-`close` is asynchronous, idempotent, and releases resources after pending work stops.
-
-The initial additive entry point is `AsyncFileSystem::open_async`, returning this
-handle, with a default `NotSupported` implementation. Its context is bound at backend
-construction. The existing `open` returns blocking `FsFile` and remains a legacy route;
-its derived helpers remain documented as potentially blocking. New scans and Python
-async bindings use `open_async`, not those helpers. An additive `close_async` method
-provides backend-owned client cleanup, with a default no-op for borrowed resources. Renaming/removing the legacy route
-requires a later compatibility decision. No sync backend becomes native async through
-a blanket implementation or an implicit thread-pool wrapper.
-
-Owned reads match the C result lifetime and avoid retaining a caller's borrowed buffer
-across suspension. Standard async reader adapters can follow once this contract works;
-they must preserve pending data when a caller changes its buffer between polls.
-
-The proposed `fsspec_async_s3_open` uses an explicit context, or a new default-budget
-context when passed null. Construction validates configuration without network I/O;
-metadata requests occur through async operations. It creates a native client without a
-per-filesystem runtime and without probing or wrapping a synchronous registry backend.
-
-Native S3 opened readers pin an ETag or equivalent native validator and check it on
-subsequent reads. Replacing an object fails the read instead of mixing versions. A
-backend without that guarantee reports its limitation; it does not claim a snapshot.
-
-## Operations and errors
-
-A successful start returns an owned `fsspec_operation`. All path/options inputs are
-copied or retained before start returns. Output buffers are never borrowed from callers
-for the duration of an asynchronous operation. Backend callbacks borrow those copied
-inputs only during the callback; providers copy values they need afterward.
-
-Start functions report admission errors synchronously. The operation reports I/O errors
-asynchronously. Both use the existing status kind and retry-safe bit. Errors have owned
-UTF-8 messages; asynchronous completions never read thread-local last-error state.
-Optional `out_error` receives an owned error on failure and null on success. Callers free
-previous errors before reusing that slot. Other output arguments are unchanged on failure.
-
-Operation states are `Pending`, `Ready`, and `Taken`. A Ready result contains exactly one
-terminal outcome: success, failure, cancellation, or timeout. Publishing a terminal outcome
-is atomic; competing outcomes cannot replace it. A completion must check deadline expiry
-before publishing success, even if the timer callback has not run yet.
-
-`operation_subscribe` installs one readiness callback and retains the supplied dispatcher.
-Registration atomically checks readiness, including completion before or during registration.
-A second subscription fails without replacing the first. Success transfers ownership of its
-callback context; failure does not. Posting happens outside internal locks. Delivery may
-precede the subscribing function's return on another thread.
-
-Readiness callbacks borrow the operation for their call and run at most once. They are
-notifications, not owners of its result. A rejected/discarded notification releases its
-callback context; the result remains queryable. No callback is redirected to an arbitrary
-thread after a foreign dispatcher rejects it. A stopped caller event loop cannot be made
-to resume its awaiting tasks by fsspec.
-
-`operation_take` transfers the owned result once. Taking a Pending or Taken operation is
-`InvalidArgument`. Concurrent consumers must coordinate; retaining an operation is useful
-for cancellation and inspection, not for broadcasting its payload. Rust Future wrappers
-subscribe once, maintain their own current waker, and check readiness when polling.
-
-`fsspec_async_result` is opaque. Its error and byte accessors borrow data until
-`async_result_free`; callers must not free those borrowed pointers. The current
-payloads are unit and bytes. Metadata, file, and position payloads require additive
-accessors when the file API is implemented; no public result union is frozen now.
-
-Raw C `operation_release` drops a reference, without implicitly cancelling work. High-level
-Rust/Python wrappers request cancellation when an await is abandoned, then release their
-reference. Provider leases keep operation state and resources valid independently.
-
-## Foreign backend completion and cancellation
-
-A backend receives an owned `fsspec_completion` producer token. Its start callback does
-not wait for I/O: it schedules work and returns, retaining the token until I/O and cleanup
-finish. It may complete synchronously inside the callback. The caller's readiness callback
-is still dispatched separately.
-
-Completion functions consume one producer reference. Bytes and error messages are
-copied during that call. The proposed `info` completion copies metadata; `file`
-transfers one owned handle reference. Completion payloads
-must match the operation type and declared read limit. Invalid payloads fail as
-`InvalidArgument`. Late completions consume/dispose their payloads but do not change the
-terminal outcome. Releasing the final producer token without a completion fails an otherwise
-pending operation as `Unavailable`; it acknowledges that no producer work remains.
-
-A producer registers at most one cancellation hook with `completion_on_cancel`. The hook
-has its own dispatcher and context lifetime. Registration catches cancellation that happened
-before it; cancellation after registration schedules the same hook. It runs at most once,
-including when timeout and explicit cancellation race. It is a request to stop, not proof of
-cleanup. Token completion/final release is the acknowledgement of quiescence. Providers
-retain tokens for work that ignores cancellation or is still in a `finally` block.
-
-| Race                                                | Required outcome                                                         |
-| --------------------------------------------------- | ------------------------------------------------------------------------ |
-| Cancel before backend-start job runs                | Record Cancelled and skip backend invocation                             |
-| Cancel during/after start, before hook installation | Record Cancelled; run hook when installed                                |
-| Success versus cancellation/timeout                 | First valid terminal transition wins; expired deadlines prevent success  |
-| Completion after cancellation/timeout               | Dispose payload; release producer lease only after actual cleanup        |
-| Consumer releases operation while work continues    | Producer lease prevents use-after-free                                   |
-| Provider loses its last token without completing    | Pending operation becomes Unavailable; no silent permanent Pending state |
-
-Logical cancellation may wake a consumer promptly while the provider is still cleaning up.
-The proposed admission slots and buffer reservations remain charged until work is quiescent; cancellation
-cannot be used to exceed resource limits by repeatedly starting replacements.
-
-## File and context shutdown (proposed)
-
-Read/seek operations share a cursor. Rust's mutable borrow serializes them; the C wrapper
-allows one outstanding cursor operation per file. An overlapping operation fails with
-`Unavailable` and the retry-safe bit. Pending close rejects new I/O. Immutable metadata
-queries can proceed separately where the provider supports them.
-
-A cancelled read or seek may have changed the cursor. The handle remains busy until its
-producer stops. Before reuse, a seekable handle requires a successful absolute seek;
-a non-seekable handle must be closed. Queued operations that never reached the backend
-have not changed the cursor. Rust adapters preserve this distinction internally.
-
-`file_close` cancels pending work, waits for quiescence, invokes provider close, and finishes
-only after cleanup completes. Repeated close joins the same cleanup; it does not invoke
-provider close twice. A close timeout leaves the file Closing. Another close can await the
-remaining cleanup. Final handle release schedules best-effort cleanup; explicit close is the
-observable guarantee. Read-handle close never publishes writes.
-
-`fs_close` rejects new filesystem work, drains its operations/files, then invokes the
-optional provider filesystem-close hook once. An open result attaches its file to that
-filesystem and must use the same context. Independently constructed file handles belong
-to their context directly. The filesystem hook closes provider-owned async clients;
-it never implicitly closes a caller-owned shared client. A missing hook means there
-are no provider-owned resources needing async cleanup.
-
-`context_close` rejects new work, cancels pending operations, closes its files and
-filesystems in that order, and drains producer leases and queued jobs. Its own close operation is excluded from the drain count.
-Control operations have reserved admission, so a full data queue cannot prevent cancellation
-or close. Repeated context close joins existing cleanup. A timed-out close does not authorize
-releasing resources still used by a foreign provider.
-
-The owner keeps its event loop driven through drain. The interpreter and provider code
-remain alive until drain completes and all foreign handles and callback references are released.
-A loop that rejects new jobs fails newly submitted backend work as Unavailable. Stopping a
-loop after it accepted jobs without executing/discarding them violates the dispatcher contract;
-fsspec retains outstanding leases rather than freeing live pointers. No runtime can guarantee
-cleanup progress after its owner has stopped driving it.
-
-## Deadlines and shared bounds
-
-Proposed context defaults are 64 admitted data operations, 64 MiB of accounted buffers, and
-8 MiB per read. Values must be positive and `max_read_size <= max_buffered_bytes`. All
-backends under a context share its budget, regardless of bucket or credential identity.
-Separate contexts have separate budgets but share the default runtime.
-
-Admission exhaustion returns retry-safe Unavailable before dispatch. An admitted operation
-waits asynchronously for byte capacity; the wait counts toward its deadline. Large reads
-are decomposed by callers or streaming adapters into bounded requests. One request above
-the context's read limit is InvalidArgument, with no allocation or backend I/O.
-
-Accounting covers copied arguments, fsspec-owned transport/output buffers, and queued
-results. Reserve capacity before allocation/dispatch, including copies at an ABI crossing.
-Count retained allocations, not just the lengths of slices sharing a larger allocation.
-Credit is released when memory is freed or the result is transferred to its consumer.
-Foreign producer buffers borrowed during completion remain provider-owned; the copied
-result is charged to fsspec. Foreign clients must bound their own buffering, and returning
-more bytes than requested is an error. Caller-retained results, provider allocations,
-independent backend caches, allocator overhead, and uninstrumented HTTP/codec internals
-are outside the context budget: it is not an RSS cap or a bound on arbitrary foreign code.
-A later shared buffer-allocation ABI would be needed to account for foreign allocations.
-
-Streaming has bounded prefetch and stops requesting more data when consumers stop reading.
-Early close cancels pending reads and drains their leases. Existing materializing
-`get_ranges` remains a collecting API; this proposal does not relabel it as streaming.
-
-Timeouts are durations from submission, measured by fsspec's monotonic clock, including
-queueing and dispatch. Zero expires without starting I/O; `UINT64_MAX` means no deadline.
-The producer can query remaining time without sharing clock epochs. Timeout records the
-Timeout kind, requests cancellation, and follows the same lease rules as explicit cancel.
-The future file wrapper can mark cancellation/timeouts before dispatch safe to retry.
-The implemented generic operation layer always marks its cancellation/timeouts unsafe to retry. After dispatch, cursor reads
-and relative seeks report `retry_safe=false` when their position is uncertain; callers
-recover position before submitting a new read. Metadata, immutable positioned reads,
-and idempotent close can report retry-safe errors. Future writes must define their own
-unknown-outcome rules.
-
-## Python asyncio binding (proposed)
-
-The binding captures an explicit loop, or `asyncio.get_running_loop()` at construction from
-an async context. It holds strong references to the loop and provider while work exists.
-It does not select a process-global loop or call `asyncio.run()` for each request.
-
-| C hook             | Python behavior                                                                                              |
-| ------------------ | ------------------------------------------------------------------------------------------------------------ |
-| Dispatcher `post`  | Acquire GIL; enqueue `job_run` with `loop.call_soon_threadsafe`; retain job wrapper until run/discard        |
-| Backend start      | On provider loop, create an asyncio Task for the backend coroutine; keep producer token through task cleanup |
-| Cancellation hook  | Dispatch `task.cancel` onto provider loop; do not mutate a Task from a worker thread                         |
-| Backend completion | Convert task result/exception and finish producer; cancellation is acknowledged only after coroutine cleanup |
-| Consumer readiness | On consumer loop, take result and settle its asyncio Future if still pending                                 |
-| Await cancelled    | Request native operation cancellation; preserve producer lifetime until cleanup finishes                     |
-| `aclose()`         | Await context/file drain while provider and consumer loops remain driven                                     |
-
-The adapter must register task cancellation and completion safely even with an eager task
-factory or a task already completed at registration. Consumer subscriptions capture the
-originating Python caller's `contextvars` context for readiness delivery. Python backend
-registration captures a provider context and copies it for each C-originated operation;
-arbitrary per-request Python context is not implicitly transported through C. Neither
-side inherits a native callback thread's context. Credentials remain explicit backend
-configuration. Callback exceptions are caught and translated to structured operation errors;
-Python exceptions and Rust panics never unwind across C. GIL acquisition alone does not
-make manipulating asyncio Futures from a foreign thread valid.
-
-A Python backend can therefore export its async files through C to a Rust consumer:
-Rust starts an operation, the registered dispatcher schedules the coroutine on Python's
-loop, and the producer resolves a Rust Future through completion notification. The inverse
-uses the managed Tokio backend and posts its completion onto the awaiting Python loop.
-These loops can be different and may run on different threads.
-
-The Python adapter must use an explicit closing state and retain accepted job wrappers;
-`call_soon_threadsafe` alone does not provide discard/drain accounting. `aclose()` disposes
-queued wrappers before loop shutdown. Closing somebody else's loop is never part of release.
-
-## Compatibility and acceptance
-
-New opaque handles, vtables, and symbols are additive. Existing file/fs vtables are not
-reinterpreted. New vtables start with `struct_size`/`abi_version`, use existing validation
-rules, and copy callback tables. Missing required callbacks fail construction; optional
-seek reports NotSupported. Required filesystem callbacks are info/open/release; close is optional for borrowed
-resources. Required
-file callbacks are read/info/close/release. Dispatcher post/release are required.
-
-Constructor success transfers the provider's one data reference; failure leaves it
-with the caller. Context and dispatcher arguments are borrowed and internally retained.
-Null options select defaults, including no operation deadline. Nonnull option structs
-must include all fields declared in this draft; invalid sizes or zero context limits
-are rejected before dispatch. Retain of null returns null; release/free of null is a
-no-op. Query and completion functions require valid nonnull handles. Typed completion
-entry points consume their token even when the payload is invalid or the result is late.
-
-New async APIs do not make synchronous `FsFile` calls on event-loop threads. Explicit
-blocking adapters, if added later, use a bounded shared executor and retain accounting until
-the blocking call ends. Async operations never wait synchronously for callbacks on their
-own event loop. Native async registration and lookup remain separate from the existing
-synchronous registry until an additive factory contract is implemented; a sync registry
-entry alone does not advertise async support.
-
-Implementation must pass these cases in Rust and through the built wheel's C ABI:
-
-- Two native S3 backends share the managed runtime and context budget; none creates a worker
-  pool per file/backend. An explicitly borrowed Tokio runtime remains caller-owned.
-- A Python asyncio backend serves a Rust consumer and a native Rust backend serves an asyncio
-  consumer. Heartbeats continue during delayed I/O and cancellation cleanup.
-- Provider loop and consumer loop differ; contextvars and callback thread identity are correct.
-- Complete-before-subscribe, cancellation-before-hook, synchronous completion, eager Python
-  tasks, completion-after-timeout, discarded dispatch jobs, and released consumer handles.
-- Start errors and asynchronous failures preserve kind, retry safety, and owned messages
-  despite unrelated errors on worker threads. Invalid pointers/options fail before dispatch.
-- Slow consumers, oversized requests, retained slices, ABI copies, repeated cancelled requests,
-  and pending cleanup cannot exceed the declared accounting budget.
-- Same-handle cursor races, cancelled seek/read recovery, repeated close, close timeout, and
-  context close with a saturated data queue. Cleanup never implicitly commits.
-- Provider/loop shutdown rejects new work and drains accepted work; callbacks and finalizers
-  cannot use an unloaded module or finalized Python interpreter.
-- Unchanged synchronous suites, C/C++ header compilation, direct Rust builds, shared-library
-  wheels, and the no-default-features core/WASM build.
-
-Operation/producer lifetimes, managed and foreign callback dispatch, Rust Future
-wrappers, and the asyncio integration fixture are implemented. Next add async file
-handles with shared admission/byte budgets and drainable close, then native S3
-reads over that boundary.
+Success, failure, cancellation, and timeout compete for one terminal transition.
+An expired deadline prevents success even if its timer has not run yet. Late
+completions consume their payload and producer reference without replacing the
+recorded result. Dropping the final producer without completing pending work
+records `Unavailable`.
+
+Readiness does not imply cleanup. `is_quiescent()` reports release of the last
+producer reference. `drain()` waits for producers, accepted callback jobs, and
+handle accounting cleanup. `drain_operation()` returns a unit operation for the
+same wait. Neither takes the source result. A retained, untaken byte result keeps
+its buffer reservation even after work drains.
+
+Each producer reference is a cleanup lease. Retain one when publishing an early
+result while I/O or a coroutine's `finally` block still uses resources. Cancellation
+may wake the consumer immediately but does not free those resources or permit
+replacement work to exceed the context limits.
+
+## C ABI
+
+Implemented declarations are installed in `fsspec.h`. New handles and vtables are
+independent of the synchronous registry. Registering a sync filesystem does not
+advertise native async support.
+
+| Function family                                                        | Behavior                                                                                                                                                 |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fsspec_async_context_create`                                          | Construct a budget context; null options select defaults.                                                                                                |
+| `fsspec_async_fs_from_vtable`, `fsspec_async_file_from_vtable`         | Copy a versioned vtable and retain a required context and optional dispatcher. Null dispatcher selects managed dispatch.                                 |
+| `fsspec_async_fs_open_read`, `fsspec_async_fs_info`                    | Copy the path and start an operation.                                                                                                                    |
+| `fsspec_async_file_read`, `seek`, `info`                               | Start cursor or metadata operations. Seek whence is 0 start, 1 current, 2 end; negative start offsets are invalid.                                       |
+| `fsspec_async_file_close`, `fs_close`, `context_close`                 | Start or join cleanup without consuming the handle. Control operations bypass data admission limits.                                                     |
+| `fsspec_operation_create`                                              | Construct an independent observer/producer pair without a context budget.                                                                                |
+| `fsspec_operation_state`, `take`                                       | States: 0 pending, 1 ready, 2 taken. Transfer one owned result. Pending/taken is Invalid.                                                                |
+| `fsspec_operation_subscribe`                                           | Install one notification, including after completion; null dispatcher uses managed dispatch.                                                             |
+| `fsspec_operation_cancel`, `is_quiescent`, `drain`                     | Request cancellation, inspect producer cleanup, or return a unit operation waiting for complete drain.                                                   |
+| `fsspec_completion_on_cancel`                                          | Register one cancellation hook, including after cancellation occurred.                                                                                   |
+| `fsspec_completion_unit`, `bytes`, `info`, `file`, `position`, `error` | Complete and consume one producer reference, including late or invalid completion. Bytes, metadata, and error text are copied; file ownership transfers. |
+| `fsspec_async_result_kind`                                             | 0 unit, 1 bytes, 2 info, 3 file, 4 position; `UINT32_MAX` error.                                                                                         |
+| `fsspec_async_result_error`, `bytes`                                   | Borrow data until result free; never free those borrowed pointers.                                                                                       |
+| `fsspec_async_result_take_info`, `take_file`                           | Move payload out once and leave a unit result. Free metadata with `fsspec_file_info_free`; release files with `fsspec_async_file_release`.               |
+| `fsspec_async_result_position`                                         | Copy a successful position value.                                                                                                                        |
+
+Filesystem callbacks `info`, `open_read`, and `release` are required; `close` is
+optional for borrowed clients. File callbacks `read`, `info`, `close`, and `release`
+are required; missing `seek` returns `NotSupported`. C start offsets above
+`INT64_MAX` are unsupported. All callbacks must return promptly and never unwind.
+
+Constructors take one provider `data` reference only on success. On failure,
+ownership remains with the caller. Start errors and asynchronous results use owned
+status/message errors, never thread-local last-error state. Optional `out_error`
+is set to null on success or an owned error on failure; other outputs are unchanged
+on failure. Free prior errors before reusing an error slot. Retain of null returns
+null; release/free of null is a no-op. Query functions require live nonnull handles.
+
+## Runtime and dispatcher ownership
+
+Native coordination, callback defaults, and deadlines share one lazy, process-owned
+Tokio runtime with the object-store bridge: two async workers and up to eight
+blocking workers. Constructing a context or file does not create a worker pool.
+Current synchronous `S3Fs` still has its existing runtime behavior.
+
+A foreign dispatcher schedules callback jobs on a caller-owned event loop. Python
+coroutines use that loop's I/O facilities; Tokio futures need their native runtime
+and reactor. No Python loop object, Rust future, or Tokio handle crosses C. Finite
+deadlines still use the managed runtime when callbacks use a foreign dispatcher.
+Selecting a borrowed Tokio runtime for native coordination is not implemented yet.
+
+`post(data, job, out_error)` may run on any thread. It must not execute the job on
+the submitting stack. Another thread may execute it before `post` returns.
+
+| Post result | Ownership                                                                                    |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| Success     | Dispatcher owns the job and must call exactly one of `fsspec_dispatch_job_run` or `discard`. |
+| Failure     | Dispatcher has neither run nor retained the job; library retains ownership.                  |
+
+Accepted jobs retain their dispatcher until execution/discard. Closing a dispatcher
+rejects new posts and runs or discards accepted jobs. Rejected/discarded starts fail
+as `Unavailable`. Discarding a readiness notification preserves its recorded result;
+discarding cancellation does not prove I/O stopped. There is no fallback to an
+arbitrary thread after a caller-owned dispatcher rejects work.
+
+Provider and callback `release(data)` functions may run on any thread and must be
+thread-safe and nonblocking. Loop-affine cleanup belongs in `close`. Python release
+trampolines acquire the GIL while the interpreter is alive. Keep loops driven and
+all callback code loaded until operations drain and references are released.
+
+## Limits and backpressure
+
+Context defaults are 64 admitted operations, 64 MiB of data buffers, and 8 MiB per
+read/metadata result. Limits must be positive, with read limit no greater than the
+context byte limit. All handles in a context share limits.
+
+Admission exhaustion returns retry-safe `Unavailable` before dispatch. An admitted
+file read or metadata request waits asynchronously for byte capacity; that wait
+counts toward its deadline. Paths must be copied before a C start returns, so
+filesystem `open_read` and `info` reserve their argument and maximum result capacity
+up front. If capacity is unavailable, these starts return retry-safe `Unavailable`
+instead of retaining unaccounted path data while waiting. Oversized requests fail
+as Invalid before allocation or dispatch.
+
+Reservations cover copied paths and retained byte/metadata string buffers. A read
+reserves its requested size; metadata reserves the context's read limit. Native
+`Vec` and `String` capacities, including unused capacity, must fit the reservation.
+C byte/metadata inputs are checked before copying. Reservations remain until both
+producer cleanup and result transfer/disposal; errors release unused result capacity
+once producers stop. Caller-owned returned data and foreign provider allocations
+are outside the budget.
+
+Diagnostics have a separate 4096-byte UTF-8 text limit. Oversized provider errors are
+truncated at a character boundary while preserving error kind and retry safety.
+Diagnostics, handle/control structures, metadata map overhead, allocator overhead,
+and uninstrumented provider/HTTP buffers are outside the data-byte budget. These
+limits are not an RSS cap. Providers must bound their own buffering.
+
+Timeouts use relative monotonic nanoseconds. Zero expires immediately;
+`UINT64_MAX` means no deadline. A producer can query remaining time without sharing
+clock epochs. Cancellation/timeouts are conservatively unsafe to retry. Provider
+errors preserve their retry-safe flag, except unknown outcomes are never safe to
+retry. Writes require a separate async publication contract.
+
+## Cursor and shutdown behavior
+
+One read/seek can use a file cursor at a time. Metadata can run separately. Raw
+operation calls report retry-safe `Unavailable` when a previous cursor operation
+has not stopped. Failed or cancelled dispatched cursor operations require an
+absolute seek before reuse; a non-seekable file must be closed. Cancellation before
+provider invocation does not invalidate the cursor.
+
+Files retain their context; files returned by `open_read` also retain their parent
+filesystem. Releasing the caller's context or filesystem reference does not close
+these dependents. The final file reference schedules best-effort close; use explicit
+close to observe cleanup and failures. Dropping an untaken file result also releases
+its file reference.
+
+File close rejects new I/O, cancels existing operations, drains producers and
+accepted jobs, and invokes provider close. Filesystem close drains its open/info
+operations, closes its children, then closes its provider client. Context close
+rejects new work and joins cleanup for its resources. Provider close itself must
+retain its completion until resource cleanup is finished.
+
+Repeated close calls join a pending cleanup or reuse successful cleanup. A close
+waiter's cancellation/timeout does not stop cleanup; another close can await it.
+A failed provider close can be retried, while the handle remains closed to new I/O.
+Read-only cleanup never commits writes. Closing cannot guarantee progress after
+an event-loop owner stops driving its loop.
+
+## Integration coverage and remaining native work
+
+The ctypes fixtures in `test_async_capi.py` and `test_async_files.py` exercise
+managed notification threads, caller-owned asyncio providers, read/seek/metadata,
+parent close ordering, cancelled coroutine cleanup, shared limits, and final release.
+Rust tests cover retained producer leases, result capacities, cursor recovery, close
+retries, dispatcher rejection/discard, and safe futures through C. These fixtures
+are not a public Python async filesystem implementation.
+
+Native S3 is next. The {download}`draft header <../proposals/async-io.h>` contains
+only its proposed constructor. Native opened readers will pin a validator and check
+subsequent reads, so replacing an object fails instead of mixing versions. Shared
+budgets and runtime ownership must also apply to native transport/prefetch buffers.
+Async scan integration and context-aware Python wrappers can then use those handles.
 
 The execution rules are grounded in Python's
 [thread-safe asyncio scheduling](https://docs.python.org/3/library/asyncio-dev.html#concurrency-and-multithreading)
