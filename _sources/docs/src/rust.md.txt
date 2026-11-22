@@ -228,6 +228,11 @@ fn chunks(fs: &dyn FileSystem, path: &str) -> Result<Vec<Vec<u8>>, OperationErro
 primitive methods return futures, and its default helpers are `async fn`s.
 `LocalFs` and `S3Fs` implement only the synchronous `FileSystem` trait.
 
+`AsyncFileSystem::open` currently returns a blocking `FsFile`; awaiting open does not
+make subsequent reads asynchronous. The [async I/O contract](async-io.md) provides
+operation futures and managed/foreign callback dispatch in `fsspec_rs::async_io`, plus Rust futures over the shared library
+in `fsspec_sys::async_io`. Async file handles and shared byte budgets remain proposed.
+
 The default async implementation avoids recursive async futures in `walk()` by
 using an explicit stack. Method semantics otherwise match `FileSystem`.
 

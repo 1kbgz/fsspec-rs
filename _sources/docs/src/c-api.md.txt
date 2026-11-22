@@ -278,6 +278,13 @@ Range ordering, consistency and request limits follow the
 | `fsspec_file_commit(file)`, `fsspec_file_discard(file)` | Commits or discards a transactional write.                                                                                                       |
 | `fsspec_file_close(file)`                               | Flushes, commits, and frees the handle. After commit or discard, it only frees. Failures discard pending writes before freeing. Null is ignored. |
 
+## Async operations and dispatch
+
+The [async I/O contract](async-io.md) documents operation/producer handles, managed
+and foreign event-loop dispatch, owned results/errors, cancellation, and deadlines.
+These symbols are exported in `fsspec.h`. Async filesystem/file handles and shared
+byte budgets remain proposed; their draft declarations are not exported.
+
 ## Foreign backends
 
 `fsspec_fs_from_vtable(vtable, data)` wraps an implementation written outside

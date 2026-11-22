@@ -113,6 +113,11 @@
     </a>
   </li>
   <li class="fd-tree-item">
+    <a class="fd-link" href="async-io.html">
+      <span class="fd-link-text">Async I/O and execution contexts</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
     <a class="fd-link" href="api.html">
       <span class="fd-link-text">API reference</span>
     </a>
@@ -489,6 +494,10 @@ methods or integrate Parquet decoding.</p>
 <p><code class="docutils literal notranslate"><span class="pre">AsyncFileSystem</span></code> is the experimental async version of <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code>. Its
 primitive methods return futures, and its default helpers are <code class="docutils literal notranslate"><span class="pre">async</span> <span class="pre">fn</span></code>s.
 <code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> and <code class="docutils literal notranslate"><span class="pre">S3Fs</span></code> implement only the synchronous <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> trait.</p>
+<p><code class="docutils literal notranslate"><span class="pre">AsyncFileSystem::open</span></code> currently returns a blocking <code class="docutils literal notranslate"><span class="pre">FsFile</span></code>; awaiting open does not
+make subsequent reads asynchronous. The <a class="reference internal" href="async-io.html"><span class="std std-doc">async I/O contract</span></a> provides
+operation futures and managed/foreign callback dispatch in <code class="docutils literal notranslate"><span class="pre">fsspec_rs::async_io</span></code>, plus Rust futures over the shared library
+in <code class="docutils literal notranslate"><span class="pre">fsspec_sys::async_io</span></code>. Async file handles and shared byte budgets remain proposed.</p>
 <p>The default async implementation avoids recursive async futures in <code class="docutils literal notranslate"><span class="pre">walk()</span></code> by
 using an explicit stack. Method semantics otherwise match <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code>.</p>
 </section>

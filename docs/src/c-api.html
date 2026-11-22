@@ -27,7 +27,7 @@
     <script src="../../_static/js/custom.js?v=956e5d78"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="API reference" href="api.html" />
+    <link rel="next" title="Async I/O and execution contexts" href="async-io.html" />
     <link rel="prev" title="Rust traits and types" href="rust.html" />
     <script>
       (function () {
@@ -113,6 +113,11 @@
     </a>
   </li>
   <li class="fd-tree-item">
+    <a class="fd-link" href="async-io.html">
+      <span class="fd-link-text">Async I/O and execution contexts</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
     <a class="fd-link" href="api.html">
       <span class="fd-link-text">API reference</span>
     </a>
@@ -175,6 +180,9 @@
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#id1">Files</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#async-operations-and-dispatch">Async operations and dispatch</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#foreign-backends">Foreign backends</a>
@@ -696,6 +704,13 @@ the new symbols require an updated library.</p>
 </tbody>
 </table>
 </section>
+<section id="async-operations-and-dispatch">
+<h2>Async operations and dispatch<a class="headerlink" href="#async-operations-and-dispatch" title="Link to this heading">¶</a></h2>
+<p>The <a class="reference internal" href="async-io.html"><span class="std std-doc">async I/O contract</span></a> documents operation/producer handles, managed
+and foreign event-loop dispatch, owned results/errors, cancellation, and deadlines.
+These symbols are exported in <code class="docutils literal notranslate"><span class="pre">fsspec.h</span></code>. Async filesystem/file handles and shared
+byte budgets remain proposed; their draft declarations are not exported.</p>
+</section>
 <section id="foreign-backends">
 <h2>Foreign backends<a class="headerlink" href="#foreign-backends" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">fsspec_fs_from_vtable(vtable,</span> <span class="pre">data)</span></code> wraps an implementation written outside
@@ -792,10 +807,10 @@ registry state.</p>
       <span class="fd-pagination-title">Rust traits and types</span>
     </span>
   </a>
-  <a class="fd-pagination-card fd-pagination-next" href="api.html" title="Next: API reference">
+  <a class="fd-pagination-card fd-pagination-next" href="async-io.html" title="Next: Async I/O and execution contexts">
     <span class="fd-pagination-text">
       <span class="fd-pagination-label">Next</span>
-      <span class="fd-pagination-title">API reference</span>
+      <span class="fd-pagination-title">Async I/O and execution contexts</span>
     </span>
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="m9 18 6-6-6-6"/></svg>
   </a>
@@ -847,6 +862,9 @@ registry state.</p>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#id1">Files</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#async-operations-and-dispatch">Async operations and dispatch</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#foreign-backends">Foreign backends</a>
