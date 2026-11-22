@@ -55,6 +55,49 @@ pub const FSSPEC_RETRY_SAFE: fsspec_operation_status = 0x10000;
 pub const FSSPEC_CONDITION_MATCH: u32 = 1;
 pub const FSSPEC_CONDITION_MISSING: u32 = 2;
 
+/// Opaque async handles. Retain/release through the matching library functions.
+pub struct fsspec_dispatcher {
+    _private: [u8; 0],
+}
+pub struct fsspec_dispatch_job {
+    _private: [u8; 0],
+}
+pub struct fsspec_operation {
+    _private: [u8; 0],
+}
+pub struct fsspec_completion {
+    _private: [u8; 0],
+}
+pub struct fsspec_async_result {
+    _private: [u8; 0],
+}
+
+/// Owned error; free with fsspec_async_error_free. Never uses thread-local state.
+#[repr(C)]
+pub struct fsspec_async_error {
+    pub status: fsspec_operation_status,
+    pub message: fsspec_string,
+}
+
+/// Thread-safe nonblocking dispatch. Successful post takes the job and must run
+/// or discard it exactly once, never inline on the submitting stack. Failed post
+/// leaves ownership with libfsspec. release may run on any thread. Callbacks must
+/// not unwind. Initialize struct_size and abi_version; both callbacks required.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct fsspec_dispatcher_vtable {
+    pub struct_size: usize,
+    pub abi_version: u32,
+    pub post: Option<
+        unsafe extern "C" fn(
+            *mut c_void,
+            *mut fsspec_dispatch_job,
+            *mut *mut fsspec_async_error,
+        ) -> fsspec_operation_status,
+    >,
+    pub release: Option<unsafe extern "C" fn(*mut c_void)>,
+}
+
 /// Opaque object validator. Both strings null means no validator in a result.
 /// Input strings are borrowed; result strings are owned by the result.
 #[repr(C)]

@@ -7,6 +7,8 @@
 //! in pure Rust, with the same "implement a few primitives, get everything
 //! else for free" design pattern as fsspec.
 
+#[cfg(feature = "async")]
+pub mod async_io;
 pub mod buffered;
 pub mod caching;
 pub mod error;
@@ -21,6 +23,8 @@ mod fs;
 mod local;
 mod memory;
 mod ranges;
+#[cfg(feature = "async")]
+mod runtime;
 #[cfg(feature = "s3")]
 mod s3;
 #[cfg(feature = "s3")]

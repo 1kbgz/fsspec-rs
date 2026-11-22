@@ -285,6 +285,7 @@ pages = [
     "docs/src/filesystems.md",
     "docs/src/rust.md",
     "docs/src/c-api.md",
+    "docs/src/async-io.md",
     "docs/src/api.md",
     "docs/src/explanation.md",
 ]
