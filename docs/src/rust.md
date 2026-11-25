@@ -278,6 +278,45 @@ single-letter forms. `OpenOptions::default()` uses a 4 MiB block size,
 `LocalFs::new()` starts with `auto_mkdir = false`. `LocalFs::with_auto_mkdir(true)` creates missing parent directories during
 write, append, exclusive-create, and copy operations.
 
+## Browser WebAssembly
+
+The core crate supports `wasm32-unknown-unknown` with `default-features = false`.
+The `async`, `object-store`, and `s3` features enable native runtime adapters and are
+not browser features. `AsyncFileSystem`, `AsyncFsFile`, and `IoFuture` are available
+without them. Browser backends use their own JavaScript executor, such as
+`wasm_bindgen_futures::spawn_local`, and await promises with `JsFuture`.
+
+On this target, filesystem factories, shared filesystems, files, cache callbacks,
+and I/O futures may own browser-local values. `platform::MaybeSend` and
+`platform::MaybeSync` impose no thread bounds. They do not make those values safe
+to transfer between workers. Other targets, including Emscripten, retain the
+existing `Send`/`Sync` requirements.
+
+`register_filesystem`, `set_fallback_filesystem`, and `url_to_fs` use a default
+registry local to the current browser thread. Direct access to
+`DEFAULT_FILESYSTEMS` uses `.with(|registry| ...)` on browser WASM; native targets
+retain the process-wide `LazyLock<RwLock<FilesystemRegistry>>`. Factory calls run
+outside registry locks, so a factory can register another backend.
+
+The registry accepts synchronous factories and `FileSystem` implementations.
+Browser applications must acquire permission or directory handles asynchronously
+before registering a factory that captures them. An async-only backend implements
+`AsyncFileSystem` directly; it is not automatically exposed through the synchronous
+registry. Its `open_async` returns an `AsyncFsFile` for asynchronous reads. Helpers
+such as `cat_file` still use the legacy `open`/`FsFile` contract unless overridden.
+
+The core has no built-in `opfs://` protocol. A separate backend can own OPFS
+handles through these traits. OPFS synchronous access handles require a dedicated
+worker; blocking the browser main thread to wait for a promise is unsupported.
+`LocalFs` does not provide browser disk access. `MemoryFs` works in WASM and omits
+timestamps because `std::time::SystemTime::now()` is unavailable on this target.
+
+`make -C rust test-wasm` exercises memory storage, local callbacks, and registry
+reentrancy in Node. `make -C rust test-browser` runs a real OPFS read/seek/close
+fixture in a headless browser. Browser tests require a compatible Chrome and
+ChromeDriver on `PATH`, or a `CHROMEDRIVER` path. Both targets install the
+`wasm-bindgen` test runner version from `Cargo.lock`.
+
 ## S3Fs
 
 `S3Fs` wraps `object_store::aws::AmazonS3` and runs its async calls through an

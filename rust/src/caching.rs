@@ -23,7 +23,11 @@ use crate::error::FsResult;
 // ============================================================================
 
 /// A function that retrieves the byte range `[start, end)` from the backend.
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 pub type Fetcher = Box<dyn FnMut(u64, u64) -> FsResult<Vec<u8>> + Send>;
+/// A range fetcher that may capture browser-local handles.
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+pub type Fetcher = Box<dyn FnMut(u64, u64) -> FsResult<Vec<u8>>>;
 
 // ============================================================================
 // CacheType enum
@@ -83,7 +87,7 @@ impl FromStr for CacheType {
 // ============================================================================
 
 /// A read cache that wraps a `Fetcher`.
-pub trait Cache: Send {
+pub trait Cache: crate::platform::MaybeSend {
     /// Fetch the byte range `[start, end)`.
     ///
     /// The cache decides whether to call the underlying fetcher or

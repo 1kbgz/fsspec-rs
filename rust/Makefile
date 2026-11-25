@@ -23,7 +23,7 @@ fix:  ## fix code with rustfmt
 #alias
 format: fix
 
-.PHONY: check checks check-wasm test-wasm
+.PHONY: check checks check-wasm wasm-test-tools test-wasm test-browser
 check:
 	cargo check --workspace --all-features
 # alias
@@ -33,11 +33,17 @@ check-wasm:  ## check that the core crate builds for wasm32 without the s3 featu
 	rustup target add wasm32-unknown-unknown
 	RUSTFLAGS="-D warnings" cargo check -p fsspec_rs --no-default-features --target wasm32-unknown-unknown
 
-test-wasm:  ## run the core crate's wasm32 tests in Node, without the s3 feature
+wasm-test-tools:  ## install the runner matching Cargo.lock
 	rustup target add wasm32-unknown-unknown
-	cargo install wasm-bindgen-cli --locked --version $$(cargo pkgid wasm-bindgen | sed 's/.*@//')
+	cargo install wasm-bindgen-cli --locked --target-dir target/wasm-tools --version $$(cargo pkgid wasm-bindgen | sed 's/.*@//')
+
+test-wasm: wasm-test-tools  ## run core tests in Node without native runtime features
 	CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER=wasm-bindgen-test-runner \
 		cargo test -p fsspec_rs --no-default-features --target wasm32-unknown-unknown --test wasm
+
+test-browser: wasm-test-tools  ## run OPFS integration in headless Chrome (requires chromedriver)
+	CHROMEDRIVER="$${CHROMEDRIVER:-chromedriver}" CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER=wasm-bindgen-test-runner \
+		cargo test -p fsspec_rs --no-default-features --target wasm32-unknown-unknown --test browser
 
 .PHONY: test tests test-ci tests-ci
 test:  ## run the tests

@@ -7,7 +7,7 @@ use crate::types::FileInfo;
 ///
 /// Mirrors fsspec's `AbstractBufferedFile` — backends implement
 /// the raw I/O methods and get buffered read/write for free.
-pub trait FsFile: Read + Write + Seek + Send {
+pub trait FsFile: Read + Write + Seek + crate::platform::MaybeSend {
     /// Return metadata about the open file.
     fn info(&self) -> FsResult<FileInfo>;
 

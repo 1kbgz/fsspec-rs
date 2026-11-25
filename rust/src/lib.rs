@@ -17,6 +17,7 @@ pub mod error;
 pub mod file;
 #[cfg(feature = "object-store")]
 pub mod object_store_bridge;
+pub mod platform;
 pub mod registry;
 pub mod types;
 

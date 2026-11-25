@@ -3,24 +3,31 @@
 //! backend crates export a factory and applications register it.
 
 use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, LazyLock, Mutex, OnceLock, PoisonError, RwLock};
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+use std::sync::LazyLock;
+use std::sync::{Arc, Mutex, OnceLock, PoisonError, RwLock};
 
 use crate::error::{FsError, FsResult};
 use crate::fs::FileSystem;
 use crate::local::LocalFs;
 use crate::memory::MemoryFs;
+use crate::platform::{MaybeSend, MaybeSync};
 #[cfg(feature = "s3")]
 use crate::s3::{S3ClientOptions, S3Config, S3Fs};
 
 /// A filesystem shared between callers.
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 pub type SharedFileSystem = Arc<dyn FileSystem + Send + Sync>;
+/// A filesystem shared by callers on one browser thread; not transferable between workers.
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+pub type SharedFileSystem = Arc<dyn FileSystem>;
 
 /// String storage options for one filesystem, like the keyword arguments of
 /// `fsspec.filesystem`.
 pub type FsOptions = BTreeMap<String, String>;
 
 /// Builds filesystems for one protocol.
-pub trait FilesystemFactory: Send + Sync {
+pub trait FilesystemFactory: MaybeSend + MaybeSync {
     /// Builds a filesystem for `path`, the URL without its `protocol://` prefix.
     fn create(&self, path: &str, options: &FsOptions) -> FsResult<SharedFileSystem>;
 
@@ -33,7 +40,7 @@ pub trait FilesystemFactory: Send + Sync {
 
 impl<F> FilesystemFactory for F
 where
-    F: Fn(&str, &FsOptions) -> FsResult<SharedFileSystem> + Send + Sync,
+    F: Fn(&str, &FsOptions) -> FsResult<SharedFileSystem> + MaybeSend + MaybeSync,
 {
     fn create(&self, path: &str, options: &FsOptions) -> FsResult<SharedFileSystem> {
         self(path, options)
@@ -236,8 +243,27 @@ impl FilesystemRegistry {
 }
 
 /// The process-wide registry used by [`register_filesystem`] and [`url_to_fs`].
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 pub static DEFAULT_FILESYSTEMS: LazyLock<RwLock<FilesystemRegistry>> =
     LazyLock::new(|| RwLock::new(FilesystemRegistry::default()));
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+thread_local! {
+    /// The default registry for this browser thread. Factories run outside its locks.
+    pub static DEFAULT_FILESYSTEMS: RwLock<FilesystemRegistry> =
+        RwLock::new(FilesystemRegistry::default());
+}
+
+fn with_default_registry<T>(f: impl FnOnce(&RwLock<FilesystemRegistry>) -> T) -> T {
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    {
+        DEFAULT_FILESYSTEMS.with(f)
+    }
+    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+    {
+        f(&DEFAULT_FILESYSTEMS)
+    }
+}
 
 /// Routes [`register_filesystem`] and [`url_to_fs`] to another registry, such as the
 /// one inside a shared `libfsspec`, so every crate in the process that only knows
@@ -265,10 +291,12 @@ pub fn try_register_filesystem<F: FilesystemFactory + 'static>(
     match HOOKS.get() {
         Some(hooks) => (hooks.register)(protocol, Box::new(factory)),
         None => {
-            DEFAULT_FILESYSTEMS
-                .write()
-                .unwrap_or_else(PoisonError::into_inner)
-                .register(protocol, factory);
+            with_default_registry(|registry| {
+                registry
+                    .write()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .register(protocol, factory);
+            });
             Ok(())
         }
     }
@@ -291,10 +319,12 @@ pub fn set_fallback_filesystem<F: FilesystemFactory + 'static>(factory: Option<F
             factory.map(|factory| Box::new(factory) as Box<dyn FilesystemFactory>),
         ),
         None => {
-            DEFAULT_FILESYSTEMS
-                .write()
-                .unwrap_or_else(PoisonError::into_inner)
-                .set_fallback(factory);
+            with_default_registry(|registry| {
+                registry
+                    .write()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .set_fallback(factory);
+            });
             Ok(())
         }
     }
@@ -306,7 +336,7 @@ pub fn url_to_fs(url: &str, options: &FsOptions) -> FsResult<(SharedFileSystem, 
     if let Some(hooks) = HOOKS.get() {
         return (hooks.url_to_fs)(url, options);
     }
-    FilesystemRegistry::url_to_fs_shared(&DEFAULT_FILESYSTEMS, url, options)
+    with_default_registry(|registry| FilesystemRegistry::url_to_fs_shared(registry, url, options))
 }
 
 fn split_protocol(url: &str) -> FsResult<(&str, &str)> {

@@ -3,15 +3,22 @@ use std::collections::HashMap;
 use crate::error::{FsError, FsResult};
 use crate::file::FsFile;
 use crate::fs::byte_range;
+use crate::platform::{MaybeSend, MaybeSync};
 use crate::types::{DuResult, FileInfo, FileType, OpenMode, OpenOptions, WalkEntry};
 
 /// Owned-buffer asynchronous file operations. Backends keep cleanup resources
 /// alive when a returned future is dropped. Close never publishes a write.
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 pub type IoFuture<'a, T> = std::pin::Pin<
     Box<dyn std::future::Future<Output = Result<T, crate::OperationError>> + Send + 'a>,
 >;
 
-pub trait AsyncFsFile: Send + Sync {
+/// A future polled on the browser thread that owns its JavaScript handles.
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+pub type IoFuture<'a, T> =
+    std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, crate::OperationError>> + 'a>>;
+
+pub trait AsyncFsFile: MaybeSend + MaybeSync {
     fn read(&mut self, max_bytes: usize) -> IoFuture<'_, Vec<u8>>;
     fn seek(&mut self, position: std::io::SeekFrom) -> IoFuture<'_, u64>;
     fn info(&self) -> IoFuture<'_, FileInfo>;
@@ -26,7 +33,7 @@ pub trait AsyncFsFile: Send + Sync {
 /// async operations for free via default implementations, exactly like
 /// fsspec's `AsyncFileSystem`.
 #[allow(async_fn_in_trait)]
-pub trait AsyncFileSystem: Send + Sync {
+pub trait AsyncFileSystem: MaybeSend + MaybeSync {
     /// Protocol name(s) this filesystem handles.
     fn protocol(&self) -> &[&str];
 
@@ -49,17 +56,17 @@ pub trait AsyncFileSystem: Send + Sync {
         &self,
         path: &str,
         detail: bool,
-    ) -> impl std::future::Future<Output = FsResult<Vec<FileInfo>>> + Send;
+    ) -> impl std::future::Future<Output = FsResult<Vec<FileInfo>>> + MaybeSend;
 
     /// Delete a single file.
-    fn rm_file(&self, path: &str) -> impl std::future::Future<Output = FsResult<()>> + Send;
+    fn rm_file(&self, path: &str) -> impl std::future::Future<Output = FsResult<()>> + MaybeSend;
 
     /// Copy a single file within this filesystem.
     fn cp_file(
         &self,
         src: &str,
         dst: &str,
-    ) -> impl std::future::Future<Output = FsResult<()>> + Send;
+    ) -> impl std::future::Future<Output = FsResult<()>> + MaybeSend;
 
     /// Open a file and return a file-like object.
     fn open(
@@ -67,14 +74,14 @@ pub trait AsyncFileSystem: Send + Sync {
         path: &str,
         mode: OpenMode,
         opts: Option<OpenOptions>,
-    ) -> impl std::future::Future<Output = FsResult<Box<dyn FsFile>>> + Send;
+    ) -> impl std::future::Future<Output = FsResult<Box<dyn FsFile>>> + MaybeSend;
 
     /// Open a read-only, genuinely asynchronous handle. Legacy `open` still
     /// returns a blocking FsFile. Sync-only backends do not gain async support.
     fn open_async(
         &self,
         _path: &str,
-    ) -> impl std::future::Future<Output = Result<Box<dyn AsyncFsFile>, crate::OperationError>> + Send
+    ) -> impl std::future::Future<Output = Result<Box<dyn AsyncFsFile>, crate::OperationError>> + MaybeSend
     {
         async { Err(FsError::NotSupported("async file handles unavailable".into()).into()) }
     }
@@ -82,22 +89,23 @@ pub trait AsyncFileSystem: Send + Sync {
     /// Close backend-owned asynchronous resources; borrowed resources need no cleanup.
     fn close_async(
         &self,
-    ) -> impl std::future::Future<Output = Result<(), crate::OperationError>> + Send {
+    ) -> impl std::future::Future<Output = Result<(), crate::OperationError>> + MaybeSend {
         async { Ok(()) }
     }
 
     /// Return metadata about a single path.
-    fn info(&self, path: &str) -> impl std::future::Future<Output = FsResult<FileInfo>> + Send;
+    fn info(&self, path: &str)
+        -> impl std::future::Future<Output = FsResult<FileInfo>> + MaybeSend;
 
     /// Create a directory.
     fn mkdir(
         &self,
         path: &str,
         create_parents: bool,
-    ) -> impl std::future::Future<Output = FsResult<()>> + Send;
+    ) -> impl std::future::Future<Output = FsResult<()>> + MaybeSend;
 
     /// Remove an empty directory.
-    fn rmdir(&self, path: &str) -> impl std::future::Future<Output = FsResult<()>> + Send;
+    fn rmdir(&self, path: &str) -> impl std::future::Future<Output = FsResult<()>> + MaybeSend;
 
     // ---------------------------------------------------------------
     // Concrete methods — default implementations built on primitives
