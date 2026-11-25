@@ -173,6 +173,9 @@
     <a href="#localfs">LocalFs</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
+    <a href="#browser-webassembly">Browser WebAssembly</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
     <a href="#s3fs">S3Fs</a>
   </li>
   <li class="fd-toc-item" data-depth="2">
@@ -538,6 +541,40 @@ single-letter forms. <code class="docutils literal notranslate"><span class="pre
 <p><code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> uses <code class="docutils literal notranslate"><span class="pre">std::fs</span></code> and implements <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code>.</p>
 <p><code class="docutils literal notranslate"><span class="pre">LocalFs::new()</span></code> starts with <code class="docutils literal notranslate"><span class="pre">auto_mkdir</span> <span class="pre">=</span> <span class="pre">false</span></code>. <code class="docutils literal notranslate"><span class="pre">LocalFs::with_auto_mkdir(true)</span></code> creates missing parent directories during
 write, append, exclusive-create, and copy operations.</p>
+</section>
+<section id="browser-webassembly">
+<h2>Browser WebAssembly<a class="headerlink" href="#browser-webassembly" title="Link to this heading">¶</a></h2>
+<p>The core crate supports <code class="docutils literal notranslate"><span class="pre">wasm32-unknown-unknown</span></code> with <code class="docutils literal notranslate"><span class="pre">default-features</span> <span class="pre">=</span> <span class="pre">false</span></code>.
+The <code class="docutils literal notranslate"><span class="pre">async</span></code>, <code class="docutils literal notranslate"><span class="pre">object-store</span></code>, and <code class="docutils literal notranslate"><span class="pre">s3</span></code> features enable native runtime adapters and are
+not browser features. <code class="docutils literal notranslate"><span class="pre">AsyncFileSystem</span></code>, <code class="docutils literal notranslate"><span class="pre">AsyncFsFile</span></code>, and <code class="docutils literal notranslate"><span class="pre">IoFuture</span></code> are available
+without them. Browser backends use their own JavaScript executor, such as
+<code class="docutils literal notranslate"><span class="pre">wasm_bindgen_futures::spawn_local</span></code>, and await promises with <code class="docutils literal notranslate"><span class="pre">JsFuture</span></code>.</p>
+<p>On this target, filesystem factories, shared filesystems, files, cache callbacks,
+and I/O futures may own browser-local values. <code class="docutils literal notranslate"><span class="pre">platform::MaybeSend</span></code> and
+<code class="docutils literal notranslate"><span class="pre">platform::MaybeSync</span></code> impose no thread bounds. They do not make those values safe
+to transfer between workers. Other targets, including Emscripten, retain the
+existing <code class="docutils literal notranslate"><span class="pre">Send</span></code>/<code class="docutils literal notranslate"><span class="pre">Sync</span></code> requirements.</p>
+<p><code class="docutils literal notranslate"><span class="pre">register_filesystem</span></code>, <code class="docutils literal notranslate"><span class="pre">set_fallback_filesystem</span></code>, and <code class="docutils literal notranslate"><span class="pre">url_to_fs</span></code> use a default
+registry local to the current browser thread. Direct access to
+<code class="docutils literal notranslate"><span class="pre">DEFAULT_FILESYSTEMS</span></code> uses <code class="docutils literal notranslate"><span class="pre">.with(|registry|</span> <span class="pre">...)</span></code> on browser WASM; native targets
+retain the process-wide <code class="docutils literal notranslate"><span class="pre">LazyLock&lt;RwLock&lt;FilesystemRegistry&gt;&gt;</span></code>. Factory calls run
+outside registry locks, so a factory can register another backend.</p>
+<p>The registry accepts synchronous factories and <code class="docutils literal notranslate"><span class="pre">FileSystem</span></code> implementations.
+Browser applications must acquire permission or directory handles asynchronously
+before registering a factory that captures them. An async-only backend implements
+<code class="docutils literal notranslate"><span class="pre">AsyncFileSystem</span></code> directly; it is not automatically exposed through the synchronous
+registry. Its <code class="docutils literal notranslate"><span class="pre">open_async</span></code> returns an <code class="docutils literal notranslate"><span class="pre">AsyncFsFile</span></code> for asynchronous reads. Helpers
+such as <code class="docutils literal notranslate"><span class="pre">cat_file</span></code> still use the legacy <code class="docutils literal notranslate"><span class="pre">open</span></code>/<code class="docutils literal notranslate"><span class="pre">FsFile</span></code> contract unless overridden.</p>
+<p>The core has no built-in <code class="docutils literal notranslate"><span class="pre">opfs://</span></code> protocol. A separate backend can own OPFS
+handles through these traits. OPFS synchronous access handles require a dedicated
+worker; blocking the browser main thread to wait for a promise is unsupported.
+<code class="docutils literal notranslate"><span class="pre">LocalFs</span></code> does not provide browser disk access. <code class="docutils literal notranslate"><span class="pre">MemoryFs</span></code> works in WASM and omits
+timestamps because <code class="docutils literal notranslate"><span class="pre">std::time::SystemTime::now()</span></code> is unavailable on this target.</p>
+<p><code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">-C</span> <span class="pre">rust</span> <span class="pre">test-wasm</span></code> exercises memory storage, local callbacks, and registry
+reentrancy in Node. <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">-C</span> <span class="pre">rust</span> <span class="pre">test-browser</span></code> runs a real OPFS read/seek/close
+fixture in a headless browser. Browser tests require a compatible Chrome and
+ChromeDriver on <code class="docutils literal notranslate"><span class="pre">PATH</span></code>, or a <code class="docutils literal notranslate"><span class="pre">CHROMEDRIVER</span></code> path. Both targets install the
+<code class="docutils literal notranslate"><span class="pre">wasm-bindgen</span></code> test runner version from <code class="docutils literal notranslate"><span class="pre">Cargo.lock</span></code>.</p>
 </section>
 <section id="s3fs">
 <h2>S3Fs<a class="headerlink" href="#s3fs" title="Link to this heading">¶</a></h2>
@@ -942,6 +979,9 @@ filesystem errors with these variants:</p>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#localfs">LocalFs</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#browser-webassembly">Browser WebAssembly</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#s3fs">S3Fs</a>
