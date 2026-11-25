@@ -148,8 +148,10 @@ For NFS, use a `file-rs:///mount/create-checks` URL and
 `FSSPEC_CREATE_TEST_OPTIONS='{"auto_mkdir": true}'`.
 
 The suite creates a unique subdirectory, checks competing creates, verifies
-complete binary and empty objects through a second client, and removes its test
-files. Local directories may remain empty. To reuse it in another repository,
+complete binary and empty objects through a second client, checks readers during
+creation, and reopens acknowledged objects in a separate process. It removes its test
+files. Storage options must be JSON-serializable; process-local memory stores skip
+the process-reopen check. Local directories may remain empty. To reuse it in another repository,
 import `fsspec_rs.testing.create` tests and supply `create_url` and
 `create_storage_options` fixtures with a unique scratch prefix.
 
@@ -157,6 +159,7 @@ Record the package version, store version, endpoint configuration and mount
 options with the results. Run failure-injection checks in your deployment for
 lost acknowledgements and interrupted writes; the local protocol tests in
 `test_create_recovery.py` exercise those client paths without certifying a real
-store. For NFS, also verify visibility and competing publication from separate
+store. A process reopen does not test server restart or power-loss durability. For NFS,
+also verify visibility and competing publication from separate
 hosts. The in-process local, memory and simulated S3 results are not AWS,
 on-prem or NFS certification.
