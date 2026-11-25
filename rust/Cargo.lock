@@ -361,12 +361,15 @@ dependencies = [
  "async-trait",
  "bytes",
  "futures-util",
+ "js-sys",
  "object_store",
  "percent-encoding",
  "sha2",
  "tempfile",
  "tokio",
  "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
 ]
 

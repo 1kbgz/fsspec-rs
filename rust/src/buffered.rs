@@ -19,7 +19,11 @@ use crate::types::{FileInfo, FileType, OpenMode};
 
 /// A function that writes the complete buffer to the backend.
 /// Called with `(data)`.
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 pub type Uploader = Box<dyn FnMut(&[u8]) -> FsResult<()> + Send>;
+/// An uploader that may capture browser-local handles.
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+pub type Uploader = Box<dyn FnMut(&[u8]) -> FsResult<()>>;
 
 // ============================================================================
 // BufferedFile
